@@ -249,35 +249,35 @@ export function FiveAgentArchitectureView() {
 export function EvidenceFusionStudio() {
   const [threatClass, setThreatClass] = useState("PORT_SCAN");
   const [confidence, setConfidence] = useState(0.88);
-  const [anomalyScore, setAnomalyScore] = useState(0.72);
+  const [anomalyScore, setAnomalyScore] = useState(-0.18);
+  const [isAnomaly, setIsAnomaly] = useState(true);
+  const [result, setResult] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  // Real-time calculation matching Python EvidenceFusionAgent
-  const isThreatAttack = threatClass !== "BENIGN";
-  const isAnomaly = anomalyScore > 0.50;
-  let simulatedAction = "ALLOW";
-  let simulatedStatus = "AGREE";
-  let rationale = "";
-
-  if (confidence < 0.65) {
-    simulatedAction = "REVIEW";
-    simulatedStatus = "INCOMPLETE";
-    rationale = `Confidence (${confidence.toFixed(2)}) below critical threshold (0.65); routed to SOC analyst review.`;
-  } else if (isThreatAttack && isAnomaly) {
-    simulatedAction = "BLOCK";
-    simulatedStatus = "AGREE";
-    rationale = `Both agents confirm attack signal (${threatClass} with score ${anomalyScore.toFixed(3)}). Fast containment triggered.`;
-  } else if (isThreatAttack && !isAnomaly) {
-    simulatedAction = "REVIEW";
-    simulatedStatus = "DISAGREE";
-    rationale = `Threat detector flagged ${threatClass}, but anomaly isolation detected normal distribution. Preserved for review.`;
-  } else if (!isThreatAttack && isAnomaly) {
-    simulatedAction = "REVIEW";
-    simulatedStatus = "DISAGREE";
-    rationale = `Classifier predicted BENIGN, but anomaly score is elevated (${anomalyScore.toFixed(3)}). Possible zero-day outlier.`;
-  } else {
-    simulatedAction = "ALLOW";
-    simulatedStatus = "AGREE";
-    rationale = "Both agents corroborate normal baseline benign traffic. Flow permitted.";
+  async function runFusion() {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/fusion/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          predicted_class: threatClass,
+          confidence,
+          anomaly_score: anomalyScore,
+          is_anomaly: isAnomaly,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail?.message || payload.detail || "Fusion API unavailable.");
+      setResult(payload);
+    } catch (err) {
+      setResult(null);
+      setError(err instanceof Error ? err.message : "Fusion request failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -285,129 +285,60 @@ export function EvidenceFusionStudio() {
       <div className="panel-head">
         <div>
           <div className="panel-kicker">AGENT 03 · EVIDENCE FUSION & DECISION MATRIX</div>
-          <h3>Deterministic Multi-Signal Arbitration</h3>
-          <p>
-            Agent 3 unites supervised classification with unsupervised anomaly detection without hiding disagreement or uncertainty.
-          </p>
+          <h3>Production Fusion Workbench</h3>
+          <p>Submits explicit A1 and A2 evidence to the same Python fusion agent used by the replay engine.</p>
         </div>
         <span className="panel-icon"><Fingerprint size={18} /></span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 16, margin: "16px 0" }}>
-        {/* Interactive Live Simulator */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, margin: "16px 0" }}>
         <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Live Fusion Policy Simulator</div>
-
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 4 }}>
-              Agent 1 Predicted Class:
-            </label>
-            <select
-              value={threatClass}
-              onChange={e => setThreatClass(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "8px 10px",
-                background: "var(--panel)",
-                border: "1px solid var(--line)",
-                borderRadius: 6,
-                color: "var(--text)",
-                fontSize: 12,
-              }}
-            >
-              {["BENIGN", "PORT_SCAN", "DOS", "DDOS", "BRUTE_FORCE"].map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Agent evidence inputs</div>
+          <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 5 }}>A1 predicted class</label>
+          <select value={threatClass} onChange={e => setThreatClass(e.target.value)} style={{ width: "100%", padding: 9, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", marginBottom: 14 }}>
+            {["BENIGN", "PORT_SCAN", "DOS", "DDOS", "BRUTE_FORCE"].map(value => <option key={value}>{value}</option>)}
+          </select>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
+            <span style={{ color: "var(--muted)" }}>A1 confidence (model output)</span><b>{confidence.toFixed(2)}</b>
           </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-              <span style={{ color: "var(--muted)" }}>Agent 1 Classifier Confidence:</span>
-              <span style={{ fontWeight: 600 }}>{(confidence * 100).toFixed(0)}%</span>
-            </div>
-            <input
-              type="range"
-              min="0.20"
-              max="1.00"
-              step="0.01"
-              value={confidence}
-              onChange={e => setConfidence(parseFloat(e.target.value))}
-              style={{ width: "100%" }}
-            />
+          <input aria-label="A1 confidence" type="range" min="0" max="1" step="0.01" value={confidence} onChange={e => setConfidence(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
+            <span style={{ color: "var(--muted)" }}>A2 anomaly score (raw model scale)</span><b>{anomalyScore.toFixed(3)}</b>
           </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-              <span style={{ color: "var(--muted)" }}>Agent 2 Anomaly Score:</span>
-              <span style={{ fontWeight: 600 }}>{anomalyScore.toFixed(2)}</span>
-            </div>
-            <input
-              type="range"
-              min="0.00"
-              max="1.00"
-              step="0.01"
-              value={anomalyScore}
-              onChange={e => setAnomalyScore(parseFloat(e.target.value))}
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div style={{ background: "var(--panel)", padding: 12, borderRadius: 6, border: "1px solid var(--line)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>SIMULATED OUTCOME</span>
-              <div style={{ display: "flex", gap: 6 }}>
-                <span className={`tag ${simulatedAction === "BLOCK" ? "tag-red" : simulatedAction === "ALLOW" ? "tag-green" : "tag-amber"}`}>
-                  {simulatedAction}
-                </span>
-                <span className="tag tag-blue">STATUS: {simulatedStatus}</span>
-              </div>
-            </div>
-            <p style={{ fontSize: 11, color: "var(--text)", margin: 0, lineHeight: 1.5 }}>
-              {rationale}
-            </p>
-          </div>
+          <input aria-label="A2 anomaly score" type="range" min="-0.5" max="0.5" step="0.005" value={anomalyScore} onChange={e => setAnomalyScore(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--muted)", fontSize: 11 }}>
+            <input type="checkbox" checked={isAnomaly} onChange={e => setIsAnomaly(e.target.checked)} />
+            A2 independently flagged this flow as anomalous
+          </label>
+          <button className="primary-btn" type="button" onClick={runFusion} disabled={busy} style={{ marginTop: 16, width: "100%" }}>
+            {busy ? "Evaluating with Agent 3…" : "Run production fusion"} <Fingerprint size={15}/>
+          </button>
         </div>
 
-        {/* Holdout Sample Distribution Card */}
         <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Holdout Distribution (5,000 Sample)</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14 }}>
-            Empirically measured from the official evaluation holdout set:
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ background: "var(--panel)", padding: 10, borderRadius: 6, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: "var(--green)" }}>ALLOW (Safe Traffic)</span>
-              <b style={{ fontSize: 12 }}>2,597 (51.9%)</b>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Agent 3 decision output</div>
+          {error && <div className="parse-warning" role="alert">{error}</div>}
+          {!result && !error && <div className="empty-inline">Run the workbench to request a decision from the backend fusion agent. No result is assumed.</div>}
+          {result && <>
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
+              <span className={"tag " + (result.action === "BLOCK" ? "tag-red" : result.action === "ALLOW" ? "tag-green" : "tag-amber")}>{result.action}</span>
+              <span className="tag tag-blue">{result.evidence_status}</span>
+              {result.agent_agreement && <span className="tag">{result.agent_agreement}</span>}
             </div>
-            <div style={{ background: "var(--panel)", padding: 10, borderRadius: 6, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: "#ef4444" }}>BLOCK (Corroborated Threat)</span>
-              <b style={{ fontSize: 12 }}>259 (5.2%)</b>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginBottom: 12 }}>
+              <div className="metric-card" style={{ minHeight: 76 }}><div className="metric-label">FINAL CLASS</div><div className="metric-value" style={{ fontSize: 17 }}>{result.final_class || "—"}</div></div>
+              <div className="metric-card" style={{ minHeight: 76 }}><div className="metric-label">FUSION CONFIDENCE</div><div className="metric-value" style={{ fontSize: 17 }}>{typeof result.confidence === "number" ? result.confidence.toFixed(3) : "—"}</div></div>
             </div>
-            <div style={{ background: "var(--panel)", padding: 10, borderRadius: 6, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: "#f59e0b" }}>REVIEW (Disagreements)</span>
-              <b style={{ fontSize: 12 }}>2,144 (42.9%)</b>
-            </div>
-          </div>
-
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>EVIDENCE INTEGRITY:</div>
-            <div style={{ fontSize: 11, display: "flex", justifyContent: "space-between" }}>
-              <span>AGREE Status:</span>
-              <b>2,857 flows (57.1%)</b>
-            </div>
-            <div style={{ fontSize: 11, display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-              <span>DISAGREE Status:</span>
-              <b>2,143 flows (42.9%)</b>
-            </div>
-          </div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Rationale from Python agent</div>
+            <ul style={{ margin: 0, paddingLeft: 18, color: "var(--text)", fontSize: 11, lineHeight: 1.7 }}>
+              {(result.rationale || []).map((item: string, index: number) => <li key={index}>{item}</li>)}
+            </ul>
+          </>}
         </div>
       </div>
-
       <div className="panel-foot">
-        <span><LockKeyhole size={13} /> Zero synthetic labels · Disagreements explicitly preserved for explainability</span>
-        <span>CONFIDENCE GATE: &gt;= 0.65 REQUIRED FOR BLOCK</span>
+        <span><LockKeyhole size={13} /> Backend-authoritative Agent 3 · simulated action only</span>
+        <span>Confidence threshold and anomaly flag come from Python implementation</span>
       </div>
     </section>
   );
