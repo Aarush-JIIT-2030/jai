@@ -16,6 +16,8 @@ if str(SOURCE_DIR) not in sys.path:
     sys.path.insert(0, str(SOURCE_DIR))
 
 from cybersentinel.pipeline import CyberSentinelPipeline
+from cybersentinel.agents.fusion import EvidenceFusionAgent
+from cybersentinel.contracts import ThreatDetectionResult, AnomalyDetectionResult
 from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
 from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
@@ -230,6 +232,27 @@ def analyze_batch(payload: BatchAnalyzeRequest):
     for result in results:
         actions[result["action"]] += 1
     return {"total_analyzed": len(results), "actions": actions, "results": results}
+
+
+@app.post("/api/fusion/simulate")
+def simulate_fusion(payload: dict[str, Any]):
+    """Run the production Agent 3 fusion contract against explicit A1/A2 evidence."""
+    predicted = str(payload.get("predicted_class", "")).upper()
+    confidence = payload.get("confidence")
+    anomaly_score = payload.get("anomaly_score")
+    is_anomaly = payload.get("is_anomaly")
+    if predicted not in {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}:
+        raise HTTPException(status_code=422, detail="predicted_class must be one of the five official classes.")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= float(confidence) <= 1:
+        raise HTTPException(status_code=422, detail="confidence must be a number between 0 and 1.")
+    if isinstance(anomaly_score, bool) or not isinstance(anomaly_score, (int, float)) or not pd.notna(anomaly_score):
+        raise HTTPException(status_code=422, detail="anomaly_score must be a finite number.")
+    if not isinstance(is_anomaly, bool):
+        raise HTTPException(status_code=422, detail="is_anomaly must be a boolean from Agent 2.")
+    threat = ThreatDetectionResult(predicted_class=predicted, confidence=float(confidence))
+    anomaly = AnomalyDetectionResult(anomaly_score=float(anomaly_score), is_anomaly=is_anomaly)
+    result = EvidenceFusionAgent().fuse(threat, anomaly)
+    return result.to_dict()
 
 
 @app.post("/api/replay/simulate")
