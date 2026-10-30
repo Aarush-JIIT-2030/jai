@@ -1,77 +1,74 @@
-# CyberSentinel — Submission Contract & Schema Compliance Verification
+# CyberSentinel — Submission Contract (Corrected Against Official Day 2 Brief)
 
-**Document ID:** CS-VERIFY-06  
-**Project:** CyberSentinel — Multi-Agent Network Intrusion Detection & Adaptive Defense  
-**Track:** JAI 2026 Hackathon | Track 1: Agentic AI for Cybersecurity  
-**Audit Status:** PASSED — 100% SUBMISSION SCHEMA COMPLIANT (`READY_FOR_SUBMISSION`)  
-**Validator Tool:** `src/cybersentinel/evaluation/validator.py`  
-**Execution Timestamp:** 2026-10-31T00:37:12+05:30  
+**Status:** Corrected documentation. A fresh local run of the current branch is still required before declaring submission-ready.
 
----
+## Source of truth
 
-## 1. Executive Summary
+The Day 2 briefing requires three CSVs and explicitly specifies the following record-level contracts. The official brief's per-record clarification takes precedence over the compact/partially obscured table layout.
 
-This audit validates that all three mandatory submission CSV files comply strictly with the hackathon organizer schema, column ordering, data types, row count invariants, and referential constraints.
+## 1. classification.csv
 
-Validation executed via `SubmissionValidator.validate_submission_bundle()` confirmed zero contract errors or warnings.
+Exact required columns, in order:
 
----
+`record_id,predicted_class,anomaly score,evidence status`
 
-## 2. Submission Artifact Cryptographic Registry
+Requirements:
 
-| Filename | Row Count (excl. header) | File Size (Bytes) | SHA-256 Hash |
-|---|---|---|---|
-| **`classification.csv`** | 114,185 | 3,285,637 | `FAABB0B6752EA258F652A0687B3AC75943C8A37D621EDA25F53C1A48D60608BB` |
-| **`policy.csv`** | 19,546 | 1,034,097 | `46AFB05427B9C8679190B2D207B346018B1E85CAB24B67A4327C2DD61280C712` |
-| **`replay.csv`** | 114,185 | 2,095,153 | `91FA36AD38932164938C22EECED13F0BBFD062A1F13C0CF391575831A012D3C9` |
-| **`summary.json`** | 12 lines | 293 | `6BA2F17DC6370BEC495AFCCAEEFA1AF33ADFAC2A48DE37BF6FF6A1B521F5639C` |
-| **`validation_report.json`** | 114,196 lines | 5,276,049 | `A5459ED335A9A16872912999417755C131185062693937F72D3A84F71D25E7DB` |
+- Exactly one prediction for every organiser-provided evaluation record ID.
+- Five-class taxonomy only: `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, `PORT_SCAN`.
+- Predictions must be generated from permitted flow features.
+- Include predictions for records that are later blocked by an active policy.
+- Do not submit actual/ground-truth labels.
+- Anomaly score and evidence status must reflect the implemented Agent 2 / Agent 3 outputs.
 
----
+## 2. policy.csv
 
-## 3. Schema & Column Specification Audit
+Exact required columns, in order:
 
-### 3.1 `classification.csv` Contract
-- **Required Columns:** `flow_id`, `predicted_label`, `confidence`, `is_anomaly`
-- **Audit Findings:**
-  - `flow_id`: Sequential 0-indexed integers (`0` to `114184`). 0 nulls.
-  - `predicted_label`: Categorical string matching enum `{"BENIGN", "DOS", "PORT_SCAN", "DDOS", "BRUTE_FORCE"}`. 0 invalid classes.
-  - `confidence`: Float $[0.0, 1.0]$. 0 out-of-bound values.
-  - `is_anomaly`: Boolean integer (`0` or `1`). 0 nulls.
+`policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
 
-### 3.2 `policy.csv` Contract
-- **Required Columns:** `policy_id`, `rule_type`, `target`, `duration_steps`, `trigger_threat`, `confidence`, `created_step`
-- **Audit Findings:**
-  - `policy_id`: Unique identifier formatted as `POL-<uuid8>`. 0 duplicate keys across 19,546 rows.
-  - `rule_type`: Action string matching enum `{"BLOCK_IP", "RATE_LIMIT", "QUARANTINE"}`.
-  - `target`: Target identifier (Host synthetic IP).
-  - `duration_steps`: Integer $\ge 1$ (150–300 steps).
-  - `trigger_threat`: Threat category that initiated policy.
-  - `confidence`: Agent confidence $[0.0, 1.0]$.
-  - `created_step`: Sequential step index where rule was instantiated.
+Requirements:
 
-### 3.3 `replay.csv` Contract
-- **Required Columns:** `step_index`, `action`, `applied_policy_id`
-- **Audit Findings:**
-  - `step_index`: Sequential integer matching flow sequence (`0` to `114184`).
-  - `action`: Categorical string matching enum `{"ALLOW", "BLOCK"}`.
-  - `applied_policy_id`: Empty string when `action == "ALLOW"`; valid `policy_id` from `policy.csv` when `action == "BLOCK"`.
+- Use organiser-provided record IDs.
+- Scored interface requires `scope_type=SOURCE_IP` and `policy_action=BLOCK`.
+- A policy is activated only after its triggering record.
+- Expiry must follow the implementation's documented record-boundary convention.
+- Policy scope values derived from anonymised features must be disclosed as derived identities, never represented as native IP observations.
 
----
+## 3. replay.csv
 
-## 4. Submission Validation Results Summary
+The briefing's explicit per-record clarification requires:
 
-```json
-{
-  "status": "READY_FOR_SUBMISSION",
-  "total_records_evaluated": 114185,
-  "classification_errors": 0,
-  "policy_errors": 0,
-  "replay_errors": 0,
-  "referential_integrity_errors": 0,
-  "temporal_causality_violations": 0
-}
-```
+`record_id,action,applied_policy_id`
 
-The submission bundle is cryptographically locked, mathematically consistent, and ready for evaluator scoring.
+Requirements:
 
+- Every evaluation record exactly once.
+- `action` must be `ALLOW` or `BLOCK`.
+- `BLOCK` must reference a valid policy that was activated earlier and is still active for that record.
+- `ALLOW` must have an empty `applied_policy_id`.
+- A policy cannot block the record that triggered its creation.
+
+## 4. Required validation
+
+The independent validator must check:
+
+- Exact header names and order.
+- Exact organiser record-ID coverage and uniqueness.
+- Five-class taxonomy.
+- Numeric anomaly-score validity and evidence-status validity.
+- Unique policy IDs and valid policy scope/action.
+- Activation and expiry order.
+- Referential integrity from replay to policy.
+- Active-policy matching at each BLOCK record.
+- No self-blocking.
+- No policy lookahead or hidden-label use.
+- No duplicate or missing replay/classification records.
+
+A local validator result is not proof that the organiser API accepted the files. Do not claim upload success until the organiser endpoint returns an actual successful response.
+
+## 5. Historical report correction
+
+An earlier version of this dossier described a different schema (`flow_id`, `predicted_label`, `confidence`, `is_anomaly`; and alternate policy/replay columns). Those columns do **not** match the Day 2 briefing and must not be used for the official submission.
+
+The current generator in `src/cybersentinel/replay/engine.py` writes the four-column classification schema, six-column policy schema, and three-column replay schema above. Re-run `python scripts/generate_submissions.py` and the current validator after any replay/model changes.
