@@ -111,6 +111,10 @@ def system_diagnostics():
     return {
         "api": {"available": True, "mode": "offline-replay"},
         "models": model_status,
+        "model_sizes": {
+            "agent_1_bytes": THREAT_MODEL.stat().st_size if THREAT_MODEL.is_file() else None,
+            "agent_2_bytes": ANOMALY_MODEL.stat().st_size if ANOMALY_MODEL.is_file() else None,
+        },
         "models_ready": get_pipeline() is not None,
         "evaluation_dataset": {
             "present": dataset.is_file(),
