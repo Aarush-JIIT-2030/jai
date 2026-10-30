@@ -251,15 +251,25 @@ class ReplayEngine:
             for p in all_policies
         ]
 
+        attack_count = sum(label != "BENIGN" for label in labels) if has_label else None
+        benign_count = sum(label == "BENIGN" for label in labels) if has_label else None
         metrics = {
             "total_records": total_rows,
             "blocked_records": blocked_count,
             "allowed_records": allowed_count,
             "policies_created": len(all_policies),
             "attacks_contained": attacks_contained,
+            "attacks_allowed": max(0, attack_count - attacks_contained) if attack_count is not None else None,
+            "attack_records": attack_count,
+            "benign_records": benign_count,
             "benign_preserved": benign_preserved,
             "false_blocks": false_blocks,
-            "containment_rate": round(attacks_contained / max(1, attacks_contained + false_blocks) * 100, 2),
+            # Keep rates semantically distinct: containment uses all attacks as denominator;
+            # block precision uses all BLOCK actions; benign preservation uses all benign flows.
+            "containment_rate": round(attacks_contained / max(1, attack_count) * 100, 2) if attack_count is not None else None,
+            "block_precision": round(attacks_contained / max(1, blocked_count) * 100, 2) if has_label else None,
+            "benign_preservation_rate": round(benign_preserved / max(1, benign_count) * 100, 2) if benign_count is not None else None,
+            "false_block_rate": round(false_blocks / max(1, benign_count) * 100, 2) if benign_count is not None else None,
             "elapsed_seconds": round(elapsed, 2),
             "throughput_fps": round(total_rows / max(0.001, elapsed), 1),
         }
