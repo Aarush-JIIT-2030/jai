@@ -1,91 +1,85 @@
-# CyberSentinel — Agent Red-Team & Adversarial Stress Test Results
+# CyberSentinel — Five-Agent Architecture & Adversarial Test Map (Corrected)
 
-**Document ID:** CS-VERIFY-03  
-**Project:** CyberSentinel — Multi-Agent Network Intrusion Detection & Adaptive Defense  
-**Track:** JAI 2026 Hackathon | Track 1: Agentic AI for Cybersecurity  
-**Audit Status:** PASSED — ALL 5 AGENTS HARDENED AGAINST ADVERSARIAL VECTORS  
-**Automated Tests:** 60/60 Passed (19 Dedicated Adversarial Fixtures)  
+**Status:** Corrected role mapping based on current source code and the official Day 2 brief. Test results must be taken from the latest CI run, not copied from this historical report.
 
----
+## Official agent responsibilities
 
-## 1. Executive Summary
+| Agent | Required responsibility | Current implementation |
+|---|---|---|
+| A1 | Supervised five-class threat detection | `ThreatDetectionAgent` / `ThreatDetectionModel`; source implementation uses scikit-learn RandomForest by default. |
+| A2 | Independent anomaly detection | `AnomalyDetectionAgent`; Isolation Forest model and anomaly evidence. |
+| A3 | Evidence fusion | `EvidenceFusionAgent`; combines A1 and A2, records agreement/disagreement/incomplete evidence and rationale. |
+| A4 | Temporal correlation | `TemporalCorrelationAgent`; sliding-window grouping using observed endpoints, ports and record order. |
+| A5 | Adaptive defense | `AdaptiveDefenseAgent`; simulated temporary ALLOW/BLOCK policy lifecycle, activation and expiry. |
 
-This dossier documents the red-team stress testing and contract fuzzing conducted across all five autonomous agents in CyberSentinel. The testing protocol subjected each agent to boundary conditions, corrupted telemetry, extreme numerical inputs, and adversarial disagreement scenarios to ensure resilience under operational load.
+**Important correction:** Earlier copies of this dossier incorrectly assigned temporal correlation to A3, policy management to A4, and an incident reporter to A5. That role mapping contradicts the official brief and the current implementation. The five rows above are authoritative.
 
----
+## A1 — Threat Detection
 
-## 2. Agent 1: Threat Classification Agent (LightGBM Multi-Class)
+Source: `src/cybersentinel/agents/threat_detection/model.py`
 
-### Adversarial Vector 1.1: NaN and Infinite Feature Influx
-- **Attack Scenario:** Attackers inject malformed packets causing floating-point division by zero in network telemetry extractors (`Flow Bytes/s = Inf`, `Flow Packets/s = NaN`).
-- **Defensive Behavior:** The feature extraction pipeline intercepts non-finite values prior to LightGBM scoring, sanitizing `NaN` and `Inf` to median-neutral float representations (`0.0`).
-- **Test Result:** Verified in `test_adversarial_agents.py::test_agent1_nan_inf_resilience`. Zero unhandled exceptions; output probabilities remain valid distributions summing to 1.0.
+- Five allowed classes: `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, `PORT_SCAN`.
+- Numeric feature conversion removes identifier-like columns and replaces non-finite values with missing values before imputation.
+- The source default backend is RandomForest; optional XGBoost is a separate backend.
+- The returned confidence is the maximum `predict_proba` value and is **not calibrated**. Do not call it a calibrated probability.
+- Model artifact availability and metadata must be checked at runtime.
 
-### Adversarial Vector 1.2: Extreme Outlier Flooding
-- **Attack Scenario:** Packets with astronomical header lengths ($>10^{12}$ bytes) or negative segment sizes designed to overflow integer buffers.
-- **Defensive Behavior:** Clamping layer restricts numeric values to physical protocol bounds prior to tensor construction.
-- **Test Result:** Verified. Predictions classify anomalous bursts as attacks without buffer overflow or segmentation faults.
+Adversarial coverage should include missing/non-finite features, unexpected columns, feature ordering, invalid labels, artifact absence/corruption and model inference failures.
 
-### Adversarial Vector 1.3: Model Deserialization & Cold-Start Fault
-- **Attack Scenario:** Model weight artifact missing or corrupted on disk.
-- **Defensive Behavior:** Agent throws a structured, typed configuration error (`ModelNotFoundError`) rather than returning invalid zero-vector predictions silently.
+## A2 — Anomaly Detection
 
----
+Source: `src/cybersentinel/agents/anomaly_detection.py`
 
-## 3. Agent 2: Zero-Day Anomaly Detection Agent (Isolation Forest)
+A2 must run independently of A1 and return a score, flag, status and evidence. Score interpretation must follow the actual artifact's scoring convention; do not convert it to a probability without calibration.
 
-### Adversarial Vector 2.1: Subtle Low-and-Slow Attack Concealment
-- **Attack Scenario:** Low-volume volumetric drift intended to stay beneath classification thresholds.
-- **Defensive Behavior:** Unsupervised Isolation Forest evaluates path-length density across the 71-dimensional space. Anomalous clusters with low tree path depth trigger anomaly flags ($s < -0.15$) independent of Agent 1's supervised predictions.
-- **Test Result:** Agent 2 successfully flags novel attack vectors even when Agent 1's confidence in `BENIGN` is $\approx 60\%$.
+Adversarial coverage should include NaN/Inf, missing values, extreme values, invalid artifacts, threshold boundaries and benign false-positive measurement.
 
-### Adversarial Vector 2.2: Adversarial Benign Masking
-- **Attack Scenario:** Attackers craft packet sizes that match common HTTP/TLS distributions to mimic normal traffic.
-- **Defensive Behavior:** Multi-variate correlation of inter-arrival timing variances exposes the artificial regularity of automated toolkits.
+## A3 — Evidence Fusion
 
----
+Source: `src/cybersentinel/agents/fusion.py`
 
-## 4. Agent 3: Temporal Correlation Agent (Windowed Temporal Memory)
+The production fusion contract is authoritative. It validates both agent outputs, routes incomplete evidence to REVIEW, routes disagreement to REVIEW, and uses the configured high-confidence gate for corroborated attack/benign recommendations.
 
-### Adversarial Vector 3.1: State Exhaustion Memory Leak (Fixed & Audited)
-- **Vulnerability Identified:** The initial implementation tracked source-port sets across an unbounded process lifetime. Over 114k flows, port sets grew monotonically, causing 28,423 benign flows to be misidentified as port scans.
-- **Remediation:** Migrated to strict window-bounded `Counter[int]` coupled with a 150-flow circular FIFO deque. Stale port allocations are decremented and purged on every eviction step.
-- **Test Result:** Memory footprint remains constant at $< 25$ MB throughout 114,185 flows. False blocks dropped by 76.7%.
+The frontend workbench now calls `POST /api/fusion/simulate`, which invokes this Python implementation. Do not maintain a separate frontend decision matrix.
 
-### Adversarial Vector 3.2: Distributed Low-Rate Multi-Source Port Scanning
-- **Attack Scenario:** Attackers rotate source IP fingerprints rapidly, sending 1 probe per IP across a target subnet.
-- **Defensive Behavior:** CIDR `/24` subnet aggregation clusters dispersed probes into a single correlation entity, detecting the coordinated scan pattern.
+## A4 — Temporal Correlation
 
----
+Source: `src/cybersentinel/agents/correlation.py`
 
-## 5. Agent 4: Adaptive Policy Engine (Simulated Guardrails)
+The agent maintains a bounded sliding history and corresponding source/port and destination/source counters. It emits group IDs, observed member IDs, endpoints and evidence.
 
-### Adversarial Vector 4.1: Policy Table Overload & CIDR Explosion
-- **Attack Scenario:** Rapid burst of 10,000 distinct attacker IPs designed to saturate the simulated firewall rule evaluation pipeline.
-- **Defensive Behavior:** Policy Engine enforces deduplication and subnet-mask aggregation (`/32` escalated to `/24` if $>5$ hostile IPs belong to the same prefix within 50 steps). Strict TTL expiry (max 300 steps) guarantees rule compaction.
-- **Test Result:** Active policy table remains bounded (average 320 concurrent rules; peak 840 rules). Replay throughput maintained at $>6,400$ FPS.
+Adversarial coverage should include counter eviction, duplicate ports, interleaved sources, empty endpoint metadata, benign traffic, port-scan thresholds, DDoS convergence and authentication bursts.
 
-### Adversarial Vector 4.2: Self-Blocking Paradox (Causality Breach)
-- **Invariant:** A packet that generates a policy cannot be blocked by that policy in the same step.
-- **Test Result:** Replay causality verified across all 114,185 records. In 100% of cases where `policy_created = True`, `action = ALLOW` and `applied_policy_id = ""`.
+## A5 — Adaptive Defense
 
----
+Source: `src/cybersentinel/agents/adaptive_defense.py`
 
-## 6. Agent 5: Threat Explanation & Reporting Agent (Explainable AI)
+The agent checks previously activated policies before allowing a new record into the analysis path. A newly created policy is forward-looking; the triggering record must remain ALLOW. Policies are simulated in application memory and never alter the host firewall.
 
-### Adversarial Vector 5.1: Malformed Telemetry Serialization
-- **Attack Scenario:** Special characters, shell metacharacters, or quotes inside metadata attributes.
-- **Defensive Behavior:** Reporter sanitizes all string attributes with RFC-8259 compliant JSON escaping and markdown entity encoding.
-- **Test Result:** Reports render cleanly without XSS vulnerabilities or broken markdown artifacts.
+Adversarial coverage should include exact activation/expiry boundaries, non-matching endpoints, duplicate policy attempts, overlapping policy cases, empty identity and valid policy references.
 
----
+## Replay-level acceptance invariants
 
-## 7. Multi-Agent Agreement & Disagreement Matrix
+Source: `src/cybersentinel/replay/engine.py`
 
-| Scenario | Agent 1 (Classifier) | Agent 2 (Anomaly) | Agent 3 (Correlation) | Agent 4 (Policy Action) | Agent 5 (Report Verdict) |
-|---|---|---|---|---|---|
-| **Known Exploit Burst** | `DOS` (0.94) | Normal | High volume | **BLOCK (Immediate)** | Confirmed DoS signature with rate telemetry |
-| **Novel Zero-Day Drift** | `BENIGN` (0.58) | High Anomaly (0.88) | Low volume | **REVIEW / THROT** | Zero-day anomaly alert flagged for SOC analyst |
-| **Coordinated Port Scan** | `BENIGN` (0.72) | Slight Drift | Multi-port cluster | **BLOCK (Subnet)** | Horizontal port sweep detected across window |
-| **Legitimate Traffic** | `BENIGN` (0.98) | Normal | Normal | **ALLOW** | Standard benign communication |
+- Records retain supplied order.
+- Existing active policies are checked before the per-record action decision.
+- Classification output is retained for every record, including records blocked by an earlier policy.
+- The triggering record is not blocked by its own policy.
+- BLOCK references an active policy; ALLOW has an empty policy ID.
+- Ground-truth labels are used only for offline evaluation metrics, never for inference or policy decisions.
 
+## Test evidence
+
+Relevant suites include:
+
+- `tests/test_threat_detection.py`
+- `tests/test_anomaly_detection.py`
+- `tests/test_fusion.py`
+- `tests/test_correlation.py`
+- `tests/test_adaptive_defense.py`
+- `tests/test_replay.py`
+- `tests/test_adversarial_agents.py`
+- `tests/test_api.py`
+
+The latest CI result for the corrected branch is the source of truth for pass/fail counts. Do not reuse the previous 60-test result after code changes without rerunning the suite.
