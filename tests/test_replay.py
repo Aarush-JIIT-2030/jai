@@ -44,6 +44,13 @@ def test_replay_causal_workflow(tmp_path):
     assert len(results["classification_rows"]) == 4
     assert len(results["replay_rows"]) == 4
 
+    # Rate names must use their correct denominators.
+    assert results["metrics"]["attack_records"] == 2
+    assert results["metrics"]["attacks_contained"] == 1
+    assert results["metrics"]["containment_rate"] == 50.0
+    assert results["metrics"]["block_precision"] == 100.0
+    assert results["metrics"]["benign_preservation_rate"] == 100.0
+
     # Flow 101: First attack flow -> ALLOW into analyzer, activates policy
     assert results["replay_rows"][0]["record_id"] == 101
     assert results["replay_rows"][0]["action"] == "ALLOW"
