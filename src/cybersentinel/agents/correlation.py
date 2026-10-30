@@ -42,35 +42,45 @@ class TemporalCorrelationAgent:
         return {k: set(v.keys()) for k, v in self.dest_source_counts.items()}
 
     @staticmethod
-    def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:
-        """Extract or synthesize source IP, destination IP, and destination port."""
-        # 1. Source IP
-        src_ip = None
-        for key in ("source_ip", "Source IP", "src_ip", "src", "Source_IP"):
-            if key in flow and flow[key] is not None:
-                src_ip = str(flow[key]).strip()
-                break
-        if not src_ip:
-            # Deterministic synthetic endpoint from flow characteristics if not in dataset
-            dport = int(flow.get("Destination Port", 0))
-            duration = int(flow.get("Flow Duration", 0))
-            fwd_pkts = int(flow.get("Total Fwd Packets", 0))
-            seed = f"{dport}:{duration % 100}:{fwd_pkts % 50}"
-            hash_suffix = hashlib.md5(seed.encode()).hexdigest()[:4]
-            src_ip = f"192.168.1.{int(hash_suffix, 16) % 254 + 1}"
+    def derive_source_identity(flow: dict[str, Any]) -> str:
+        """Return a native source IP or a disclosed stable TCP-stack-derived identity.
 
-        # 2. Destination IP
+        No identity is invented from destination ports or per-flow counters. If the
+        required fingerprint fields are unavailable, return an empty string so the
+        defense agent cannot create an over-broad policy.
+        """
+        for key in ("source_ip", "Source IP", "src_ip", "src", "Source_IP"):
+            value = flow.get(key)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+
+        fingerprint_fields = ("Init_Win_bytes_forward", "min_seg_size_forward", "Fwd Header Length")
+        values = [flow.get(key) for key in fingerprint_fields]
+        if any(value is None or str(value).strip() in {"", "nan", "None"} for value in values):
+            return ""
+        seed = "|".join(str(value).strip() for value in values)
+        digest = hashlib.sha256(seed.encode("utf-8")).digest()
+        # RFC1918-shaped synthetic identity, not a native or observed IP address.
+        return f"10.{digest[0]}.{digest[1]}.{digest[2]}"
+
+    @staticmethod
+    def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:
+        """Extract observed endpoints; only source identity may be derived."""
+        src_ip = TemporalCorrelationAgent.derive_source_identity(flow)
+
         dst_ip = None
         for key in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP"):
-            if key in flow and flow[key] is not None:
-                dst_ip = str(flow[key]).strip()
+            value = flow.get(key)
+            if value is not None and str(value).strip():
+                dst_ip = str(value).strip()
                 break
-        if not dst_ip:
-            dst_ip = "10.0.0.1"
-
-        # 3. Destination Port
-        dport = int(flow.get("Destination Port", 0))
-        return src_ip, dst_ip, dport
+        # Destination is intentionally left unknown when the dataset omits it.
+        dport_value = flow.get("Destination Port", 0)
+        try:
+            dport = int(dport_value)
+        except (TypeError, ValueError):
+            dport = 0
+        return src_ip, dst_ip or "", dport
 
     def correlate(
         self,
@@ -81,6 +91,12 @@ class TemporalCorrelationAgent:
     ) -> CorrelationResult:
         """Analyze a flow in sequence and correlate with recent sliding-window activity."""
         src_ip, dst_ip, dport = self.extract_endpoints(flow)
+        if not src_ip:
+            return CorrelationResult(
+                correlated=False,
+                status="not_ready",
+                message="No native source IP or complete TCP-stack fingerprint is available for endpoint correlation.",
+            )
 
         # Evict oldest item if sliding window is full
         if len(self.history) >= self.window_size:
