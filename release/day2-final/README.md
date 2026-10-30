@@ -34,6 +34,6 @@ The system processes network flows in strict chronological order with causal pol
 * [`model-verification-report.md`](./model-verification-report.md) — Verified metrics, training scopes, and feature schema.
 * [`replay-report.md`](./replay-report.md) — Replay throughput (6,712 FPS) and official 114k holdout statistics.
 * [`csv-validation-report.md`](./csv-validation-report.md) — Integrity report for the 3 submission CSV files.
-* [`demo-script.md`](./demo-script.md) — Step-by-step judging panel walkthrough.
+* [`system-walkthrough.md`](./system-walkthrough.md) — Step-by-step panel walkthrough.
 * [`known-limitations.md`](./known-limitations.md) — Explicit boundary disclosures.
 

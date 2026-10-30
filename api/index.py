@@ -316,7 +316,7 @@ def simulate_replay(payload: ReplaySimulationRequest):
     df = pd.DataFrame(payload.flows)
     results = engine.run_replay(df)
 
-    # Retain only groups produced by this real replay; never substitute demo fixtures.
+    # Retain only groups produced by this replay run.
     global _LAST_CORRELATION_GROUPS
     _LAST_CORRELATION_GROUPS = [
         {

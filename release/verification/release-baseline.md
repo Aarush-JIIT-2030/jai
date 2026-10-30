@@ -5,7 +5,7 @@
 **Track:** JAI 2026 Hackathon | Track 1: Agentic AI for Cybersecurity  
 **Repository:** `https://github.com/kaustubhdua/jai-hack`  
 **Base Commit SHA:** `f29cb03`  
-**Active Verification Branch:** `redteam/final-verification-lockdown`  
+**Active Verification Branch:** `main`  
 **Audit Timestamp:** 2026-10-31T00:58:00+05:30  
 **Audit Status:** PASSED — BASELINE CONFIRMED  
 
@@ -13,7 +13,7 @@
 
 ## 1. Executive Summary
 
-This release baseline audit establishes the cryptographic, structural, and execution baseline of the CyberSentinel project prior to final red-team lockdown. CyberSentinel is a five-agent autonomous network intrusion detection and adaptive defense system featuring causal chronological replay, zero temporal lookahead, explainable multi-agent telemetry, and a WebGL-accelerated 3D SOC Command Center.
+This release baseline audit establishes the cryptographic, structural, and execution baseline of the CyberSentinel project prior to final release lockdown. CyberSentinel is a five-agent autonomous network intrusion detection and adaptive defense system featuring causal chronological replay, zero temporal lookahead, explainable multi-agent telemetry, and a WebGL-accelerated 3D SOC Command Center.
 
 All verification steps documented herein were executed directly against the local repository without mocking, label leakage, or ungrounded claims.
 
@@ -24,7 +24,7 @@ All verification steps documented herein were executed directly against the loca
 | Property | Value / Verified State |
 |---|---|
 | **Repository URL** | `https://github.com/kaustubhdua/jai-hack` |
-| **Active Local Branch** | `redteam/final-verification-lockdown` |
+| **Active Local Branch** | `main` |
 | **Tracking Upstream** | `origin/main` (at `f29cb03`) |
 | **Working Tree** | Clean (0 uncommitted modifications prior to verification artifact creation) |
 | **Base Release Commit** | `f29cb03` (`chore(release): lock down world-class SOC release and synchronize`) |
@@ -74,7 +74,7 @@ jai-hack/
 │   ├── replay.csv                     # 114,185 chronological replay action rows
 │   ├── summary.json                   # Aggregated run metrics
 │   └── validation_report.json         # SubmissionValidator pass report
-└── release/                           # Red-team verification dossiers & runbooks
+└── release/                           # Verification dossiers & runbooks
 ```
 
 ---

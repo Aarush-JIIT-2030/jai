@@ -82,7 +82,7 @@ $$60{,}001 = 53{,}392 + 6{,}609 \implies \mathbf{60{,}001 = 60{,}001} \quad [\te
 
 ## 5. False Block Root-Cause & Resolution Proof
 
-During red-team auditing of early run baselines, false blocks were measured at 28,423 flows due to unbounded port tracking in `TemporalCorrelationAgent`:
+During exploratory stress testing of early run baselines, false blocks were measured at 28,423 flows due to unbounded port tracking in `TemporalCorrelationAgent`:
 
 - **The Defect:** Stale destination ports were accumulated in host sets across the entire lifetime of the process without deque eviction. Consequently, after observing benign web browsing spanning 5 distinct remote endpoints, the host was permanently flagged as an active `PORT_SCAN` attacker for the remainder of the 114k flows.
 - **The Resolution:** Implemented exact window-bounded frequency tracking using `Counter[int]` with active decrement/removal during FIFO eviction, paired with a threat-class gate restricting port-scan heuristics to unclassified/suspicious flows.

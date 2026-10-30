@@ -1,4 +1,4 @@
-# CyberSentinel — Corrected Live Demonstration Runbook
+# CyberSentinel — Operational Presentation Runbook
 
 **Status:** Presenter runbook aligned to the current application and official Day 2 requirements. Rehearse from a clean local startup before presenting.
 
@@ -12,7 +12,7 @@
 6. Open Submission Studio and run the actual validator.
 7. Keep the terminal visible for any command the panel asks to inspect.
 
-## Five-minute demonstration
+## Five-minute presentation walkthrough
 
 ### 00:00–00:40 — Product overview
 

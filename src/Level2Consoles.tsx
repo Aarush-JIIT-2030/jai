@@ -382,7 +382,7 @@ export function TemporalCorrelationConsole() {
         <div>
           <div className="panel-kicker">AGENT 04 · TEMPORAL CORRELATION & INCIDENTS</div>
           <h3>Observed Correlation Groups</h3>
-          <p>Groups emitted by Agent 4 during the latest completed chronological replay. No demo incidents are inserted.</p>
+          <p>Groups emitted by Agent 4 during the latest completed chronological replay.</p>
         </div>
         <button className="secondary-btn" type="button" onClick={loadGroups} disabled={loading}><RefreshCw size={14}/> Refresh</button>
       </div>

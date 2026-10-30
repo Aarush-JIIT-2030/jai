@@ -134,7 +134,7 @@ def test_fusion_simulator_rejects_invalid_confidence():
     assert response.status_code == 422
 
 
-def test_correlation_groups_never_return_demo_fixtures(monkeypatch):
+def test_correlation_groups_empty_when_no_replay_state(monkeypatch):
     monkeypatch.setattr(index, "_LAST_CORRELATION_GROUPS", [])
     response = TestClient(index.app).get("/api/correlation/groups")
     assert response.status_code == 200

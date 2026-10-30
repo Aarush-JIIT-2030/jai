@@ -1,4 +1,4 @@
-# CyberSentinel — Hackathon Presentation & Live Demo Script
+# CyberSentinel — Technical Presentation & System Walkthrough
 
 ## JAI 2026 | Track 1: Agentic AI for Cybersecurity
 **Duration:** 5 Minutes | **Format:** Live Technical Walkthrough & Architecture Defense

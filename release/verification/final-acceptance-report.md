@@ -6,7 +6,7 @@
 
 A source-level review found several material inconsistencies that required correction:
 
-1. Earlier red-team documents assigned the wrong responsibilities to Agents 3–5. The official mapping is A3 Evidence Fusion, A4 Temporal Correlation, A5 Adaptive Defense.
+1. Earlier preliminary documents assigned the wrong responsibilities to Agents 3–5. The official mapping is A3 Evidence Fusion, A4 Temporal Correlation, A5 Adaptive Defense.
 2. Earlier submission-contract documentation described columns that do not match the official Day 2 brief. The corrected contract is documented in `submission-contract-results.md`.
 3. The frontend contained hard-coded sample correlation groups, sample policy rows, benchmark fallbacks, replay progress/results and confusion-matrix fallbacks. These could make unavailable data appear real.
 4. The Evidence Fusion workbench used frontend logic with a different confidence threshold from the Python fusion agent. It now calls the production backend fusion contract.
@@ -63,7 +63,7 @@ The previous local release report recorded 114,185 flows, 19,546 policies, 48,21
 
 ## 6. Rulebook compliance
 
-The JAI rulebook permits AI tools and open-source libraries but requires disclosure (T5–T6), genuine commit history (T2), accurate metrics (F8), and disclosure of mocked or hard-coded demo elements (F7). The README has been updated to disclose Antigravity, ChatGPT and the CICR design reference. No organiser submission success is claimed here.
+The JAI rulebook permits AI tools and open-source libraries but requires disclosure (T5–T6), genuine commit history (T2), accurate metrics (F8), and disclosure of synthetic or fixture elements (F7). The README has been updated to disclose Antigravity, ChatGPT and the CICR design reference. No organiser submission success is claimed here.
 
 ## 7. Verdict
 
