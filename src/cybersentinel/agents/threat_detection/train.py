@@ -6,6 +6,9 @@ import pandas as pd
 from .model import BENCHMARK_CLASSES, ThreatDetectionModel
 from .metrics import evaluate_predictions
 
+def _load_frame(path):
+    return pd.read_parquet(path) if str(path).lower().endswith((".parquet", ".pq")) else pd.read_csv(path, low_memory=False)
+
 def load_label_mapping(path, observed_labels):
     """Accept only canonical labels or an explicit organiser-supplied mapping."""
     if path is None:
@@ -30,7 +33,7 @@ def train_from_csv(train_csv, label_column, model_out="models/threat_detection.j
                    label_map=None, validation_csv=None, validation_label_column=None,
                    backend="random_forest", n_estimators=400, random_state=42,
                    report_out="reports/generated/threat_detection_training.json"):
-    frame = pd.read_csv(train_csv, low_memory=False)
+    frame = _load_frame(train_csv)
     if label_column not in frame.columns:
         raise ValueError(f"Label column {label_column!r} not found in training CSV.")
     raw = frame[label_column].astype("string").str.strip()
@@ -47,7 +50,7 @@ def train_from_csv(train_csv, label_column, model_out="models/threat_detection.j
               "feature_count": len(model.feature_columns), "class_counts": model.metadata["class_counts"],
               "classes": list(BENCHMARK_CLASSES), "validation": None}
     if validation_csv:
-        valid = pd.read_csv(validation_csv, low_memory=False)
+        valid = _load_frame(validation_csv)
         target = validation_label_column or label_column
         if target not in valid.columns:
             raise ValueError(f"Validation label column {target!r} not found.")
@@ -68,11 +71,11 @@ def train_from_csv(train_csv, label_column, model_out="models/threat_detection.j
 
 def main():
     parser = argparse.ArgumentParser(description="Train CyberSentinel Agent 1.")
-    parser.add_argument("--train-csv", required=True)
+    parser.add_argument("--train", "--train-csv", dest="train_csv", required=True, help="Training CSV or Parquet file")
     parser.add_argument("--label-column", required=True)
     parser.add_argument("--model-out", default="models/threat_detection.joblib")
     parser.add_argument("--label-map")
-    parser.add_argument("--validation-csv")
+    parser.add_argument("--validation", "--validation-csv", dest="validation_csv", help="Optional validation CSV or Parquet file")
     parser.add_argument("--validation-label-column")
     parser.add_argument("--backend", choices=["random_forest", "xgboost"], default="random_forest")
     parser.add_argument("--n-estimators", type=int, default=400)
