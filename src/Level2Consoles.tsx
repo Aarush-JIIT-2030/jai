@@ -645,130 +645,89 @@ export function AdaptiveDefenseConsole() {
 // ============================================================================
 export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
   const [running, setRunning] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [doneSummary, setDoneSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<any>(null);
+  const [error, setError] = useState("");
 
-  async function triggerSimulation() {
+  async function runOfficialReplay() {
     setRunning(true);
-    setPaused(false);
-    setProgress(0);
-    setStepIndex(0);
-    setDoneSummary(null);
-
-    // Call real backend replay endpoint with synthetic streaming
-    for (let i = 1; i <= 10; i++) {
-      if (paused) break;
-      await new Promise(r => setTimeout(r, 100 / playbackSpeed));
-      setProgress(i * 10);
-      setStepIndex(i * 11418);
+    setSummary(null);
+    setError("");
+    try {
+      const response = await fetch("/api/replay/run-official", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail?.message || payload.detail || "Official replay could not be started.");
+      setSummary(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Replay request failed.");
+    } finally {
+      setRunning(false);
     }
-
-    setDoneSummary({
-      total_records: 114185,
-      blocked_records: 54828,
-      allowed_records: 59357,
-      policies_created: 19546,
-      attacks_contained: 48219,
-      benign_preserved: 53392,
-      false_blocks: 6609,
-      containment_rate: 87.95,
-      throughput_fps: 6400.6,
-      elapsed_seconds: 17.84,
-      files: ["classification.csv", "policy.csv", "replay.csv"],
-    });
-    setRunning(false);
   }
+
+  const metrics = summary?.metrics;
+  const rate = (value: unknown) => typeof value === "number" ? value.toFixed(2) + "%" : "Not available (unlabelled evaluation data)";
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
       <div className="panel-head">
         <div>
           <div className="panel-kicker">LEVEL 02 · CAUSAL CHRONOLOGICAL REPLAY ENGINE</div>
-          <h3>Offline Traffic Replay Simulator</h3>
-          <p>
-            Replay network flows in exact arrival order, enforce causal policy evaluation, and observe multi-agent containment.
-          </p>
+          <h3>Official Offline Replay</h3>
+          <p>Runs the installed evaluation dataset through the backend replay engine and generates the three official CSV artifacts.</p>
         </div>
         <span className="panel-icon"><FileSpreadsheet size={18} /></span>
       </div>
 
-      <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)", marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+      <div style={{ background: "var(--panel2)", padding: 17, borderRadius: 9, border: "1px solid var(--line)", margin: "16px 0" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div>
-            <b>Official Evaluation Stream (114,185 Flows)</b>
-            <div style={{ fontSize: 12, color: "var(--muted)" }}>
-              Data partition: <span style={{ fontFamily: "monospace" }}>data/processed/eval_prepared.parquet</span>
+            <b>Evaluation dataset · local server only</b>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 5 }}>
+              Expected path: <code>data/processed/eval_prepared.parquet</code>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 5 }}>
+              Records remain on the backend. The interface does not upload or fabricate a replay stream.
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>Speed:</span>
-            {[1, 5, 20].map(spd => (
-              <button
-                key={spd}
-                onClick={() => setPlaybackSpeed(spd)}
-                className="text-btn"
-                style={{
-                  padding: "3px 8px",
-                  fontSize: 11,
-                  background: playbackSpeed === spd ? "var(--panel)" : "var(--panel2)",
-                  borderRadius: 4,
-                  border: "1px solid var(--line)",
-                }}
-              >
-                {spd}x
-              </button>
-            ))}
-            <button
-              className="primary-btn"
-              disabled={!modelReady}
-              onClick={() => (running ? setPaused(!paused) : triggerSimulation())}
-              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}
-            >
-              {running ? (paused ? <Play size={14} /> : <Pause size={14} />) : <Play size={14} />}
-              {running ? (paused ? "Resume" : "Pause") : "Run Full Causal Replay"}
-            </button>
-          </div>
+          <button className="primary-btn" disabled={!modelReady || running} onClick={runOfficialReplay}>
+            {running ? <><RefreshCw size={14} className="spin-icon"/> Running official replay…</> : <><Play size={14}/> Run official chronological replay</>}
+          </button>
         </div>
 
-        {running && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-              <span>Streaming flows causally through 5-agent pipeline… (Record: {stepIndex.toLocaleString()})</span>
-              <span>{progress}%</span>
-            </div>
-            <div style={{ height: 6, background: "var(--panel)", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${progress}%`, background: "var(--blue)", transition: "width 0.2s" }} />
-            </div>
-          </div>
-        )}
+        {!modelReady && <div className="parse-warning" style={{ marginTop: 14 }}>Models are not ready. Install and verify both model artifacts before replay.</div>}
+        {running && <div style={{ marginTop: 16, padding: 12, border: "1px solid var(--line)", borderRadius: 7, color: "var(--muted)", fontSize: 11 }} role="status" aria-live="polite">The backend is processing the actual dataset in chronological order. This operation may take several seconds; do not refresh this page.</div>}
+        {error && <div className="parse-warning" role="alert" style={{ marginTop: 14 }}>{error}</div>}
 
-        {doneSummary && (
-          <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
-              <div><small style={{ fontSize: 10, color: "var(--muted)" }}>TOTAL FLOWS</small><div style={{ fontSize: 16, fontWeight: 700 }}>{doneSummary.total_records.toLocaleString()}</div></div>
-              <div><small style={{ fontSize: 10, color: "var(--muted)" }}>ACTIVE POLICIES</small><div style={{ fontSize: 16, fontWeight: 700, color: "var(--blue)" }}>{doneSummary.policies_created.toLocaleString()}</div></div>
-              <div><small style={{ fontSize: 10, color: "var(--muted)" }}>ATTACK CONTAINMENT</small><div style={{ fontSize: 16, fontWeight: 700, color: "var(--green)" }}>{doneSummary.containment_rate}%</div></div>
-              <div><small style={{ fontSize: 10, color: "var(--muted)" }}>THROUGHPUT</small><div style={{ fontSize: 16, fontWeight: 700, color: "var(--violet)" }}>{doneSummary.throughput_fps.toLocaleString()} fps</div></div>
-            </div>
-
-            <div style={{ padding: 12, background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.3)", borderRadius: 6, fontSize: 12 }}>
-              <div style={{ color: "#22c55e", fontWeight: 700, marginBottom: 2 }}>
-                ✓ REPLAY COMPLETE IN {doneSummary.elapsed_seconds} SECONDS
-              </div>
-              <div style={{ color: "var(--muted)", fontSize: 11 }}>
-                All 114,185 flows processed with 0 lookahead violations. 48,219 attacks mitigated, 53,392 benign flows preserved.
-              </div>
-            </div>
+        {summary && metrics && <div style={{ marginTop: 17, borderTop: "1px solid var(--line)", paddingTop: 15 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <div><small style={{ color: "var(--muted)" }}>REPLAY RUN</small><div style={{ fontFamily: "monospace", fontSize: 12 }}>{summary.run_id}</div></div>
+            <span className={"tag " + (summary.validation?.all_valid ? "tag-green" : "tag-amber")}>{summary.validation?.all_valid ? "CSV VALIDATION PASSED" : "VALIDATION NEEDS REVIEW"}</span>
           </div>
-        )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10 }}>
+            {[
+              ["RECORDS", metrics.total_records?.toLocaleString()],
+              ["BLOCKED", metrics.blocked_records?.toLocaleString()],
+              ["ALLOWED", metrics.allowed_records?.toLocaleString()],
+              ["POLICIES", metrics.policies_created?.toLocaleString()],
+              ["ATTACK CONTAINMENT", rate(metrics.containment_rate)],
+              ["BLOCK PRECISION", rate(metrics.block_precision)],
+              ["BENIGN PRESERVED", metrics.benign_preserved?.toLocaleString() ?? "—"],
+              ["FALSE BLOCKS", metrics.false_blocks?.toLocaleString() ?? "—"],
+            ].map(([label, value]) => <div key={label} style={{ background: "var(--panel)", padding: 11, borderRadius: 7, border: "1px solid var(--line)" }}><small style={{ color: "var(--muted)", fontSize: 9 }}>{label}</small><div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>{value ?? "—"}</div></div>)}
+          </div>
+          <div style={{ marginTop: 13, fontSize: 11, color: "var(--muted)" }}>
+            Elapsed: {metrics.elapsed_seconds}s · Throughput: {metrics.throughput_fps?.toLocaleString()} flows/sec · Correlation groups: {summary.correlation_groups}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            {Object.entries(summary.files || {}).map(([filename, info]: [string, any]) => <a key={filename} className="secondary-btn" href={"/api/submissions/download/" + filename}>{filename} · {info.rows.toLocaleString()} rows <Download size={13}/></a>)}
+          </div>
+          {!summary.validation?.all_valid && <div className="parse-warning" style={{ marginTop: 12 }}>The generated files did not pass the complete validator. Inspect Submission Studio before using them.</div>}
+        </div>}
       </div>
 
       <div className="panel-foot">
-        <span><LockKeyhole size={13} /> Strict arrival order · Invariants: Triggering records allowed · Expired rules pruned</span>
-        <span>CAUSAL STREAMING: COMPLIANT WITH CHALLENGE RULES</span>
+        <span><LockKeyhole size={13} /> Offline only · Simulated policies · No host firewall changes</span>
+        <span>Backend-authoritative replay · No synthetic progress</span>
       </div>
     </section>
   );
