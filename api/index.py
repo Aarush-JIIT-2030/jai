@@ -133,7 +133,11 @@ def get_history(limit: int = 15):
     """Retrieve runs from local SQLite database."""
     try:
         runs = list_runs(limit=limit)
-        return {"runs": runs, "source": "local_sqlite"}
+        normalized = [
+            {**run, "run_id": run.get("id"), "id": run.get("id")}
+            for run in runs
+        ]
+        return {"runs": normalized, "source": "local_sqlite"}
     except Exception as exc:
         return {"runs": [], "error": str(exc), "source": "local_sqlite"}
 
