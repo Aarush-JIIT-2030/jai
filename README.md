@@ -102,6 +102,35 @@ python -m cybersentinel.data.cleaning \
 
 The command writes prepared Parquet files, fitted preprocessing state, and a dataset profile to `data/processed/`. These generated files and the raw challenge data should not be committed to the repository.
 
+## Train and evaluate
+
+After preparing the organiser files, train both agents using the prepared training split only:
+
+```bash
+python -m cybersentinel.agents.threat_detection.train \
+  --train data/processed/training_prepared.parquet \
+  --label-column label \
+  --model-out models/threat_detection/model.joblib \
+  --report-out reports/generated/agent1-training.json
+
+python scripts/train_anomaly.py \
+  --train data/processed/training_prepared.parquet \
+  --model-out models/anomaly_detection/model.joblib \
+  --report-out reports/generated/agent2-training.json
+```
+
+Then evaluate on the untouched official evaluation split:
+
+```bash
+python scripts/evaluate_benchmark.py \
+  --eval data/processed/eval_prepared.parquet \
+  --threat-model models/threat_detection/model.joblib \
+  --anomaly-model models/anomaly_detection/model.joblib \
+  --output reports/generated/official-evaluation.json
+```
+
+The evaluation output contains measured classifier metrics, anomaly false-positive rate/attack recall, inference timings and a sampled fusion decision distribution. Fusion action counts are not classification accuracy. Model files, raw data, prepared data and generated reports remain local and git-ignored; never commit challenge records or model artifacts without organiser approval.
+
 ## API behavior
 
 The FastAPI service provides health and model-status endpoints, plus single-flow and batch analysis endpoints. Analysis requires both trained model files. If either file is missing or cannot be loaded, the service returns `MODEL_NOT_READY` instead of producing a prediction.
