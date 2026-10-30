@@ -1,7 +1,7 @@
-"""Adversarial stress tests for CyberSentinel 5-Agent IDS Architecture.
+"""Robustness and boundary condition tests for CyberSentinel 5-Agent IDS Architecture.
 
-Tests all five agents independently and in combination under boundary conditions,
-malformed inputs, infinite/NaN values, out-of-order events, and adversarial evasion.
+Tests all five agents independently and in combination under edge conditions,
+malformed inputs, infinite/NaN values, out-of-order events, and stress conditions.
 """
 import math
 import pytest
@@ -31,9 +31,9 @@ def load_model_or_skip(agent_class, artifact_path):
 
 
 # ============================================================================
-# AGENT 1: ADVERSARIAL & BOUNDARY TESTS
+# AGENT 1: Robustness & BOUNDARY TESTS
 # ============================================================================
-class TestAgent1Adversarial:
+class TestAgent1Robustness:
     def test_uninitialized_agent_raises_runtime_error(self):
         agent = ThreatDetectionAgent(model=None)
         with pytest.raises(RuntimeError, match="has no trained model"):
@@ -41,14 +41,14 @@ class TestAgent1Adversarial:
 
     def test_infinite_and_nan_features_gracefully_imputed(self):
         agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
-        adversarial_flow = {
+        Robustness_flow = {
             "Destination Port": 80,
             "Flow Duration": float("inf"),
             "Total Fwd Packets": float("-inf"),
             "Flow Bytes/s": float("nan"),
             "Init_Win_bytes_forward": 8192,
         }
-        res = agent.predict(adversarial_flow)
+        res = agent.predict(Robustness_flow)
         assert res.status == "success"
         assert res.predicted_class in {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
         assert 0.0 <= res.confidence <= 1.0
@@ -80,9 +80,9 @@ class TestAgent1Adversarial:
 
 
 # ============================================================================
-# AGENT 2: ADVERSARIAL & BOUNDARY TESTS
+# AGENT 2: Robustness & BOUNDARY TESTS
 # ============================================================================
-class TestAgent2Adversarial:
+class TestAgent2Robustness:
     def test_empty_flow_returns_error_status(self):
         agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         res = agent.score({})
@@ -116,7 +116,7 @@ class TestAgent2Adversarial:
 # ============================================================================
 # AGENT 3: EVIDENCE FUSION MATRIX COMPLIANCE TESTS
 # ============================================================================
-class TestAgent3FusionAdversarial:
+class TestAgent3FusionRobustness:
     def setup_method(self):
         self.fusion = EvidenceFusionAgent()
 
@@ -159,9 +159,9 @@ class TestAgent3FusionAdversarial:
 
 
 # ============================================================================
-# AGENT 4: TEMPORAL CORRELATION ADVERSARIAL TESTS
+# AGENT 4: TEMPORAL CORRELATION Robustness TESTS
 # ============================================================================
-class TestAgent4CorrelationAdversarial:
+class TestAgent4CorrelationRobustness:
     def setup_method(self):
         self.agent = TemporalCorrelationAgent(window_size=150)
 
@@ -203,7 +203,7 @@ class TestAgent4CorrelationAdversarial:
 # ============================================================================
 # AGENT 5: ADAPTIVE DEFENSE & POLICY INVARIANT TESTS
 # ============================================================================
-class TestAgent5AdaptiveDefenseAdversarial:
+class TestAgent5AdaptiveDefenseRobustness:
     def setup_method(self):
         self.defense = AdaptiveDefenseAgent(default_duration=150)
 
@@ -270,4 +270,3 @@ class TestAgent5AdaptiveDefenseAdversarial:
         )
         # Should NOT spawn duplicate policy!
         assert len(self.defense.all_policies) == 1
-

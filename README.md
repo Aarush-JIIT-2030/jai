@@ -121,7 +121,7 @@ Generated via `scripts/generate_submissions.py` and validated via `SubmissionVal
   * 100% canonical taxonomy conformance
   * All `applied_policy_id` references match active unexpired policies
   * 0 ground-truth label leakage
-  * Complete adversarial audit deliverables documented in [`release/final-audit/`](release/final-audit/)
+  * Complete quality assurance deliverables documented in [`release/qa-reports/`](release/qa-reports/)
 
 ---
 
@@ -208,7 +208,7 @@ If the dataset or models are missing, the API returns an explicit unavailable re
 
 ### SOURCE_IP identity limitation
 
-The prepared feature dataset may not contain native Layer 3 source IP fields. In that case the system derives a synthetic, stable identity from TCP-stack fingerprint fields. This is not an observed IP address and can collide for clients with identical fingerprints. If the required fingerprint fields are missing, policy creation fails closed rather than inventing a host identity. See `release/verification/source-ip-scope-audit.md`.
+The prepared feature dataset may not contain native Layer 3 source IP fields. In that case the system derives a synthetic, stable identity from TCP-stack fingerprint fields. This is not an observed IP address and can collide for clients with identical fingerprints. If the required fingerprint fields are missing, policy creation fails closed rather than inventing a host identity. See `release/benchmarks/source-ip-scope-audit.md`.
 
 ## 7. Open-Source Attribution & AI Disclosure
 
