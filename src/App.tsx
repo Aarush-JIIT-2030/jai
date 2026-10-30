@@ -26,13 +26,15 @@ type Health = {
 };
 
 type HistoryRow = {
-  id: string;
+  run_id: string;
   dataset_name: string;
-  dataset_rows: number;
-  processed_rows: number;
+  total_records: number;
+  blocked_records: number;
+  allowed_records: number;
+  policies_created: number;
+  containment_rate: number | null;
+  throughput_fps: number | null;
   status: string;
-  accuracy: number | null;
-  macro_f1: number | null;
   created_at: string;
 };
 
@@ -73,16 +75,15 @@ export default function App() {
   }, []);
 
   const loadHistory = useCallback(async () => {
-    if (!supabase || !session?.user) return;
     try {
-      const { data, error } = await supabase.from("analysis_runs")
-        .select("id,dataset_name,dataset_rows,processed_rows,status,accuracy,macro_f1,created_at")
-        .order("created_at", { ascending: false }).limit(8);
-      if (!error && data) setHistory(data as HistoryRow[]);
+      const response = await fetch("/api/history?limit=8");
+      if (!response.ok) throw new Error("Local history API unavailable");
+      const data = await response.json();
+      setHistory(Array.isArray(data.runs) ? data.runs : []);
     } catch {
-      // Offline mode
+      setHistory([]);
     }
-  }, [session]);
+  }, []);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
 
@@ -369,12 +370,12 @@ export default function App() {
                 <table>
                   <thead>
                     <tr>
-                      <th>EVALUATION RUN</th>
+                      <th>REPLAY RUN</th>
                       <th>RECORDS</th>
                       <th>STATUS</th>
-                      <th>ACCURACY</th>
-                      <th>MACRO-F1</th>
-                      <th>BENIGN FPR</th>
+                      <th>BLOCKED</th>
+                      <th>ALLOWED</th>
+                      <th>POLICIES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -387,13 +388,13 @@ export default function App() {
                       <td>{(100 - overview.metrics.benign_preservation_rate).toFixed(2)}% benign false blocks</td>
                     </tr>}
                     {history.map(row=>(
-                      <tr key={row.id}>
+                      <tr key={row.run_id}>
                         <td>{row.dataset_name}</td>
-                        <td>{formatNumber(row.dataset_rows)}</td>
-                        <td><span className={"tag "+(row.status==="completed"?"tag-green":"tag-amber")}>{row.status}</span></td>
-                        <td>{row.accuracy==null?"—":(row.accuracy*100).toFixed(2)+"%"}</td>
-                        <td>{row.macro_f1==null?"—":row.macro_f1.toFixed(4)}</td>
-                        <td>{new Date(row.created_at).toLocaleString()}</td>
+                        <td>{formatNumber(row.total_records)}</td>
+                        <td><span className={"tag "+(row.status==="COMPLETED"?"tag-green":"tag-amber")}>{row.status}</span></td>
+                        <td>{formatNumber(row.blocked_records)}</td>
+                        <td>{formatNumber(row.allowed_records)}</td>
+                        <td>{formatNumber(row.policies_created)}</td>
                       </tr>
                     ))}
                   </tbody>
