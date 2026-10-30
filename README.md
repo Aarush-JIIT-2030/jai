@@ -71,7 +71,7 @@ The supervised classifier is implemented in `src/cybersentinel/agents/threat_det
 
 Detailed instructions and commands: [`docs/AGENT1.md`](docs/AGENT1.md).
 
-The current Agent 1 training and prediction command-line tools read CSV. The Member 1 data-preparation tool reads the supplied Parquet files and writes prepared Parquet files. Convert prepared files to CSV or add Parquet support to the Agent 1 CLI before training this exact dataset with that command.
+The Agent 1 training and evaluation commands accept both CSV and Parquet files. The Member 1 data-preparation tool reads the supplied Parquet files and writes prepared Parquet files, so those prepared outputs can be passed directly to Agent 1 training. Batch prediction CLI currently reads CSV.
 
 If source labels are not already the five canonical classes, pass `--label-map` with the exact organiser-provided JSON mapping. The software deliberately refuses to guess mappings. The official eval file is evaluation-only and must never be used to fit preprocessing or the classifier.
 
