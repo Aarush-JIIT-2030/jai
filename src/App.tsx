@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import Papa from "papaparse";
 import {
   Activity, AlertTriangle, ArrowRight, ArrowUpRight, Bell, Check,
-  ChevronDown, CircleHelp, CloudUpload, Cpu, Database, FileSpreadsheet, Fingerprint,
-  Gauge, LockKeyhole, LogOut, Network, RefreshCw, Shield,
+  ChevronDown, CircleHelp, CloudUpload, Cpu, Database, Download, FileSpreadsheet, Fingerprint,
+  Gauge, Layers, LockKeyhole, LogOut, Network, Play, RefreshCw, Shield,
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { Agent2Console, AgentReadiness, FlowInspector } from "./FlowInspector";
+import { Agent2Console, FlowInspector } from "./FlowInspector";
 import { BatchReplay } from "./BatchReplay";
-import { TopologyCommandCentre, TemporalCorrelationConsole, AdaptiveDefenseConsole, ReplayStudio } from "./Level2Consoles";
+import { TopologyCommandCentre, FiveAgentArchitectureView, EvidenceFusionStudio, TemporalCorrelationConsole, AdaptiveDefenseConsole, ReplayStudio, SubmissionStudio, ModelIntelligenceView, AuditHistoryView, SystemHealthView } from "./Level2Consoles";
 import { ParticleBackdrop } from "./components/ParticleBackdrop";
 
 type Health = {
@@ -192,31 +192,31 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Shield size={21}/></div><span>CYBERSENTINEL</span></div>
       <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14}/></div>
-      <div className="nav-label">WORKSPACE</div>
+      <div className="nav-label">COMMAND WORKSPACE</div>
       {[
         ["Overview", Gauge],
-        ["Flow analysis", Network],
-        ["Agent intelligence", Cpu],
-        ["Temporal correlation", Activity],
-        ["Adaptive defense", ShieldAlert],
-        ["Replay & submissions", FileSpreadsheet],
-        ["Evidence history", Database],
+        ["Five-Agent Architecture", Layers],
+        ["Flow Inspector", Network],
+        ["Evidence Fusion", Fingerprint],
+        ["Temporal Investigations", Activity],
+        ["Adaptive Defense", ShieldAlert],
+        ["Replay Studio", Play],
+        ["Submission Studio", Download],
+        ["Model Intelligence", Cpu],
+        ["Audit & Local History", Database],
+        ["Settings & Health", SlidersHorizontal],
       ].map(([name, Icon]: any) => (
         <button
           key={name}
           className={"nav-item " + (activeNav === name ? "active" : "")}
           onClick={() => setActiveNav(name)}
         >
-          <Icon size={17} />
+          <Icon size={16} />
           {name}
-          {name === "Evidence history" && history.length > 0 ? (
-            <span className="nav-count">{history.length}</span>
-          ) : null}
         </button>
       ))}
-      <div className="nav-label nav-label-lower">SYSTEM</div>
-      <button className="nav-item" onClick={()=>setNotice("Settings are managed through this workspace's environment configuration.")}><SlidersHorizontal size={17}/>Settings</button>
-      <button className="nav-item" onClick={()=>setNotice("Use the repository README and documentation under docs/ for complete guides.")}><CircleHelp size={17}/>Documentation<ArrowUpRight size={13} className="nav-external"/></button>
+      <div className="nav-label nav-label-lower">DOCUMENTATION & REPO</div>
+      <button className="nav-item" onClick={()=>setNotice("Complete offline setup, reproduction benchmarks, and model artifacts are verified under release/day2-final/.")}><CircleHelp size={16}/>Release Guides<ArrowUpRight size={13} className="nav-external"/></button>
       <div className="sidebar-bottom">
         <div className="system-card">
           <div className="system-card-head"><span className="pulse-dot"/> SYSTEM STATUS</div>
@@ -254,142 +254,151 @@ export default function App() {
           </div>
         </section>
         {notice && <div className="notice"><Check size={15}/>{notice}<button onClick={()=>setNotice("")}><X size={15}/></button></div>}
-        {activeNav === "Flow analysis" && (
+        {activeNav === "Overview" && <TopologyCommandCentre />}
+        {activeNav === "Five-Agent Architecture" && <FiveAgentArchitectureView />}
+        {activeNav === "Flow Inspector" && (
           <>
             <FlowInspector modelReady={Boolean(health?.model_ready)} />
             <Agent2Console ready={Boolean(health?.agents?.agent_2_anomaly_detection)} />
             <BatchReplay modelReady={Boolean(health?.model_ready)} />
           </>
         )}
-        {activeNav === "Agent intelligence" && <AgentReadiness health={health} />}
-        {activeNav === "Temporal correlation" && <TemporalCorrelationConsole />}
-        {activeNav === "Adaptive defense" && <AdaptiveDefenseConsole />}
-        {activeNav === "Replay & submissions" && <ReplayStudio modelReady={Boolean(health?.model_ready)} />}
+        {activeNav === "Evidence Fusion" && <EvidenceFusionStudio />}
+        {activeNav === "Temporal Investigations" && <TemporalCorrelationConsole />}
+        {activeNav === "Adaptive Defense" && <AdaptiveDefenseConsole />}
+        {activeNav === "Replay Studio" && <ReplayStudio modelReady={Boolean(health?.model_ready)} />}
+        {activeNav === "Submission Studio" && <SubmissionStudio />}
+        {activeNav === "Model Intelligence" && <ModelIntelligenceView />}
+        {activeNav === "Audit & Local History" && <AuditHistoryView />}
+        {activeNav === "Settings & Health" && <SystemHealthView health={health} />}
 
-        {activeNav === "Overview" && <TopologyCommandCentre />}
+        {activeNav === "Overview" && (
+          <>
+            <TopologyCommandCentre />
+            <section className="metrics-grid">
+              <Metric icon={Database} label="DATASET RECORDS" value={dataset ? formatNumber(dataset.rows) : "114,185"} detail={dataset ? "Loaded in browser" : "Official evaluation holdout"} tone="blue"/>
+              <Metric icon={ShieldCheck} label="THREAT CLASSES" value="05" detail="BENIGN, DoS, DDoS, PortScan, BruteForce" tone="green"/>
+              <Metric icon={Cpu} label="ACTIVE AGENTS" value="05" detail="5/5 agent pipeline operational" tone="violet"/>
+              <Metric icon={Gauge} label="MODEL READINESS" value={health?.model_ready ? "Active" : "Pending"} detail={health?.model_ready ? "Both models verified" : "Model artifacts missing"} tone={health?.model_ready ? "green" : "amber"}/>
+            </section>
 
-        <section className="metrics-grid">
-          <Metric icon={Database} label="DATASET RECORDS" value={dataset ? formatNumber(dataset.rows) : "114,185"} detail={dataset ? "Loaded in browser" : "Official evaluation holdout"} tone="blue"/>
-          <Metric icon={ShieldCheck} label="THREAT CLASSES" value="05" detail="BENIGN, DoS, DDoS, PortScan, BruteForce" tone="green"/>
-          <Metric icon={Cpu} label="ACTIVE AGENTS" value="05" detail="5/5 agent pipeline operational" tone="violet"/>
-          <Metric icon={Gauge} label="MODEL READINESS" value={health?.model_ready ? "Active" : "Pending"} detail={health?.model_ready ? "Both models verified" : "Model artifacts missing"} tone={health?.model_ready ? "green" : "amber"}/>
-        </section>
-
-        <section className="content-grid">
-          <div className="panel dataset-panel">
-            <div className="panel-head">
-              <div>
-                <div className="panel-kicker">DATA INGESTION</div>
-                <h3>Dataset inspection</h3>
-                <p>Validate a labelled flow CSV before model training or replay.</p>
-              </div>
-              <span className="panel-icon"><FileSpreadsheet size={18}/></span>
-            </div>
-            <input ref={inputRef} type="file" accept=".csv,text/csv" hidden onChange={e=>inspectFile(e.target.files?.[0])}/>
-            {!dataset ? (
-              <button className="dropzone" onClick={()=>inputRef.current?.click()} disabled={busy}>
-                <div className="upload-icon"><CloudUpload size={23}/></div>
-                <b>{busy?"Inspecting CSV…":"Drop your dataset here"}</b>
-                <span>or <u>browse files</u> · CSV format</span>
-                <small>Processed locally in your browser · File is not uploaded</small>
-              </button>
-            ) : (
-              <div className="dataset-loaded">
-                <div className="file-line">
-                  <div className="file-icon"><FileSpreadsheet size={19}/></div>
-                  <div className="file-info"><b>{dataset.name}</b><span>{formatNumber(dataset.rows)} rows · {dataset.columns.length} columns</span></div>
-                  <span className="tag tag-green"><Check size={12}/> Inspected</span>
-                </div>
-                <div className="dataset-facts">
-                  <div><small>ROWS</small><b>{formatNumber(dataset.rows)}</b></div>
-                  <div><small>FEATURES</small><b>{dataset.columns.length}</b></div>
-                  <div><small>LABEL FIELD</small><b>{dataset.labelColumn??"Not found"}</b></div>
-                </div>
-                <div className="label-head"><b>Detected label distribution</b><span>{knownLabels.length}/5 benchmark classes · {labelCoverage}% mapped</span></div>
-                {Object.keys(dataset.labels).length ? Object.entries(dataset.labels).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([label,count])=>(
-                  <div className="label-bar" key={label}>
-                    <span>{label}</span>
-                    <div className="bar-track"><i style={{width:(count/totalLabels*100)+"%"}}/></div>
-                    <b>{formatNumber(count)}</b>
+            <section className="content-grid">
+              <div className="panel dataset-panel">
+                <div className="panel-head">
+                  <div>
+                    <div className="panel-kicker">DATA INGESTION</div>
+                    <h3>Dataset inspection</h3>
+                    <p>Validate a labelled flow CSV before model training or replay.</p>
                   </div>
-                )) : <div className="empty-inline">No recognised label column detected. Confirm the organiser's schema and label mapping.</div>}
-                {dataset.errors.length>0&&<div className="parse-warning">{dataset.errors.join(" · ")}</div>}
-                <button className="text-btn" onClick={()=>{setDataset(null);setNotice("");}}>Choose another file <ArrowRight size={14}/></button>
+                  <span className="panel-icon"><FileSpreadsheet size={18}/></span>
+                </div>
+                <input ref={inputRef} type="file" accept=".csv,text/csv" hidden onChange={e=>inspectFile(e.target.files?.[0])}/>
+                {!dataset ? (
+                  <button className="dropzone" onClick={()=>inputRef.current?.click()} disabled={busy}>
+                    <div className="upload-icon"><CloudUpload size={23}/></div>
+                    <b>{busy?"Inspecting CSV…":"Drop your dataset here"}</b>
+                    <span>or <u>browse files</u> · CSV format</span>
+                    <small>Processed locally in your browser · File is not uploaded</small>
+                  </button>
+                ) : (
+                  <div className="dataset-loaded">
+                    <div className="file-line">
+                      <div className="file-icon"><FileSpreadsheet size={19}/></div>
+                      <div className="file-info"><b>{dataset.name}</b><span>{formatNumber(dataset.rows)} rows · {dataset.columns.length} columns</span></div>
+                      <span className="tag tag-green"><Check size={12}/> Inspected</span>
+                    </div>
+                    <div className="dataset-facts">
+                      <div><small>ROWS</small><b>{formatNumber(dataset.rows)}</b></div>
+                      <div><small>FEATURES</small><b>{dataset.columns.length}</b></div>
+                      <div><small>LABEL FIELD</small><b>{dataset.labelColumn??"Not found"}</b></div>
+                    </div>
+                    <div className="label-head"><b>Detected label distribution</b><span>{knownLabels.length}/5 benchmark classes · {labelCoverage}% mapped</span></div>
+                    {Object.keys(dataset.labels).length ? Object.entries(dataset.labels).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([label,count])=>(
+                      <div className="label-bar" key={label}>
+                        <span>{label}</span>
+                        <div className="bar-track"><i style={{width:(count/totalLabels*100)+"%"}}/></div>
+                        <b>{formatNumber(count)}</b>
+                      </div>
+                    )) : <div className="empty-inline">No recognised label column detected. Confirm the organiser's schema and label mapping.</div>}
+                    {dataset.errors.length>0&&<div className="parse-warning">{dataset.errors.join(" · ")}</div>}
+                    <button className="text-btn" onClick={()=>{setDataset(null);setNotice("");}}>Choose another file <ArrowRight size={14}/></button>
+                  </div>
+                )}
+                <div className="panel-foot">
+                  <span><LockKeyhole size={13}/> Data stays in this browser</span>
+                  <span>MAX FILE SIZE: BROWSER-DEPENDENT</span>
+                </div>
               </div>
-            )}
-            <div className="panel-foot">
-              <span><LockKeyhole size={13}/> Data stays in this browser</span>
-              <span>MAX FILE SIZE: BROWSER-DEPENDENT</span>
-            </div>
-          </div>
 
-          <div className="panel pipeline-panel">
-            <div className="panel-head">
-              <div>
-                <div className="panel-kicker">MULTI-AGENT SYSTEM</div>
-                <h3>Detection pipeline</h3>
-                <p>Independent signals, explainable decisions.</p>
+              <div className="panel pipeline-panel">
+                <div className="panel-head">
+                  <div>
+                    <div className="panel-kicker">MULTI-AGENT SYSTEM</div>
+                    <h3>Detection pipeline</h3>
+                    <p>Independent signals, explainable decisions.</p>
+                  </div>
+                  <span className="live-tag"><span className="pulse-dot"/> LIVE STATUS</span>
+                </div>
+                <div className="agent-list">
+                  <Agent number="01" title="Threat detection" desc="Supervised five-class classification" status={health?.agents?.agent_1_threat_detection ? "Active" : "Awaiting model"} icon={ShieldAlert}/>
+                  <div className="agent-connector"/>
+                  <Agent number="02" title="Anomaly detection" desc="Independent outlier scoring + evidence" status={health?.agents?.agent_2_anomaly_detection ? "Active" : "Awaiting model"} icon={Activity}/>
+                  <div className="agent-connector"/>
+                  <Agent number="03" title="Evidence fusion" desc="Agreement, disagreement and rationale" status="Active" icon={Fingerprint}/>
+                </div>
+                <div className="fusion-note">
+                  <Sparkles size={15}/>
+                  <span>Fusion policy preserves both agent outputs and explains every simulated ALLOW / BLOCK / REVIEW decision.</span>
+                </div>
               </div>
-              <span className="live-tag"><span className="pulse-dot"/> LIVE STATUS</span>
-            </div>
-            <div className="agent-list">
-              <Agent number="01" title="Threat detection" desc="Supervised five-class classification" status={health?.agents?.agent_1_threat_detection ? "Active" : "Awaiting model"} icon={ShieldAlert}/>
-              <div className="agent-connector"/>
-              <Agent number="02" title="Anomaly detection" desc="Independent outlier scoring + evidence" status={health?.agents?.agent_2_anomaly_detection ? "Active" : "Awaiting model"} icon={Activity}/>
-              <div className="agent-connector"/>
-              <Agent number="03" title="Evidence fusion" desc="Agreement, disagreement and rationale" status="Active" icon={Fingerprint}/>
-            </div>
-            <div className="fusion-note">
-              <Sparkles size={15}/>
-              <span>Fusion policy preserves both agent outputs and explains every simulated ALLOW / BLOCK / REVIEW decision.</span>
-            </div>
-          </div>
-        </section>
+            </section>
 
-        <section className="panel history-panel">
-          <div className="panel-head history-head">
-            <div>
-              <div className="panel-kicker">BENCHMARK PERFORMANCE & AUDIT TRAIL</div>
-              <h3>Official Evaluation Holdout (114,185 Flows)</h3>
-              <p>Untouched official evaluation split results and user run telemetry.</p>
-            </div>
-            <button className="secondary-btn" onClick={loadHistory}><RefreshCw size={14}/> Refresh</button>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>EVALUATION RUN</th>
-                  <th>RECORDS</th>
-                  <th>STATUS</th>
-                  <th>ACCURACY</th>
-                  <th>MACRO-F1</th>
-                  <th>BENIGN FPR</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><b>Official Holdout Benchmark (CICIDS2017)</b></td>
-                  <td>114,185</td>
-                  <td><span className="tag tag-green">Verified</span></td>
-                  <td><b>99.9956%</b></td>
-                  <td><b>0.999897</b></td>
-                  <td>0.958% (&lt; 1.0%)</td>
-                </tr>
-                {history.map(row=>(
-                  <tr key={row.id}>
-                    <td>{row.dataset_name}</td>
-                    <td>{formatNumber(row.dataset_rows)}</td>
-                    <td><span className={"tag "+(row.status==="completed"?"tag-green":"tag-amber")}>{row.status}</span></td>
-                    <td>{row.accuracy==null?"—":(row.accuracy*100).toFixed(2)+"%"}</td>
-                    <td>{row.macro_f1==null?"—":row.macro_f1.toFixed(4)}</td>
-                    <td>{new Date(row.created_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+            <section className="panel history-panel">
+              <div className="panel-head history-head">
+                <div>
+                  <div className="panel-kicker">BENCHMARK PERFORMANCE & AUDIT TRAIL</div>
+                  <h3>Official Evaluation Holdout (114,185 Flows)</h3>
+                  <p>Untouched official evaluation split results and user run telemetry.</p>
+                </div>
+                <button className="secondary-btn" onClick={loadHistory}><RefreshCw size={14}/> Refresh</button>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>EVALUATION RUN</th>
+                      <th>RECORDS</th>
+                      <th>STATUS</th>
+                      <th>ACCURACY</th>
+                      <th>MACRO-F1</th>
+                      <th>BENIGN FPR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><b>Official Holdout Benchmark (CICIDS2017)</b></td>
+                      <td>114,185</td>
+                      <td><span className="tag tag-green">Verified</span></td>
+                      <td><b>99.9956%</b></td>
+                      <td><b>0.999897</b></td>
+                      <td>0.958% (&lt; 1.0%)</td>
+                    </tr>
+                    {history.map(row=>(
+                      <tr key={row.id}>
+                        <td>{row.dataset_name}</td>
+                        <td>{formatNumber(row.dataset_rows)}</td>
+                        <td><span className={"tag "+(row.status==="completed"?"tag-green":"tag-amber")}>{row.status}</span></td>
+                        <td>{row.accuracy==null?"—":(row.accuracy*100).toFixed(2)+"%"}</td>
+                        <td>{row.macro_f1==null?"—":row.macro_f1.toFixed(4)}</td>
+                        <td>{new Date(row.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
 
         <footer className="footer">
           <span>CYBERSENTINEL <i>·</i> JAI 2026</span>

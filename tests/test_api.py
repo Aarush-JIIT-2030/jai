@@ -87,3 +87,17 @@ def test_replay_simulate_endpoint(monkeypatch):
     data = response.json()
     assert data["metrics"]["total_records"] == 2
     assert len(data["replay_sample"]) == 2
+
+
+def test_benchmarks_endpoint():
+    response = TestClient(index.app).get("/api/benchmarks")
+    assert response.status_code == 200
+    data = response.json()
+    assert "agent_1_threat_detection" in data
+    assert data["agent_1_threat_detection"]["accuracy"] > 0.99
+
+
+def test_submission_download_invalid_file():
+    response = TestClient(index.app).get("/api/submissions/download/malicious.sh")
+    assert response.status_code == 400
+

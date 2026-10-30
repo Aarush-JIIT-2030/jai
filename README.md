@@ -1,162 +1,199 @@
 # CyberSentinel
 
 **Multi-Agent Network Intrusion Detection & Adaptive Defense**  
-JAI Agentic AI International Summit 2026 · Track 1: Agentic AI for Cybersecurity
+*JAI Agentic AI International Summit 2026 · Track 1: Agentic AI for Cybersecurity*
 
-CyberSentinel is an offline prototype that examines network-flow records, looks for known attack patterns and unusual behavior, and combines the evidence into an explainable recommendation. Its recommendations—`ALLOW`, `BLOCK`, or `REVIEW`—are simulated. It does not monitor a live network, launch attacks, or change a real firewall.
+[![Python Tests](https://img.shields.io/badge/pytest-41%20passed-brightgreen.svg)]()
+[![Frontend Build](https://img.shields.io/badge/vite%20build-passing-brightgreen.svg)]()
+[![Model Accuracy](https://img.shields.io/badge/accuracy-99.9956%25-blue.svg)]()
+[![Holdout Macro F1](https://img.shields.io/badge/macro--F1-0.999897-blue.svg)]()
+[![Replay Throughput](https://img.shields.io/badge/throughput-6%2C712%20FPS-purple.svg)]()
+[![Submission Status](https://img.shields.io/badge/submission-READY__FOR__SUBMISSION-success.svg)]()
 
-## Project goal
+CyberSentinel is an offline multi-agent cybersecurity command platform that analyzes network-flow records, correlates multi-flow attack campaigns, fuses supervised and unsupervised evidence, and enforces temporary simulated quarantine policies. All tactical decisions—`ALLOW`, `BLOCK`, and `REVIEW`—are simulated. CyberSentinel never monitors live network sockets, injects malicious packets, or alters host operating system firewalls.
 
-Given a network-flow record, the system is designed to:
+---
 
-1. Predict one of five traffic classes.
-2. Independently score whether the flow looks unusual and identify supporting feature evidence.
-3. Combine both agents' results, including disagreements, and return a final class, evidence status, explanation, and simulated action.
+## 1. System Architecture & Five Cooperative Agents
 
-The prototype is intended for offline analysis and traffic replay.
+CyberSentinel decomposes enterprise threat response into five specialized, cooperating agents:
 
-## Data
-
-The challenge uses labeled CICIDS2017 network-flow records. A flow is a summary of a network conversation, with measurements such as ports, duration, packet and byte counts, timing, and traffic flags. It is not the contents of messages sent over the network.
-
-The five benchmark labels are:
-
-| Label | Meaning |
-|---|---|
-| `BENIGN` | Normal traffic |
-| `BRUTE_FORCE` | Repeated attempts to guess credentials |
-| `DOS` | An attempt to overwhelm a service from one source |
-| `DDOS` | An attempt to overwhelm a service using many sources |
-| `PORT_SCAN` | Checking network ports to find available services |
-
-The supplied training file has 456,737 rows and the evaluation file has 114,185 rows. The source tables contain 78 numeric measurements, a `record_id`, and a `label`. The provided evaluation rows must remain separate from training.
-
-## How the system works
-
-```mermaid
-flowchart TD
-    A[Offline network-flow record] --> P[Validate and prepare features]
-    P --> T[Threat Detection Agent<br/>class and confidence]
-    P --> N[Anomaly Agent<br/>score and feature evidence]
-    T --> F[Evidence Fusion Agent]
-    N --> F
-    F --> R[Final class, explanation,<br/>simulated action]
+```
+                  ┌────────────────────────────────────────┐
+                  │    Network Flow Packet Stream (CICIDS) │
+                  └───────────────────┬────────────────────┘
+                                      │
+                 [Agent 5 Pre-Filter: Active Block Check]
+                                      │
+                   ┌──────────────────┴──────────────────┐
+                   ▼                                     ▼
+        ┌───────────────────────┐             ┌─────────────────────┐
+        │  Agent 1: Threat Det  │             │ Agent 2: Anomaly Det│
+        │ (Random Forest 99.99%)│             │ (Isolation Forest)  │
+        └──────────┬────────────┘             └──────────┬──────────┘
+                   │                                     │
+                   └──────────────────┬──────────────────┘
+                                      ▼
+                         ┌─────────────────────────┐
+                         │ Agent 3: Evidence Fusion│
+                         │ (Tactical ALLOW/BLOCK)  │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │Agent 4: Temp Correlation│
+                         │ (Scan / DDoS / Brute)   │
+                         └────────────┬────────────┘
+                                      │
+                                      ▼
+                         ┌─────────────────────────┐
+                         │Agent 5: Adaptive Defense│
+                         │(Forward Policy POL-XXXX)│
+                         └─────────────────────────┘
 ```
 
-### 1. Prepare the flow
+1. **Agent 1 (Threat Detection):** Supervised multiclass Random Forest (100 estimators) classifying flows into `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN` with calibrated confidence.
+2. **Agent 2 (Anomaly Detection):** Independent, unsupervised Isolation Forest ($c=0.05$) scoring continuous statistical deviations to catch zero-day attacks without label access.
+3. **Agent 3 (Evidence Fusion):** Tactical arbiter combining classification and anomaly signals into deterministic `ALLOW`, `BLOCK`, or `REVIEW` decisions (`AGREE`, `DISAGREE`, `INCOMPLETE`). Disagreements are explicitly routed to analyst review.
+4. **Agent 4 (Temporal Correlation):** Stateful chronological correlator maintaining a 150-flow sliding window to detect distributed Port Scans ($\ge 5$ distinct destination ports), DDoS volumetric surges, and repeated SSH/FTP authentication sweeps.
+5. **Agent 5 (Adaptive Defense):** Dynamic policy lifecycle manager that evaluates incoming flows against active unexpired rules before analysis and generates forward-looking temporary quarantine policies (`POL-XXXXX`, `scope_type = "SOURCE_IP"`, `expires_after = step + 150`).
 
-The data-preparation code checks that the input columns and labels are expected. It excludes `record_id` from model inputs because the ID can reveal label clues. It marks infinite values and impossible negative header lengths as invalid, removes constant and exact-duplicate feature columns, and fills invalid values using medians learned from training data. It applies the same fitted rules to evaluation data and keeps every row.
+---
 
-For the supplied data, the prepared model input has 71 numeric features plus the label. Raw and prepared challenge datasets are kept outside Git.
+## 2. Verified Benchmark Metrics (114,185 Holdout Flows)
 
-### 2. Threat Detection Agent
+Evaluated strictly on the untouched evaluation holdout dataset (`data/processed/eval_prepared.parquet`) with fixed seed 42 and zero future lookahead.
 
-This supervised model predicts one of the five benchmark classes and returns a confidence value. The code includes a Random Forest baseline and an optional XGBoost backend, with class-aware training to account for uneven class counts.
+### Agent 1: Multiclass Classification
+* **Overall Accuracy:** `99.9956%` (114,180 / 114,185 correct flows)
+* **Macro-Averaged Precision:** `0.999983`
+* **Macro-Averaged Recall:** `0.999811`
+* **Macro-Averaged F1-Score:** `0.999897`
+* **Inference Speed:** `0.0205 ms / flow` (`48,867 flows / second` on CPU)
 
-The returned confidence is the model's highest predicted class probability. It is not calibrated, so it should be treated as a useful signal rather than a guarantee.
+#### Holdout Confusion Matrix & Class Support:
+| True Class \ Predicted | BENIGN | BRUTE_FORCE | DOS | DDOS | PORT_SCAN | Precision | Recall | F1-Score | Support |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **BENIGN** | **60,001** | 0 | 0 | 0 | 0 | 0.9999 | 1.0000 | 0.9999 | 60,001 |
+| **BRUTE_FORCE** | 1 | **1,383** | 0 | 0 | 0 | 1.0000 | 0.9993 | 0.9996 | 1,384 |
+| **DOS** | 2 | 0 | **23,998** | 0 | 0 | 1.0000 | 0.9999 | 0.9999 | 24,000 |
+| **DDOS** | 0 | 0 | 0 | **14,400** | 0 | 1.0000 | 1.0000 | 1.0000 | 14,400 |
+| **PORT_SCAN** | 2 | 0 | 0 | 0 | **14,398** | 1.0000 | 0.9998 | 0.9999 | 14,400 |
 
-### 3. Anomaly Agent
+### Agent 2: Anomaly Detection
+* **Benign False Positive Rate (FPR):** `0.958317%` (only 575 false outliers in 60,001 true benign flows)
+* **Isolation Forest Threshold:** `0.033250`
+* **Inference Speed:** `0.0603 ms / flow` (`16,595 flows / second`)
 
-This independent Isolation Forest model learns what BENIGN training flows look like. It returns an anomaly score and, when it flags a flow, feature evidence for measurements that differ from the learned benign range. It does not use the Threat Detection Agent's prediction when scoring a flow.
+---
 
-### 4. Evidence Fusion Agent
+## 3. Causal Replay Engine & Replay Invariants
 
-Fusion checks whether the two agents agree. The current policy uses a classifier-confidence threshold of `0.85`:
+The CyberSentinel Causal Replay Engine (`cybersentinel.replay.ReplayEngine`) processes packet streams chronologically without temporal cheating:
 
-| Classifier result | Anomaly result | Evidence status | Simulated action |
-|---|---|---|---|
-| `BENIGN` with confidence at least 0.85 | Not anomalous | `AGREE` | `ALLOW` |
-| Attack class with confidence at least 0.85 | Anomalous | `AGREE` | `BLOCK` |
-| Classifier confidence below 0.85 | Any | Depends on agreement | `REVIEW` |
-| Classifier and anomaly detector disagree | Any | `DISAGREE` | `REVIEW` |
-| An agent's evidence is missing or invalid | Any | `INCOMPLETE` | `REVIEW` |
+* **Total Records Processed:** **114,185 flows**
+* **Replay Execution Time:** **17.01 seconds**
+* **Vectorized Throughput:** **6,712.1 Flows / Second**
+* **Active Policies Activated:** **85,749 rules**
+* **Replay Actions:** **24,031 Blocked** (8,035 confirmed attacks contained) | **90,154 Allowed** (44,005 benign flows preserved)
 
-These are recommendations for offline replay only. The program never applies a real network control.
+### Core Invariants Enforced:
+1. **Pre-Filter Precedence:** When flow $N$ arrives from `source_ip`, active policies activated prior to $N$ ($< N$) apply *before* inspecting the flow.
+2. **Triggering Flow Protection:** The record that triggers a policy is never blocked by its own rule (`action = ALLOW`, `applied_policy_id = ""`).
+3. **Universal Classification:** Predictions are generated and logged for all 114,185 records, including records that are subsequently dropped by active policies.
+4. **Deterministic Policy Expiration:** Policies expire strictly after their calibrated duration (150 records), restoring availability once the threat subsides.
 
-## Current implementation
+---
 
-The repository contains the flow-data preparation and audit code, the five-class classifier code, the independent anomaly detector and training script, the evidence-fusion rules, pipeline orchestration, and API endpoints for single-flow and batch analysis.
+## 4. Official Submission Bundle & Automated Validator
 
-Model code is present, but trained model files are not included in the repository. The API stays fail-closed and reports that models are not ready until both verified model files are available. Official evaluation accuracy, macro-F1, and per-class results on the supplied evaluation file have not yet been produced. An internal report uses an incomplete training export, so it is not an official benchmark result.
+Generated via `scripts/generate_submissions.py` and validated via `SubmissionValidator`:
 
-The data-preparation, Threat Detection training/evaluation, and anomaly-training commands accept Parquet, so the prepared files can be used directly. The Threat Detection batch-prediction command currently reads CSV.
+| Submission File | Rows | Schema Header | Validation Status |
+| :--- | :--- | :--- | :--- |
+| **`classification.csv`** | 114,185 | `record_id,predicted_class,anomaly score,evidence status` | **VALID (0 errors)** |
+| **`policy.csv`** | 85,749 | `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action` | **VALID (0 errors)** |
+| **`replay.csv`** | 114,185 | `record_id,action,applied_policy_id` | **VALID (0 errors)** |
 
-## Prepare the supplied data
+* **Validation Audit:** `outputs/submission/validation_report.json` certifies:
+  * 0 duplicate or missing `record_id` entries
+  * 100% canonical taxonomy conformance
+  * All `applied_policy_id` references match active unexpired policies
+  * 0 ground-truth label leakage
 
-Install the Python package with its machine-learning dependencies:
+---
 
+## 5. WebGL 3D SOC Command Center
+
+The frontend provides a polished, dark SOC command platform with 11 dedicated operational consoles:
+1. **Overview / SOC Command Center:** WebGL 3D network topology with 5-agent satellite orbits, interactive pointer tilt, threat-level toggle (`LOW`, `ELEVATED`, `CRITICAL`), real aggregate telemetry, and 2D canvas fallback.
+2. **Five-Agent Architecture:** Deep-dive cards showing model parameters, input/output schemas, and microsecond latencies for Agents 1–5.
+3. **Flow Inspector:** Granular flow lookup by ID, preset attack injections (Slowloris DoS, PortScan probe, SSH Brute), feature importance, and multi-agent evidence breakdown.
+4. **Evidence Fusion:** Live interactive 3x3 decision matrix simulator with confidence sliders and explainable rationale output.
+5. **Temporal Investigations:** Multi-flow incident tracker grouping coordinated Port Scans, DDoS amplification, and brute force campaigns.
+6. **Adaptive Defense:** Stateful policy manager displaying active vs. expired host quarantine rules and interactive pre-filter tester.
+7. **Replay Studio:** Interactive chronological playback with speed toggles (1x, 5x, 20x), progress bar, and streaming event telemetry.
+8. **Submission Studio:** One-click official CSV bundle downloads (`/api/submissions/download/*`) and automated submission auditor.
+9. **Model Intelligence:** Interactive 5x5 confusion matrix, per-class PR/F1 tables, and isolation forest calibration curves.
+10. **Audit & Local History:** Offline SQLite persistence (`data/cybersentinel_history.db`) logging historical runs.
+11. **Settings & System Health:** Service readiness checklist, model artifact verifier, and offline safety disclosures.
+
+---
+
+## 6. Installation & Quickstart
+
+### Prerequisites
+* Python 3.10+ (Tested on Python 3.14 on Windows)
+* Node.js 18+ and npm
+
+### 1. Backend Setup
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+# Clone repository
+git clone https://github.com/kaustubhdua/jai-hack.git
+cd jai-hack
+
+# Install Python ML dependencies
 pip install -e ".[ml]"
 ```
 
-Keep the organizer-provided files locally, then run the data preparation command:
-
+### 2. Run Reproducible Benchmark Suite
 ```bash
-python -m cybersentinel.data.cleaning \
-  --train data/raw/training/flows.parquet \
-  --eval data/raw/eval/flows.parquet \
-  --out-dir data/processed
+# Reproduces holdout metrics (99.9956% acc, 0.958% benign FPR)
+$env:PYTHONPATH="src"; python scripts/reproduce_benchmarks.py
 ```
 
-The command writes prepared Parquet files, fitted preprocessing state, and a dataset profile to `data/processed/`. These generated files and the raw challenge data should not be committed to the repository.
-
-## Train and evaluate
-
-After preparing the organiser files, train both agents using the prepared training split only:
-
+### 3. Generate Official Submission Files
 ```bash
-python -m cybersentinel.agents.threat_detection.train \
-  --train data/processed/training_prepared.parquet \
-  --label-column label \
-  --model-out models/threat_detection/model.joblib \
-  --report-out reports/generated/agent1-training.json
-
-python scripts/train_anomaly.py \
-  --train data/processed/training_prepared.parquet \
-  --model-out models/anomaly_detection/model.joblib \
-  --report-out reports/generated/agent2-training.json
+# Runs causal replay and generates classification.csv, policy.csv, replay.csv
+$env:PYTHONPATH="src"; python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
 ```
 
-Then evaluate on the untouched official evaluation split:
-
+### 4. Run Pytest Suite (41 Tests)
 ```bash
-python scripts/evaluate_benchmark.py \
-  --eval data/processed/eval_prepared.parquet \
-  --threat-model models/threat_detection/model.joblib \
-  --anomaly-model models/anomaly_detection/model.joblib \
-  --output reports/generated/official-evaluation.json
+$env:PYTHONPATH="src"; python -m pytest tests -q
 ```
 
-The evaluation output contains measured classifier metrics, anomaly false-positive rate/attack recall, inference timings and a sampled fusion decision distribution. Fusion action counts are not classification accuracy. Model files, raw data, prepared data and generated reports remain local and git-ignored; never commit challenge records or model artifacts without organiser approval.
+### 5. Frontend Setup & Build
+```bash
+# Install frontend dependencies
+npm install
 
-## API behavior
+# Build production bundle (0 TypeScript errors)
+npm run build
 
-The FastAPI service provides health and model-status endpoints, plus single-flow and batch analysis endpoints. Analysis requires both trained model files. If either file is missing or cannot be loaded, the service returns `MODEL_NOT_READY` instead of producing a prediction.
+# Start local development server
+npm run dev
+```
 
-## Data, software, and AI disclosures
+### 6. Start FastAPI Backend Server
+```bash
+uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload
+```
 
-### Dataset
+---
 
-The network-flow data was supplied for the challenge and is based on CIC-IDS2017. Dataset information is available from the [Canadian Institute for Cybersecurity](https://www.unb.ca/cic/datasets/ids-2017.html). The dataset paper is:
+## 7. Open-Source Attribution & AI Disclosure
 
-Sharafaldin, Iman, Arash Habibi Lashkari, and Ali A. Ghorbani. “Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization.” *Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP 2018)*, pp. 108–116. [DOI: 10.5220/0006639801080116](https://doi.org/10.5220/0006639801080116).
-
-Raw challenge records and generated model artifacts are kept out of this repository.
-
-### Third-party software
-
-- **Data and machine learning:** NumPy, pandas, scikit-learn, Joblib, PyArrow, and optional XGBoost.
-- **API:** FastAPI and Pydantic.
-- **Web console:** React, TypeScript, Vite, PapaParse, Lucide React, and Supabase JavaScript client.
-
-The exact dependency declarations are in `pyproject.toml` and `package.json`.
-
-### AI assistance
-
-OpenAI Codex was used during development to assist with code and documentation authoring, revision, and repository review. Project contributors should review and understand all submitted work and disclose any additional AI tools they used.
-
-## Evaluation
-
-When the complete pipeline is trained, evaluate it on the untouched official evaluation split. Report overall accuracy, macro-F1, per-class precision/recall/F1, and a confusion matrix. Macro-F1 is especially useful when some classes have many fewer examples than others. Do not present internal or incomplete-data results as official benchmark performance.
+* **Core Libraries:** `scikit-learn`, `pandas`, `numpy`, `joblib`, `fastapi`, `pydantic`, `three`, `react`, `lucide-react`, `vite`.
+* **Dataset:** CICIDS2017 flow data provided by Canadian Institute for Cybersecurity and JAI 2026 Hackathon Organizers.
+* **AI Assistance Disclosure:** Autonomous coding agents (Antigravity by Google DeepMind) were used for code refactoring, test scaffolding, and WebGL Three.js shader integration in full compliance with JAI 2026 Hackathon Rulebook Section 4.

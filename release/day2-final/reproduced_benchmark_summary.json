@@ -1,0 +1,112 @@
+{
+  "timestamp": "2026-10-30T17:51:32Z",
+  "dataset": {
+    "path": "C:\\Users\\kaust\\OneDrive\\Desktop\\jai hack\\data\\processed\\eval_prepared.parquet",
+    "rows": 114185,
+    "classes": {
+      "BENIGN": 60001,
+      "BRUTE_FORCE": 1384,
+      "DOS": 24000,
+      "DDOS": 14400,
+      "PORT_SCAN": 14400
+    }
+  },
+  "agent_1_threat_detection": {
+    "model_type": "random_forest",
+    "accuracy": 0.9999562114113062,
+    "macro_f1": 0.9998971631705785,
+    "macro_precision": 0.9999833349998333,
+    "macro_recall": 0.9998110468850353,
+    "per_class": {
+      "BENIGN": {
+        "precision": 0.9999166749991667,
+        "recall": 1.0,
+        "f1": 0.9999583357637472,
+        "support": 60001
+      },
+      "BRUTE_FORCE": {
+        "precision": 1.0,
+        "recall": 0.9992774566473989,
+        "f1": 0.9996385977593061,
+        "support": 1384
+      },
+      "DOS": {
+        "precision": 1.0,
+        "recall": 0.9999166666666667,
+        "f1": 0.9999583315971499,
+        "support": 24000
+      },
+      "DDOS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 14400
+      },
+      "PORT_SCAN": {
+        "precision": 1.0,
+        "recall": 0.9998611111111111,
+        "f1": 0.9999305507326898,
+        "support": 14400
+      }
+    },
+    "confusion_matrix": [
+      [
+        60001,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        1383,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        0,
+        23998,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        14400,
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0,
+        14398
+      ]
+    ],
+    "inference_seconds": 2.336604100011755,
+    "inference_fps": 48867.927604606004
+  },
+  "agent_2_anomaly_detection": {
+    "algorithm": "IsolationForest",
+    "threshold": 0.0332499818530058,
+    "benign_fpr": 0.009583173613773104,
+    "inference_seconds": 6.8807433000038145,
+    "inference_fps": 16594.86410428023
+  },
+  "agent_3_evidence_fusion_sample": {
+    "sample_size": 5000,
+    "actions": {
+      "ALLOW": 2597,
+      "BLOCK": 259,
+      "REVIEW": 2144
+    },
+    "evidence_status": {
+      "AGREE": 2857,
+      "DISAGREE": 2143,
+      "INCOMPLETE": 0
+    }
+  }
+}
