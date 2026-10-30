@@ -18,7 +18,7 @@ type Policy = {
 type CorrelationGroupItem = {
   group_id: string;
   attack_type: string;
-  source_ip: string;
+  source_identity: string;
   target_endpoints: string[];
   flow_count: number;
   evidence: string[];
@@ -348,149 +348,79 @@ export function EvidenceFusionStudio() {
 // 4. TEMPORAL CORRELATION CONSOLE (Agent 4 Sliding-Window & Threat Groups)
 // ============================================================================
 export function TemporalCorrelationConsole() {
-  const [activeWindow, setActiveWindow] = useState(150);
-  const [simulatedGroups, setSimulatedGroups] = useState<CorrelationGroupItem[]>([
-    {
-      group_id: "GRP-0001",
-      attack_type: "PORT_SCAN",
-      source_ip: "192.168.1.105",
-      target_endpoints: ["10.0.0.1:21", "10.0.0.1:22", "10.0.0.1:80", "10.0.0.1:443", "10.0.0.1:8080"],
-      flow_count: 18,
-      evidence: ["Source 192.168.1.105 probed 5 distinct ports within 150-flow window.", "High-speed SYN probe fan-out across common server daemon ports."],
-    },
-    {
-      group_id: "GRP-0002",
-      attack_type: "DDOS",
-      source_ip: "Distributed (14 Sources)",
-      target_endpoints: ["10.0.0.5:80"],
-      flow_count: 142,
-      evidence: ["Destination 10.0.0.5:80 targeted by 14 distinct client stack fingerprints.", "Volumetric surge exceeding 45,000 packets/sec on HTTP ingress."],
-    },
-    {
-      group_id: "GRP-0003",
-      attack_type: "BRUTE_FORCE",
-      source_ip: "192.168.1.88",
-      target_endpoints: ["10.0.0.2:22"],
-      flow_count: 24,
-      evidence: ["Source 192.168.1.88 executed 24 rapid SSH auth attempts on port 22.", "Repeated FIN/RST packet bursts indicating failed credential handshakes."],
-    },
-    {
-      group_id: "GRP-0004",
-      attack_type: "DOS",
-      source_ip: "192.168.2.14",
-      target_endpoints: ["10.0.0.1:80"],
-      flow_count: 86,
-      evidence: ["Source 192.168.2.14 emitted 86 clustered attack flows within 150-record window.", "Slowloris slow-header starvation pattern detected by Agent 1 and Agent 4."],
-    },
-  ]);
+  const [groups, setGroups] = useState<CorrelationGroupItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/correlation/groups?limit=10")
-      .then(res => res.json())
-      .then(data => {
-        if (data.groups && data.groups.length > 0) {
-          setSimulatedGroups(data.groups);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  async function loadGroups() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/correlation/groups?limit=100");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Correlation API unavailable.");
+      setGroups(Array.isArray(payload.groups) ? payload.groups : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load correlation groups.");
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadGroups(); }, []);
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
       <div className="panel-head">
         <div>
           <div className="panel-kicker">AGENT 04 · TEMPORAL CORRELATION & INCIDENTS</div>
-          <h3>Correlated Incident Groups</h3>
-          <p>
-            Agent 4 correlates sliding-window endpoints and flows to detect multi-flow coordinated attack sweeps.
-          </p>
+          <h3>Observed Correlation Groups</h3>
+          <p>Groups emitted by Agent 4 during the latest completed chronological replay. No demo incidents are inserted.</p>
         </div>
-        <span className="panel-icon"><Activity size={18} /></span>
+        <button className="secondary-btn" type="button" onClick={loadGroups} disabled={loading}><RefreshCw size={14}/> Refresh</button>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 15, alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>Sliding Window Size:</span>
-        {[50, 100, 150, 250].map((size) => (
-          <button
-            key={size}
-            onClick={() => setActiveWindow(size)}
-            className="text-btn"
-            style={{
-              padding: "4px 8px",
-              background: activeWindow === size ? "var(--panel)" : "var(--panel2)",
-              borderRadius: 4,
-              border: "1px solid var(--line)",
-              fontSize: 11,
-              color: activeWindow === size ? "var(--blue)" : "var(--muted)",
-              cursor: "pointer",
-            }}
-          >
-            {size} Flows
-          </button>
-        ))}
-      </div>
+      {loading && <div className="empty-inline" style={{ marginTop: 16 }}>Loading observed correlation groups…</div>}
+      {error && <div className="parse-warning" role="alert">{error}</div>}
+      {!loading && !error && groups.length === 0 && (
+        <div className="empty-history" style={{ marginTop: 16 }}>
+          <div className="empty-history-icon"><Activity size={18}/></div>
+          <div><b>No replay correlation groups available</b><span>Run a chronological replay in this API process. The console will show only groups actually produced by Agent 4.</span></div>
+        </div>
+      )}
 
-      <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
-        {simulatedGroups.map((grp) => (
-          <div
-            key={grp.group_id}
-            style={{
-              background: "var(--panel2)",
-              padding: 14,
-              borderRadius: 8,
-              border: "1px solid var(--line)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+      <div style={{ display: "grid", gap: 12, margin: "16px 0" }}>
+        {groups.map(group => (
+          <article key={group.group_id} style={{ background: "var(--panel2)", padding: 15, borderRadius: 9, border: "1px solid var(--line)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 9 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--blue)" }}>
-                  {grp.group_id}
-                </span>
-                <span
-                  className={`tag ${
-                    grp.attack_type === "PORT_SCAN"
-                      ? "tag-amber"
-                      : grp.attack_type === "DDOS"
-                      ? "tag-red"
-                      : "tag-blue"
-                  }`}
-                >
-                  {grp.attack_type}
-                </span>
+                <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--blue)" }}>{group.group_id}</span>
+                <span className={"tag " + (group.attack_type === "PORT_SCAN" ? "tag-amber" : group.attack_type === "DDOS" ? "tag-red" : "tag-blue")}>{group.attack_type}</span>
               </div>
-              <span style={{ fontSize: 11, color: "var(--muted)" }}>{grp.flow_count} Correlated Flows</span>
+              <span style={{ fontSize: 10, color: "var(--muted)" }}>{group.flow_count} observed member flows</span>
             </div>
-
-            <div style={{ fontSize: 12, marginBottom: 8 }}>
-              <b>Source:</b> <span style={{ fontFamily: "monospace" }}>{grp.source_ip}</span> &nbsp;|&nbsp;
-              <b> Targets:</b>{" "}
-              {grp.target_endpoints.map((ep, i) => (
-                <span
-                  key={i}
-                  style={{
-                    fontFamily: "monospace",
-                    background: "var(--panel)",
-                    padding: "2px 5px",
-                    borderRadius: 3,
-                    marginRight: 4,
-                    fontSize: 11,
-                  }}
-                >
-                  {ep}
-                </span>
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10, marginBottom: 10 }}>
+              <div><small style={{ color: "var(--muted)" }}>SOURCE IDENTITY</small><div style={{ fontFamily: "monospace", fontSize: 11, overflowWrap: "anywhere" }}>{group.source_identity || "Not available"}</div></div>
+              <div><small style={{ color: "var(--muted)" }}>FIRST RECORD</small><div style={{ fontFamily: "monospace", fontSize: 11 }}>{group.start_record_id ?? "—"}</div></div>
+              <div><small style={{ color: "var(--muted)" }}>LAST RECORD</small><div style={{ fontFamily: "monospace", fontSize: 11 }}>{group.end_record_id ?? "—"}</div></div>
             </div>
-
-            <div style={{ fontSize: 11, color: "var(--muted)", borderTop: "1px dashed var(--line)", paddingTop: 6 }}>
-              <b>Evidence:</b> {grp.evidence.join(" ")}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 9 }}>
+              {(group.target_endpoints || []).map((endpoint, index) => <span key={index} className="tag">{endpoint}</span>)}
             </div>
-          </div>
+            <div style={{ fontSize: 11, color: "var(--muted)", borderTop: "1px dashed var(--line)", paddingTop: 8 }}>
+              <b>Observed evidence:</b> {(group.evidence || []).join(" ")}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 7 }}>
+              Confidence/evidence strength: {typeof group.confidence === "number" ? group.confidence.toFixed(3) : "not provided"} · Member IDs: {(group.member_record_ids || []).slice(0, 8).join(", ")}{(group.member_record_ids || []).length > 8 ? " …" : ""}
+            </div>
+          </article>
         ))}
       </div>
 
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Strict chronological windowing · No future event lookahead</span>
-        <span>PATTERNS: PORT_SCAN, DDOS_CONVERGENCE, BRUTE_FORCE</span>
+        <span>DATA SOURCE: LATEST COMPLETED REPLAY</span>
       </div>
     </section>
   );
