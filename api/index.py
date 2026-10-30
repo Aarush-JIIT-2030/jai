@@ -312,6 +312,82 @@ def validate_submissions():
     return report
 
 
+@app.get("/api/overview")
+def get_overview():
+    """Compute SOC KPIs from actual replay artifacts; labels are evaluation-only."""
+    import csv
+
+    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    sub_dir = BASE_DIR / "outputs" / "submission"
+    class_file = sub_dir / "classification.csv"
+    replay_file = sub_dir / "replay.csv"
+    policy_file = sub_dir / "policy.csv"
+    required = (eval_file, class_file, replay_file, policy_file)
+    missing = [str(path.relative_to(BASE_DIR)) for path in required if not path.is_file()]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "OVERVIEW_ARTIFACTS_NOT_READY", "missing": missing,
+                    "message": "Overview metrics are unavailable until the evaluation dataset and replay artifacts are installed."},
+        )
+    try:
+        flows = pd.read_parquet(eval_file)
+        classifications = pd.read_csv(class_file, dtype={"record_id": str})
+        replay = pd.read_csv(replay_file, dtype={"record_id": str, "applied_policy_id": str})
+        policies = pd.read_csv(policy_file)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "OVERVIEW_READ_FAILED", "type": type(exc).__name__}) from exc
+
+    if "label" not in flows.columns:
+        raise HTTPException(status_code=503, detail="Evaluation labels are required only for offline metric calculation.")
+    flow_ids = [str(value) for value in flows["record_id"].tolist()] if "record_id" in flows.columns else [str(value) for value in flows.index]
+    if len(set(flow_ids)) != len(flow_ids):
+        raise HTTPException(status_code=503, detail="Evaluation record IDs are not unique.")
+    if classifications["record_id"].astype(str).duplicated().any() or replay["record_id"].astype(str).duplicated().any():
+        raise HTTPException(status_code=503, detail="Submission artifacts contain duplicate record IDs.")
+
+    class_ids = set(classifications["record_id"].astype(str))
+    replay_ids = set(replay["record_id"].astype(str))
+    expected_ids = set(flow_ids)
+    if class_ids != expected_ids or replay_ids != expected_ids:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "OVERVIEW_RECORD_MISMATCH", "expected": len(expected_ids),
+                    "classification": len(class_ids), "replay": len(replay_ids)},
+        )
+
+    truth = dict(zip(flow_ids, flows["label"].astype(str).str.upper().tolist()))
+    actions = dict(zip(replay["record_id"].astype(str), replay["action"].astype(str).str.upper()))
+    total = len(flow_ids)
+    blocked = sum(action == "BLOCK" for action in actions.values())
+    allowed = sum(action == "ALLOW" for action in actions.values())
+    attacks = sum(label != "BENIGN" for label in truth.values())
+    benign = total - attacks
+    attack_blocks = sum(actions[rid] == "BLOCK" and truth[rid] != "BENIGN" for rid in flow_ids)
+    false_blocks = sum(actions[rid] == "BLOCK" and truth[rid] == "BENIGN" for rid in flow_ids)
+    benign_preserved = sum(actions[rid] == "ALLOW" and truth[rid] == "BENIGN" for rid in flow_ids)
+    attack_misses = attacks - attack_blocks
+
+    return {
+        "source": "local_evaluation_dataset_and_generated_submission_csvs",
+        "labels_used_for": "offline_metric_calculation_only",
+        "metrics": {
+            "total_records": total, "blocked_records": blocked, "allowed_records": allowed,
+            "policies_created": int(len(policies)), "attack_records": attacks, "benign_records": benign,
+            "attacks_contained": attack_blocks, "attacks_allowed": attack_misses,
+            "false_blocks": false_blocks, "benign_preserved": benign_preserved,
+            "attack_containment_rate": round(100 * attack_blocks / max(1, attacks), 2),
+            "benign_preservation_rate": round(100 * benign_preserved / max(1, benign), 2),
+            "block_precision": round(100 * attack_blocks / max(1, blocked), 2),
+        },
+        "integrity": {
+            "classification_rows": len(classifications), "replay_rows": len(replay),
+            "policy_rows": len(policies), "record_ids_match": True,
+            "action_conservation": total == blocked + allowed,
+        },
+    }
+
+
 @app.get("/api/benchmarks")
 def get_benchmarks():
     """Return only metrics loaded from a generated benchmark report."""
