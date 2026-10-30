@@ -111,11 +111,12 @@ class TemporalCorrelationAgent:
             if not self.source_port_counts[old_src]:
                 del self.source_port_counts[old_src]
 
-            self.dest_source_counts[old_dst][old_src] -= 1
-            if self.dest_source_counts[old_dst][old_src] <= 0:
-                del self.dest_source_counts[old_dst][old_src]
-            if not self.dest_source_counts[old_dst]:
-                del self.dest_source_counts[old_dst]
+            if old_dst:
+                self.dest_source_counts[old_dst][old_src] -= 1
+                if self.dest_source_counts[old_dst][old_src] <= 0:
+                    del self.dest_source_counts[old_dst][old_src]
+                if not self.dest_source_counts[old_dst]:
+                    del self.dest_source_counts[old_dst]
 
         # Track in sliding window structures
         self.history.append({
@@ -127,7 +128,8 @@ class TemporalCorrelationAgent:
             "confidence": confidence or 0.0,
         })
         self.source_port_counts[src_ip][dport] += 1
-        self.dest_source_counts[dst_ip][src_ip] += 1
+        if dst_ip:
+            self.dest_source_counts[dst_ip][src_ip] += 1
 
         evidence: list[str] = []
         attack_type: str | None = None
@@ -144,8 +146,8 @@ class TemporalCorrelationAgent:
             )
 
         # Check Pattern 2: Distributed Denial of Service (many sources targeting single destination)
-        sources_targeting_dest = self.dest_source_counts[dst_ip]
-        if len(sources_targeting_dest) >= 8 and (threat_class in ("DDOS", "DOS") or dport in (80, 443, 8080)):
+        sources_targeting_dest = self.dest_source_counts[dst_ip] if dst_ip else {}
+        if dst_ip and len(sources_targeting_dest) >= 8 and (threat_class in ("DDOS", "DOS") or dport in (80, 443, 8080)):
             correlated = True
             attack_type = "DDOS"
             evidence.append(
@@ -193,7 +195,7 @@ class TemporalCorrelationAgent:
                     group_id=new_group_id,
                     attack_type=attack_type,
                     source_ip=src_ip,
-                    target_endpoints=[f"{dst_ip}:{dport}"],
+                    target_endpoints=[f"{dst_ip}:{dport}"] if dst_ip else [],
                     member_record_ids=[record_id],
                     flow_count=1,
                     start_record_id=record_id,
@@ -207,8 +209,8 @@ class TemporalCorrelationAgent:
                 existing.end_record_id = record_id
                 if record_id not in existing.member_record_ids:
                     existing.member_record_ids.append(record_id)
-                target_str = f"{dst_ip}:{dport}"
-                if target_str not in existing.target_endpoints:
+                target_str = f"{dst_ip}:{dport}" if dst_ip else ""
+                if target_str and target_str not in existing.target_endpoints:
                     existing.target_endpoints.append(target_str)
                 existing.evidence = evidence
 
