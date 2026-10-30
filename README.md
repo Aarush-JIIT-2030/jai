@@ -12,7 +12,7 @@ CyberSentinel is an offline network-flow intrusion-detection prototype. It analy
 - **API:** Python + FastAPI on Vercel Functions.
 - **Authentication and run history:** Supabase Auth + Postgres with row-level security.
 - **ML training:** Python, Pandas, NumPy, scikit-learn, Joblib and PyArrow. Train locally; do not train large models inside a Vercel request.
-- **Inference status:** The API health endpoint is available. Agent 1 software and Member 1 data preprocessing are implemented. Official classifier metrics and complete inference remain pending; the API stays fail-closed until trained artifacts and both agents are integrated.
+- **Inference status:** Agent 1, Agent 2, Agent 3 and fail-closed API integration are implemented. Model artifacts are not present in the repository; train them locally from the organiser files before inference can become ready. Official evaluation metrics remain pending.
 
 ## Day 1 benchmark
 
@@ -92,6 +92,35 @@ The preprocessor learns feature selection and fill values from training only, ex
 
 The progress Q&A based on work completed to date is in [`docs/day1-progress-questionnaire.md`](docs/day1-progress-questionnaire.md). It is a working status document, not an organiser-provided form.
 
+## Train, evaluate and run the agents
+
+After preparing the organiser Parquet files with the Member 1 command above, train the agents locally:
+
+```bash
+python -m cybersentinel.agents.threat_detection.train \\
+  --train data/processed/training_prepared.parquet \\
+  --label-column label \\
+  --model-out models/threat_detection/model.joblib \\
+  --report-out reports/generated/agent1-training.json
+
+python scripts/train_anomaly.py \\
+  --train data/processed/training_prepared.parquet \\
+  --model-out models/anomaly_detection/model.joblib \\
+  --report-out reports/generated/agent2-training.json
+```
+
+Evaluate both models on the untouched official evaluation split only after training:
+
+```bash
+python scripts/evaluate_benchmark.py \\
+  --eval data/processed/eval_prepared.parquet \\
+  --threat-model models/threat_detection/model.joblib \\
+  --anomaly-model models/anomaly_detection/model.joblib \\
+  --output reports/generated/official-evaluation.json
+```
+
+The evaluation command reports measured five-class accuracy, macro-F1, per-class metrics, confusion matrix, anomaly false-positive rate/attack recall, inference timings and a sampled fusion decision distribution. Fusion decision counts are not classification accuracy. Generated models, datasets and reports remain local and git-ignored. Only after artifacts have been verified and securely made available to the deployment should `/api/health` report `model_ready: true`.
+
 ## Supabase and Vercel
 
 The `analysis_runs` table stores per-user run metadata and measured metrics only. RLS restricts access to the authenticated row owner. Raw flow records and datasets are not stored in Supabase.
@@ -115,6 +144,6 @@ Report measured accuracy, macro-F1, per-class precision/recall/F1, confusion mat
 
 - **Member 1 data audit and preprocessing:** completed for the supplied Parquet files; code and aggregate findings are merged in [PR #6](https://github.com/kaustubhdua/jai-hack/pull/6). No challenge rows or fitted values are committed.
 - **Agent 1 software:** implemented and merged in [PR #5](https://github.com/kaustubhdua/jai-hack/pull/5). It has not yet produced official benchmark metrics on the supplied files.
-- **Agent 2 anomaly detector:** not implemented yet; the current module is a placeholder.
-- **Evidence fusion:** not implemented yet; the current module is a placeholder.
-- **Official evaluation and submission:** benchmark accuracy/macro-F1 and API submission are still pending. The API remains fail-closed until the full inference pipeline is ready.
+- **Agent 2 anomaly detector:** Isolation Forest baseline, benign-only training, persisted threshold and feature evidence are implemented; real organiser-data training is pending.
+- **Evidence fusion:** deterministic, fail-safe evidence fusion and orchestration are merged; focused policy tests are included.
+- **Official evaluation and submission:** benchmark accuracy/macro-F1 and API submission are still pending. The API remains fail-closed until both model artifacts are trained and deployed.
