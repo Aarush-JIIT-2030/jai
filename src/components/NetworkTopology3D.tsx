@@ -39,7 +39,7 @@ const NODES_METADATA: Record<string, NodeData> = {
     latency: "Model benchmark metadata",
     flows: "Awaiting measured replay",
     color: 0x06b6d4, // Cyan
-    description: "Evaluates 71 preprocessed network flow statistics to classify known attack families (DoS, DDoS, PortScan, BruteForce) with calibrated probability confidence.",
+    description: "Evaluates 71 preprocessed network flow statistics to classify known attack families (DoS, DDoS, PortScan, BruteForce) with model confidence (not probability-calibrated).",
     contract: "Input: 71 numeric flow statistics -> Output: Class + Confidence",
   },
   agent2: {
