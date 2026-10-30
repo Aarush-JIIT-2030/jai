@@ -12,80 +12,81 @@ CyberSentinel is an offline network-flow intrusion-detection prototype. It analy
 - **API:** Python + FastAPI on Vercel Functions.
 - **Authentication and run history:** Supabase Auth + Postgres with row-level security.
 - **ML training:** Python, Pandas, NumPy, scikit-learn and Joblib. Train locally; do not train large models inside a Vercel request.
-- **Inference status:** API health endpoint is available. Predictions intentionally remain disabled until real models are trained and verified on organiser data.
+- **Inference status:** The API health endpoint is available. The Agent 1 training/prediction code is implemented, but official inference remains gated until the organiser dataset is used to train and validate the model.
 
 ## Day 1 benchmark
 
-The organiser benchmark classes are `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN`. Use the exact label mapping and train/validation files supplied by organisers. Do not infer mappings. Keep official validation data unchanged.
+The organiser benchmark classes are BENIGN, BRUTE_FORCE, DOS, DDOS and PORT_SCAN. Use the exact label mapping and train/validation files supplied by organisers. Do not infer mappings. Keep official validation data unchanged.
 
 ## Architecture
 
-1. **Threat Detection Agent** — supervised five-class classifier; returns predicted class and confidence.
+1. **Threat Detection Agent** — supervised five-class classifier; returns predicted class and model-derived confidence.
 2. **Anomaly Agent** — independent anomaly score and feature evidence; must not consume Agent 1's prediction.
 3. **Evidence Fusion Agent** — combines both outputs, records agreement/disagreement, final class, rationale and simulated action.
 
-Shared contracts are in `src/cybersentinel/contracts.py`. Pipeline orchestration is in `src/cybersentinel/pipeline.py`.
+Shared contracts are in src/cybersentinel/contracts.py. Pipeline orchestration is in src/cybersentinel/pipeline.py.
 
 ## Local setup
 
 Node.js 20+ and Python 3.10+ recommended.
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
+    npm install
+    cp .env.example .env.local
+    npm run dev
 
-Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local` for local auth. The publishable key is intended for browser use; database access is protected by RLS. Never put a service-role key in frontend variables.
+Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local for local auth. Never put a service-role key in frontend variables.
 
-For Python API development:
+For Python API and ML development:
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]"
 
-For local ML training and evaluation dependencies:
+Optional XGBoost experiment:
 
-```bash
-pip install -r requirements-ml.txt
-```
+    pip install -e ".[xgboost]"
 
 Run frontend build and tests:
 
-```bash
-npm run build
-pytest
-```
+    npm run build
+    pytest
+
+## Agent 1 — Member 2 workstream
+
+The supervised classifier is implemented in src/cybersentinel/agents/threat_detection/:
+
+- model.py — trainable Random Forest baseline and optional XGBoost backend, preprocessing, model-derived confidence, versioned save/load.
+- train.py — organiser-label mapping validation, training and optional official validation evaluation.
+- predict.py — adapter preserving the main pipeline's ThreatDetectionAgent interface.
+- predict_cli.py — batch CSV predictions.
+- evaluate.py — accuracy, macro-F1, class-wise precision/recall/F1 and confusion matrix.
+
+Detailed instructions and commands: docs/AGENT1.md.
+
+Training example (replace file names and label column with the organiser's actual files/schema):
+
+    python -m cybersentinel.agents.threat_detection.train --train-csv data/raw/train.csv --label-column Label --validation-csv data/raw/validation.csv
+
+If source labels are not already the five canonical classes, pass --label-map with the exact organiser-provided JSON mapping. The software deliberately refuses to guess mappings. The official validation file is evaluation-only and is never used to fit preprocessing or the classifier.
 
 ## Dataset handling
 
-Put organiser-provided CSV files under `data/raw/` (git-ignored). Never commit raw or processed challenge data unless organisers explicitly permit redistribution. The current web console inspects CSV headers and label distribution locally in the browser; it does not upload the file. It does not claim to perform model inference.
+Put organiser-provided CSV files under data/raw/ (git-ignored). Never commit raw or processed challenge data unless organisers explicitly permit redistribution. The web console inspects CSV headers and label distribution locally in the browser; it does not claim to perform model inference.
 
-## Supabase
+## Supabase and Vercel
 
-The `analysis_runs` table stores per-user run metadata and measured metrics only. RLS restricts select/insert/update/delete to the authenticated row owner. Raw flow records and uploaded datasets are not stored in Supabase.
+The analysis_runs table stores per-user run metadata and measured metrics only. RLS restricts access to the authenticated row owner. Raw flow records and datasets are not stored in Supabase.
 
-## Vercel deployment
-
-The Vercel project is connected to `kaustubhdua/jai-hack` and configured for Vite. Required frontend variables:
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-
-The Python API is in `api/index.py`. `GET /api/health` reports service readiness. `POST /api/analyze` fails closed with `MODEL_NOT_READY` until the real inference pipeline and model artifacts are integrated.
+The Python API is in api/index.py. GET /api/health reports service readiness. POST /api/analyze remains fail-closed with MODEL_NOT_READY until the complete real inference pipeline and model artifacts are integrated.
 
 ## Team ownership
 
 | Workstream | Suggested owner | Main paths |
 |---|---|---|
-| Data inspection and preprocessing | Teammate 1 | `src/cybersentinel/data/` |
-| Supervised threat classifier | Teammate 2 | `src/cybersentinel/agents/threat_detection.py` |
-| Independent anomaly detector | Teammate 3 | `src/cybersentinel/agents/anomaly_detection.py` |
-| Fusion, integration, evaluation | Team lead / integrator | `src/cybersentinel/agents/fusion.py`, `pipeline.py`, `evaluation/` |
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for branches, interface rules and data safety.
+| Data inspection and preprocessing | Teammate 1 | src/cybersentinel/data/ |
+| Supervised threat classifier | Teammate 2 | src/cybersentinel/agents/threat_detection/ |
+| Independent anomaly detector | Teammate 3 | src/cybersentinel/agents/anomaly_detection.py |
+| Fusion, integration and submission | Team lead / integrator | src/cybersentinel/agents/fusion.py, pipeline.py, evaluation/ |
 
 ## Metrics and disclosure
 
@@ -93,4 +94,4 @@ Report measured accuracy, macro-F1, per-class precision/recall/F1, confusion mat
 
 ## Current status
 
-The web console, Supabase auth/history foundation, RLS-protected metadata table and Vercel API health endpoint are scaffolded. Model training, actual predictions, fusion decisions and official validation metrics remain pending receipt and inspection of the organiser dataset and label mapping.
+Agent 1's software implementation and synthetic unit tests are in place. Training and benchmark metrics on the official dataset are still pending receipt and inspection of the organiser files and exact label mapping. Agent 2, Evidence Fusion, and end-to-end official API submission remain separate integration workstreams.
