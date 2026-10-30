@@ -1,83 +1,82 @@
-# CyberSentinel — Hackathon Live Demo Rehearsal & Presentation Script
+# CyberSentinel — Corrected Live Demonstration Runbook
 
-**Document ID:** CS-VERIFY-09  
-**Project:** CyberSentinel — Multi-Agent Network Intrusion Detection & Adaptive Defense  
-**Track:** JAI 2026 Hackathon | Track 1: Agentic AI for Cybersecurity  
-**Audit Status:** REHEARSED & READY — 5-MINUTE LIVE DEMONSTRATION RUNBOOK  
-**Audience:** Technical Judges, Security Evaluators, AI Researchers  
+**Status:** Presenter runbook aligned to the current application and official Day 2 requirements. Rehearse from a clean local startup before presenting.
 
----
+## Before the panel
 
-## 1. Demo Structure & Timing Blueprint
+1. Confirm the organiser-provided evaluation dataset is installed at `data/processed/eval_prepared.parquet`.
+2. Confirm both model artifacts exist and pass model loading.
+3. Start the FastAPI backend and Vite frontend using the repository's documented commands.
+4. Open Settings & Health and verify the API and model readiness.
+5. Run the official replay once if the panel expects pre-generated CSVs. The Replay Studio now calls the backend; it does not animate fake progress.
+6. Open Submission Studio and run the actual validator.
+7. Keep the terminal visible for any command the panel asks to inspect.
 
-This script is structured for a 5-minute live judging evaluation, showcasing technical depth, live WebGL interactivity, rigorous mathematics, and transparent engineering honesty.
+## Five-minute demonstration
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       5-MINUTE PANEL PRESENTATION TIMELINE                  │
-├─────────────┬─────────────────────────────────┬─────────────────────────────┤
-│ Timestamp   │ Segment                         │ Primary Screen / Action     │
-├─────────────┼─────────────────────────────────┼─────────────────────────────┤
-│ 00:00-00:45 │ Hook & Architecture Overview    │ Slide / Console 01 Overview │
-│ 00:45-01:45 │ WebGL 3D SOC & Spatial Topology │ Console 01 WebGL 3D Canvas  │
-│ 01:45-02:45 │ Five-Agent Defense Pipeline     │ Consoles 03, 04, 05 & 06    │
-│ 02:45-03:30 │ Live Scenario Trigger & Policy  │ Scenario Launcher & Replay  │
-│ 03:30-04:15 │ Mathematical Proofs & Metrics   │ Console 09 Evaluation Suite │
-│ 04:15-05:00 │ Submission Lockdown & Q&A       │ Console 10 Submission Hub   │
-└─────────────┴─────────────────────────────────┴─────────────────────────────┘
-```
+### 00:00–00:40 — Product overview
 
----
+Open Overview. Explain that CyberSentinel is an offline network-flow replay and simulated-defense product. Rotate and inspect the Three.js topology. Explain that it is an interactive architecture schematic; do not describe it as live network telemetry.
 
-## 2. Step-by-Step Presenter Script
+### 00:40–01:20 — Five-agent architecture
 
-### Minute 0:00 – 0:45: Hook & System Purpose
-- **Action:** Open browser at `http://localhost:5173/`. Landing screen is `Console 01: Overview`.
-- **Spoken Narrative:**
-  > "Good morning judges. In modern cloud and enterprise perimeters, attacks evolve faster than static firewall rules can be manually authored. CyberSentinel is an autonomous, five-agent network intrusion detection and adaptive defense system. It doesn't just classify threats—it formulates temporary, simulated firewall policies to actively contain cascading attack bursts while preserving legitimate enterprise traffic. Over 114,185 evaluation flows, CyberSentinel achieved an 88.99% attack containment rate while maintaining 88.99% benign traffic availability with strict physical causality and zero lookahead."
+Open Five-Agent Architecture and explain the official division:
 
-### Minute 0:45 – 01:45: WebGL 3D Command Center Interactivity
-- **Action:** Use mouse to rotate the 3D topology. Click on the `Threat Classifier` node. The Node Telemetry Drawer slides out from the right. Click `Reset View`. Click `2D View` toggle, then switch back to `3D View`.
-- **Spoken Narrative:**
-  > "Here in our SOC Command Center, we render a hardware-accelerated 3D WebGL topology built in Three.js. Each tier represents a vital layer of enterprise defense—from internet ingress and perimeter firewalls down to our five agent pods and internal databases. Clicking any node engages our raycasting engine, surfacing real-time packet throughput and health metrics. If an analyst operates on a lightweight terminal or remote tablet, a single click toggles instantly to an interactive 2D SVG topological schematic."
+- A1 supervised five-class threat detection.
+- A2 independent anomaly detection.
+- A3 evidence fusion.
+- A4 temporal correlation.
+- A5 temporary simulated defense policies.
 
-### Minute 01:45 – 02:45: The Five-Agent Pipeline in Action
-- **Action:** Click `Threat Detection` in the sidebar, then `Zero-Day Anomalies`, then `Correlation Hub`, and finally `Policy Guardrails`.
-- **Spoken Narrative:**
-  > "Our architecture divides defense among five specialized agents:
-  > - **Agent 1 (Classifier):** LightGBM model categorizing flows into 5 classes with sub-millisecond inference.
-  > - **Agent 2 (Anomaly Detector):** Isolation Forest identifying zero-day mutations and stealthy volumetric drift.
-  > - **Agent 3 (Temporal Correlation):** Sliding-window correlation that unmasks distributed port scans and multi-vector DDoS floods.
-  > - **Agent 4 (Policy Engine):** Generates time-bounded, simulated firewall rules with adaptive TTLs.
-  > - **Agent 5 (Reporter):** Generates automated incident narratives with SHAP feature explanations."
+Explain the input/output contract of each agent. Do not describe A1 confidence as calibrated; the current RandomForest implementation exposes maximum `predict_proba` output, which is not calibrated.
 
-### Minute 02:45 – 03:30: Live Attack Scenario & Causality Verification
-- **Action:** Return to `Overview` and click the `Launch DDoS Scenario` button. Point to the packet pulses turning crimson and the active policy table populating.
-- **Spoken Narrative:**
-  > "Let's trigger an incoming DDoS attack burst. Notice two critical invariants:
-  > 1. **Zero Self-Blocking:** The packet that triggers policy creation is never blocked itself—adhering to real-world network physics.
-  > 2. **Pre-Filtering:** As soon as the rule is active, subsequent attack packets are dropped at the pre-filter stage, saving expensive ML scoring."
+### 01:20–02:00 — A1/A2 evidence and A3 fusion
 
-### Minute 03:30 – 04:15: Mathematical Verification & Identity Proofs
-- **Action:** Click `Evaluation Suite` in the sidebar. Scroll to the green mathematical conservation cards.
-- **Spoken Narrative:**
-  > "We hold our evaluation to absolute mathematical rigor. Across all 114,185 flows, every single packet is accounted for:
-  > - 54,828 blocked + 59,357 allowed = exactly 114,185 total flows.
-  > - 48,219 correctly blocked attacks + 6,609 false blocks = 54,828 blocked flows.
-  > - In earlier prototypes, false blocks reached 28,000 due to unbounded state leakage. By auditing and fixing our sliding-window port tracking, we reduced false blocks by 76.7%."
+Open Flow Inspector and inspect a record or a clearly labelled test fixture. Then open Evidence Fusion. Change the A1 class/confidence and A2 score/flag and select **Run production fusion**. Explain that the result is returned by the Python `EvidenceFusionAgent`, not calculated by a duplicate frontend rule set.
 
-### Minute 04:15 – 05:00: Submission Integrity & Mandatory Disclosure
-- **Action:** Click `Submission Manager`. Highlight the three green checkmarks and SHA-256 hashes.
-- **Spoken Narrative:**
-  > "All three official submission files—`classification.csv`, `policy.csv`, and `replay.csv`—pass the organizer validation suite with zero errors. Furthermore, in the spirit of engineering transparency, we explicitly disclose that because the benchmark parquet omitted raw IP columns, CyberSentinel derives host identities via passive client TCP stack fingerprinting across 2,484 host clusters. Thank you, and we welcome your questions."
+### 02:00–02:45 — A4 temporal correlation
 
----
+Open Replay Studio and run the actual official replay if the dataset and model artifacts are present. Then open Temporal Investigations and refresh. Show only groups returned by the latest replay. If no groups are available, explain that the console is empty because no replay group has been produced; do not use fabricated sample incidents.
 
-## 3. Disaster Recovery & Fallback Runbook
+### 02:45–03:35 — A5 adaptive defense and causality
 
-| Failure Mode | Trigger / Symptom | Recovery Action |
-|---|---|---|
-| **WebGL Context Lost** | GPU driver reset or browser tab suspended | Click the "2D View" toggle on the top right of the canvas. The system falls back to 2D SVG instantly. |
-| **Backend API Disconnected** | Terminal window closed or process killed | Restart backend in terminal: `python -m uvicorn src.cybersentinel.server.app:app --port 8000`. Frontend reconnects automatically. |
-| **Browser Freezes** | Out of memory on low-spec hardware | Refresh browser (`Ctrl+F5`). State is persistently restored from local storage and backend SQLite cache. |
+Open Adaptive Defense. Inspect actual policy rows. Use the pre-filter tester with a scope value copied from an actual generated policy and test record positions before activation, during the active interval, and after expiry.
 
+Explain:
+- The policy is created after the triggering record.
+- The triggering record remains ALLOW.
+- Only later matching records can be BLOCKED while the policy is active.
+- All policy actions are simulated; no operating-system firewall is changed.
+
+### 03:35–04:30 — Replay metrics and trade-offs
+
+Return to Replay Studio and show the returned replay metrics. Explain attack containment, block precision, benign preservation and false blocks using their correct denominators. If the evaluation dataset is unlabelled, label-based rates are unavailable; do not invent them.
+
+### 04:30–05:00 — Submission files
+
+Open Submission Studio. Run the current validator and download:
+- `classification.csv`
+- `policy.csv`
+- `replay.csv`
+
+Explain that local validation is not the same as a successful upload to the organiser API. Only claim upload success after receiving an actual organiser API response.
+
+## Technical points judges may ask
+
+**Why does classification include blocked records?** The official brief requires one five-class prediction per evaluation record, including flows later blocked during replay.
+
+**Can the triggering record block itself?** No. A5 activates a policy after the triggering record; only later matching records can be blocked.
+
+**Does the system use hidden labels?** No labels are used in prediction, fusion, correlation or policy creation. Labels, when present in a permitted labelled evaluation dataset, are used only for offline metric calculation.
+
+**Are the IP values real?** The prepared evaluation parquet has no native Layer 3 source/destination IP fields. Any endpoint identity derived from flow features is synthetic/derived and collision-prone; disclose that limitation clearly.
+
+**Does CyberSentinel modify the real firewall?** No. It is an offline replay with in-memory simulated policies.
+
+## Recovery
+
+- If models are unavailable, do not claim the agents are ready. Show the health diagnostics and explain the missing artifact.
+- If the evaluation dataset is unavailable, do not claim a full replay was run. Use a clearly labelled small test fixture only to explain the code path.
+- If the API is disconnected, restart the backend and refresh the UI.
+- If WebGL is unsupported, use the 2D fallback.
+- If the organiser API is not announced, show locally generated and validated CSVs only; do not claim submission.
