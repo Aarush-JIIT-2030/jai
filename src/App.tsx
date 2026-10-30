@@ -7,6 +7,7 @@ import {
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
+import { AgentReadiness, FlowInspector } from "./FlowInspector";
 
 type Health = { status: string; service: string; model_ready: boolean; message?: string };
 type HistoryRow = { id: string; dataset_name: string; dataset_rows: number; processed_rows: number; status: string; accuracy: number | null; macro_f1: number | null; created_at: string };
@@ -135,13 +136,15 @@ export default function App() {
       <div className="nav-label nav-label-lower">SYSTEM</div>
       <button className="nav-item" onClick={()=>setNotice("Settings are managed through this workspace's environment configuration.")}><SlidersHorizontal size={17}/>Settings</button>
       <button className="nav-item" onClick={()=>setNotice("Use the repository README and CONTRIBUTING guide for project documentation.")}><CircleHelp size={17}/>Documentation<ArrowUpRight size={13} className="nav-external"/></button>
-      <div className="sidebar-bottom"><div className="system-card"><div className="system-card-head"><span className="pulse-dot"/> SYSTEM STATUS</div><div className="system-row"><span>Web console</span><b className="status-ok">Operational</b></div><div className="system-row"><span>Inference API</span><b className={health?.status==="ok"?"status-ok":"status-warn"}>{health?.status==="ok"?"Online":"Not ready"}</b></div><div className="system-row"><span>ML models</span><b className="status-warn">Pending</b></div></div><div className="profile-row"><div className="profile-avatar">{(session.user.email?.[0]??"U").toUpperCase()}</div><div className="profile-meta"><b>{session.user.email}</b><small>Authenticated member</small></div><button title="Sign out" onClick={signOut} className="icon-btn"><LogOut size={16}/></button></div></div>
+      <div className="sidebar-bottom"><div className="system-card"><div className="system-card-head"><span className="pulse-dot"/> SYSTEM STATUS</div><div className="system-row"><span>Web console</span><b className="status-ok">Operational</b></div><div className="system-row"><span>Inference API</span><b className={health?.status==="ok"?"status-ok":"status-warn"}>{health?.status==="ok"?"Online":"Not ready"}</b></div><div className="system-row"><span>ML models</span><b className={health?.model_ready ? "status-ok" : "status-warn"}>{health?.model_ready ? "Ready" : "Pending"}</b></div></div><div className="profile-row"><div className="profile-avatar">{(session.user.email?.[0]??"U").toUpperCase()}</div><div className="profile-meta"><b>{session.user.email}</b><small>Authenticated member</small></div><button title="Sign out" onClick={signOut} className="icon-btn"><LogOut size={16}/></button></div></div>
     </aside>
     <main className="main-content">
       <header className="topbar"><div className="crumb"><span>Workspace</span><span>/</span><b>{activeNav}</b></div><div className="top-actions"><div className="env-pill"><span className="pulse-dot"/> OFFLINE REPLAY MODE</div><button className="icon-btn" title="Refresh API status" onClick={checkHealth}><RefreshCw size={16}/></button><button className="icon-btn" title="Notifications" onClick={()=>setNotice("No new notifications.")}><Bell size={16}/></button><div className="top-avatar">{(session.user.email?.[0]??"U").toUpperCase()}</div></div></header>
       <div className="page-wrap">
         <section className="page-heading"><div><div className="eyebrow">THREAT INTELLIGENCE CONSOLE <span className="heading-line"/></div><h1>{activeNav==="Overview"?"Security overview":activeNav}</h1><p>Monitor network-flow datasets, inspect evidence, and orchestrate agent-based detection.</p></div><div className="heading-actions"><span className="date-chip">JAI 2026 <span>·</span> DAY 1</span><button className="primary-btn" onClick={()=>inputRef.current?.click()}><CloudUpload size={16}/> Inspect dataset</button></div></section>
         {notice && <div className="notice"><Check size={15}/>{notice}<button onClick={()=>setNotice("")}><X size={15}/></button></div>}
+        {activeNav === "Flow analysis" && <FlowInspector modelReady={Boolean(health?.model_ready)} />}
+        {activeNav === "Agent intelligence" && <AgentReadiness health={health} />}
         <section className="metrics-grid">
           <Metric icon={Database} label="DATASET RECORDS" value={dataset?formatNumber(dataset.rows):"—"} detail={dataset?"Loaded in browser":"Awaiting organiser CSV"} tone="blue"/>
           <Metric icon={ShieldCheck} label="THREAT CLASSES" value="05" detail="Benchmark taxonomy" tone="green"/>
