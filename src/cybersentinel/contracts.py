@@ -28,6 +28,9 @@ class FusionResult:
     evidence_status: Literal["AGREE", "DISAGREE", "INCOMPLETE"]
     action: PolicyAction
     rationale: list[str] = field(default_factory=list)
+    agent_agreement: str | None = None
+    confidence: float | None = None
+    supporting_evidence: list[Any] = field(default_factory=list)
     threat_detection: ThreatDetectionResult | None = None
     anomaly_detection: AnomalyDetectionResult | None = None
 
