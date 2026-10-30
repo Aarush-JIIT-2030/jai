@@ -94,3 +94,18 @@
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+.spin-icon{animation:cs-spin .9s linear infinite}
+@keyframes cs-spin{to{transform:rotate(360deg)}}
+@media(max-width:760px){
+  .panel div[style*="repeat(4,minmax(0,1fr))"],
+  .panel div[style*="repeat(4, 1fr)"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .panel div[style*="repeat(3,minmax(0,1fr))"],
+  .panel div[style*="repeat(3, 1fr)"]{grid-template-columns:1fr!important}
+  .panel div[style*="repeat(5, 1fr)"]{display:flex!important;overflow-x:auto;gap:8px}
+  .panel table{min-width:640px}
+}
+@media(max-width:420px){
+  .panel div[style*="repeat(2,minmax(0,1fr))"],
+  .panel div[style*="repeat(2, 1fr)"]{grid-template-columns:1fr!important}
+}
