@@ -7,10 +7,10 @@ import {
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { AgentReadiness, FlowInspector } from "./FlowInspector";
+import { Agent2Console, AgentReadiness, FlowInspector } from "./FlowInspector";
 import { BatchReplay } from "./BatchReplay";
 
-type Health = { status: string; service: string; model_ready: boolean; message?: string };
+type Health = { status: string; service: string; model_ready: boolean; agents?: Record<string, boolean>; message?: string };
 type HistoryRow = { id: string; dataset_name: string; dataset_rows: number; processed_rows: number; status: string; accuracy: number | null; macro_f1: number | null; created_at: string };
 type DatasetInfo = { name: string; rows: number; columns: string[]; labels: Record<string, number>; labelColumn: string | null; errors: string[] };
 
@@ -144,12 +144,12 @@ export default function App() {
       <div className="page-wrap">
         <section className="page-heading"><div><div className="eyebrow">THREAT INTELLIGENCE CONSOLE <span className="heading-line"/></div><h1>{activeNav==="Overview"?"Security overview":activeNav}</h1><p>Monitor network-flow datasets, inspect evidence, and orchestrate agent-based detection.</p></div><div className="heading-actions"><span className="date-chip">JAI 2026 <span>·</span> DAY 1</span><button className="primary-btn" onClick={()=>inputRef.current?.click()}><CloudUpload size={16}/> Inspect dataset</button></div></section>
         {notice && <div className="notice"><Check size={15}/>{notice}<button onClick={()=>setNotice("")}><X size={15}/></button></div>}
-        {activeNav === "Flow analysis" && <><FlowInspector modelReady={Boolean(health?.model_ready)} /><BatchReplay modelReady={Boolean(health?.model_ready)} /></>}
+        {activeNav === "Flow analysis" && <><FlowInspector modelReady={Boolean(health?.model_ready)} /><Agent2Console ready={Boolean(health?.agents?.agent_2_anomaly_detection)} /><BatchReplay modelReady={Boolean(health?.model_ready)} /></>}
         {activeNav === "Agent intelligence" && <AgentReadiness health={health} />}
         <section className="metrics-grid">
           <Metric icon={Database} label="DATASET RECORDS" value={dataset?formatNumber(dataset.rows):"—"} detail={dataset?"Loaded in browser":"Awaiting organiser CSV"} tone="blue"/>
           <Metric icon={ShieldCheck} label="THREAT CLASSES" value="05" detail="Benchmark taxonomy" tone="green"/>
-          <Metric icon={Cpu} label="ACTIVE AGENTS" value="03" detail="Interfaces scaffolded" tone="violet"/>
+          <Metric icon={Cpu} label="ACTIVE AGENTS" value="03" detail={`${[health?.agents?.agent_1_threat_detection, health?.agents?.agent_2_anomaly_detection, health?.agents?.agent_3_evidence_fusion].filter(Boolean).length}/3 components ready`} tone="violet"/>
           <Metric icon={Gauge} label="MODEL READINESS" value="Pending" detail="Training data not connected" tone="amber"/>
         </section>
         <section className="content-grid">
