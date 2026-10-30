@@ -620,9 +620,12 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Flow inspection data could not be loaded: {type(exc).__name__}") from exc
 
-    required_class = {"record_id", "predicted_class", "anomaly score", "evidence status"}
+    has_class_cols = (
+        {"record_id", "predicted_class", "anomaly score", "evidence status"}.issubset(classifications.columns) or
+        {"record_id", "predicted_class", "anomaly_score", "evidence_status"}.issubset(classifications.columns)
+    )
     required_replay = {"record_id", "action", "applied_policy_id"}
-    if not required_class.issubset(classifications.columns) or not required_replay.issubset(replay.columns):
+    if not has_class_cols or not required_replay.issubset(replay.columns):
         raise HTTPException(status_code=503, detail="Generated submission files do not match the official schema.")
 
     class_map = classifications.set_index("record_id").to_dict(orient="index")
@@ -643,11 +646,13 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
             continue
         applied = decision.get("applied_policy_id", "")
+        raw_score = prediction.get("anomaly score") if "anomaly score" in prediction else prediction.get("anomaly_score")
+        raw_evidence = prediction.get("evidence status") if "evidence status" in prediction else prediction.get("evidence_status", "INCOMPLETE")
         rows.append({
             "record_id": record_id,
             "predicted_class": predicted_class,
-            "anomaly_score": numeric_from_value(prediction.get("anomaly score")),
-            "evidence_status": str(prediction.get("evidence status", "INCOMPLETE")),
+            "anomaly_score": numeric_from_value(raw_score),
+            "evidence_status": str(raw_evidence),
             "action": str(decision.get("action", "")),
             "applied_policy_id": "" if pd.isna(applied) else str(applied),
             "destination_port": int(numeric_from_value(flow.get("Destination Port", 0))),
@@ -737,4 +742,3 @@ def get_correlation_groups(limit: int = 20):
         "synthetic": False,
         "note": "Correlation groups are populated only after a real replay in this API process.",
     }
-
