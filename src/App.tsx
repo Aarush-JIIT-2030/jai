@@ -4,7 +4,7 @@ import {
   Activity, AlertTriangle, ArrowRight, ArrowUpRight, Bell, Check,
   ChevronDown, CircleHelp, CloudUpload, Cpu, Database, Download, FileSpreadsheet, Fingerprint,
   Gauge, Layers, LockKeyhole, LogOut, Menu, X, Network, Play, RefreshCw, Shield,
-  ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
+  ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { Agent2Console, FlowInspector } from "./FlowInspector";
