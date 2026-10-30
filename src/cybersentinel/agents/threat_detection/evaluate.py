@@ -6,6 +6,9 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from .model import BENCHMARK_CLASSES, ThreatDetectionModel
 from .train import load_label_mapping
 
+def _load_frame(path):
+    return pd.read_parquet(path) if str(path).lower().endswith((".parquet", ".pq")) else pd.read_csv(path, low_memory=False)
+
 def evaluate_predictions(y_true, y_pred):
     if len(y_true) != len(y_pred) or not y_true:
         raise ValueError("Evaluation requires equally sized, non-empty lists.")
@@ -25,7 +28,7 @@ def evaluate_predictions(y_true, y_pred):
             "class_order": list(BENCHMARK_CLASSES), "evaluation_rows": len(y_true)}
 
 def evaluate_csv(model_path, validation_csv, label_column, label_map=None, report_out=None):
-    frame = pd.read_csv(validation_csv, low_memory=False)
+    frame = _load_frame(validation_csv)
     if label_column not in frame.columns:
         raise ValueError(f"Label column {label_column!r} not found.")
     raw = frame[label_column].astype("string").str.strip()
@@ -48,7 +51,7 @@ def evaluate_csv(model_path, validation_csv, label_column, label_map=None, repor
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a saved Agent 1 model.")
     parser.add_argument("--model", required=True)
-    parser.add_argument("--validation-csv", required=True)
+    parser.add_argument("--validation", "--validation-csv", dest="validation_csv", required=True, help="Validation CSV or Parquet file")
     parser.add_argument("--label-column", required=True)
     parser.add_argument("--label-map")
     parser.add_argument("--report-out", default="reports/generated/threat_detection_evaluation.json")
