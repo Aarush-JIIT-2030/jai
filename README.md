@@ -12,7 +12,7 @@ CyberSentinel is an offline network-flow intrusion-detection prototype. It analy
 - **API:** Python + FastAPI on Vercel Functions.
 - **Authentication and run history:** Supabase Auth + Postgres with row-level security.
 - **ML training:** Python, Pandas, NumPy, scikit-learn and Joblib. Train locally; do not train large models inside a Vercel request.
-- **Inference status:** The API health endpoint is available. The Agent 1 training/prediction code is implemented, but official inference remains gated until the organiser dataset is used to train and validate the model.
+- **Inference status:** The API health endpoint is available. Agent 1 training/prediction code is implemented; official inference remains gated until the organiser dataset is used to train and validate the model.
 
 ## Day 1 benchmark
 
@@ -40,11 +40,11 @@ For Python API and ML development:
 
     python -m venv .venv
     source .venv/bin/activate
-    pip install -e ".[dev]"
+    pip install -e ".[dev,ml]"
 
 Optional XGBoost experiment:
 
-    pip install -e ".[xgboost]"
+    pip install -e ".[ml,xgboost]"
 
 Run frontend build and tests:
 
@@ -55,7 +55,7 @@ Run frontend build and tests:
 
 The supervised classifier is implemented in src/cybersentinel/agents/threat_detection/:
 
-- model.py — trainable Random Forest baseline and optional XGBoost backend, preprocessing, model-derived confidence, versioned save/load.
+- model.py — Random Forest baseline and optional XGBoost backend, train-fitted preprocessing, model-derived confidence, versioned save/load.
 - train.py — organiser-label mapping validation, training and optional official validation evaluation.
 - predict.py — adapter preserving the main pipeline's ThreatDetectionAgent interface.
 - predict_cli.py — batch CSV predictions.
@@ -94,4 +94,4 @@ Report measured accuracy, macro-F1, per-class precision/recall/F1, confusion mat
 
 ## Current status
 
-Agent 1's software implementation and synthetic unit tests are in place. Training and benchmark metrics on the official dataset are still pending receipt and inspection of the organiser files and exact label mapping. Agent 2, Evidence Fusion, and end-to-end official API submission remain separate integration workstreams.
+Agent 1's software implementation and synthetic unit tests are in place. Training and benchmark metrics on the official dataset are pending the organiser files and exact label mapping. Agent 2, Evidence Fusion, and end-to-end official API submission remain separate integration workstreams.
