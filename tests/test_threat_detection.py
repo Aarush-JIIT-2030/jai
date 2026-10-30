@@ -1,0 +1,61 @@
+import json
+import numpy as np
+import pandas as pd
+import pytest
+from cybersentinel.agents.threat_detection import ThreatDetectionAgent, ThreatDetectionModel
+from cybersentinel.agents.threat_detection.evaluate import evaluate_predictions
+from cybersentinel.agents.threat_detection.train import load_label_mapping
+from cybersentinel.contracts import ThreatDetectionResult
+
+CLASSES = ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"]
+
+def sample_data():
+    rows, labels = [], []
+    rng = np.random.default_rng(7)
+    for index, label in enumerate(CLASSES):
+        for _ in range(12):
+            rows.append({"Flow Duration": float(index * 100 + rng.normal(0, 2)),
+                         "Total Fwd Packets": float(index * 10 + rng.normal(0, 1)),
+                         "Flow Bytes/s": float(index * 1000 + rng.normal(0, 10)),
+                         "Flow ID": f"flow-{len(rows)}", "Timestamp": "2026-10-30 10:00:00"})
+            labels.append(label)
+    return pd.DataFrame(rows), labels
+
+def test_train_predict_save_reload_and_contract(tmp_path):
+    x, y = sample_data()
+    agent = ThreatDetectionAgent().fit(x, y)
+    result = agent.predict(x.iloc[0].to_dict())
+    assert isinstance(result, ThreatDetectionResult)
+    assert result.predicted_class in CLASSES and 0 <= result.confidence <= 1
+    assert result.status == "success"
+    assert agent.model.feature_columns == ["Flow Duration", "Total Fwd Packets", "Flow Bytes/s"]
+    path = tmp_path / "agent1.joblib"
+    agent.save(path)
+    restored = ThreatDetectionAgent.load(path)
+    assert restored.predict(x.iloc[0].to_dict()).predicted_class == result.predicted_class
+
+def test_batch_output_has_required_fields():
+    x, y = sample_data()
+    result = ThreatDetectionModel(n_estimators=25).fit(x, y).predict_frame(x.iloc[:2])
+    assert set(result[0]) == {"agent", "predicted_class", "confidence", "status"}
+    assert result[0]["agent"] == "threat_detection"
+
+def test_training_requires_all_five_classes():
+    x, y = sample_data()
+    with pytest.raises(ValueError, match="all five"):
+        ThreatDetectionModel(n_estimators=10).fit(x.iloc[:-12], y[:-12])
+
+def test_mapping_does_not_guess_original_attack_names():
+    with pytest.raises(ValueError, match="organiser mapping"):
+        load_label_mapping(None, ["BENIGN", "FTP-Patator"])
+
+def test_explicit_mapping_is_checked(tmp_path):
+    path = tmp_path / "map.json"
+    path.write_text(json.dumps({"BENIGN": "BENIGN", "Original-Label": "BRUTE_FORCE"}))
+    assert load_label_mapping(path, ["BENIGN", "Original-Label"])["Original-Label"] == "BRUTE_FORCE"
+
+def test_metrics_report_all_classes():
+    result = evaluate_predictions(CLASSES, CLASSES)
+    assert result["accuracy"] == 1.0 and result["macro_f1"] == 1.0
+    assert list(result["per_class"]) == CLASSES
+    assert len(result["confusion_matrix"]) == 5
