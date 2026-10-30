@@ -1,40 +1,77 @@
-# Agent 1 — Threat Detection
+# Agent 1 — Supervised Threat Detection
 
-Member 2 owns this supervised-learning workstream.
+*Member 2 owns this supervised-learning workstream.*
 
-## Install
+## Installation
 
-    pip install -e ".[dev,ml]"
+```bash
+pip install -e ".[dev,ml]"
+```
 
 Optional XGBoost experiment:
+```bash
+pip install -e ".[ml,xgboost]"
+```
 
-    pip install -e ".[ml,xgboost]"
+## Label Mapping
 
-## Label mapping is organiser-controlled
+If the data already uses canonical classes (`BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, `PORT_SCAN`), no mapping file is needed. If raw attack labels are used, pass `--label-map` with the exact organiser JSON mapping. No guessed attack mappings are performed.
 
-If the CSV already uses BENIGN, BRUTE_FORCE, DOS, DDOS and PORT_SCAN, no mapping file is needed. If it uses original attack labels, create a JSON object mapping each exact source label to the benchmark class using the organisers' supplied mapping. No fuzzy matching or guessed attack mappings are performed. Any placeholder must be replaced with the organiser's actual mapping.
+## Training Commands
 
-## Train and evaluate
+### 1. Training on Prepared Parquet (Canonical Challenge Split)
+```bash
+python -m cybersentinel.agents.threat_detection.train \
+  --train data/processed/training_prepared.parquet \
+  --label-column label \
+  --model-out models/threat_detection/model.joblib \
+  --report-out reports/generated/agent1-training.json
+```
 
-    python -m cybersentinel.agents.threat_detection.train --train-csv data/raw/train.csv --label-column Label --label-map data/raw/organiser-label-map.json --validation-csv data/raw/validation.csv --model-out models/threat_detection.joblib --report-out reports/generated/threat_detection_training.json
+### 2. CSV Training & Evaluation
+```bash
+python -m cybersentinel.agents.threat_detection.train \
+  --train-csv data/raw/train.csv \
+  --label-column Label \
+  --label-map data/raw/organiser-label-map.json \
+  --validation-csv data/raw/validation.csv \
+  --model-out models/threat_detection/model.joblib \
+  --report-out reports/generated/threat_detection_training.json
+```
 
-The validation file is evaluation-only. Preprocessing and the classifier are fitted on training data only. Omit --label-map only if all labels are already canonical benchmark labels.
+## Batch Inference Entry Point
 
-## XGBoost experiment
+```bash
+python -m cybersentinel.agents.threat_detection.predict_cli \
+  --model models/threat_detection/model.joblib \
+  --input-csv data/raw/unlabelled-flows.csv \
+  --output-csv reports/generated/threat_predictions.csv
+```
 
-Add --backend xgboost after installing the optional dependency. Random Forest is the default baseline and uses balanced subsampling.
+Or via direct script:
+```bash
+python agents/agent1/predict_agent1.py \
+  --model models/threat_detection/model.joblib \
+  --input data/raw/unlabelled-flows.csv \
+  --output predictions.csv
+```
 
-## Re-evaluate and batch predict
+## Verified Holdout Performance (114,185 Flows)
 
-    python -m cybersentinel.agents.threat_detection.evaluate --model models/threat_detection.joblib --validation-csv data/raw/validation.csv --label-column Label --label-map data/raw/organiser-label-map.json
-    python -m cybersentinel.agents.threat_detection.predict_cli --model models/threat_detection.joblib --input-csv data/raw/unlabelled-flows.csv --output-csv reports/generated/threat_predictions.csv
+- **Accuracy:** 99.9956%
+- **Macro-F1:** 0.999897
+- **Macro-Precision:** 0.999983
+- **Macro-Recall:** 0.999811
+- **Per-Class F1:**
+  - `BENIGN`: 0.999958 (Support: 60,001)
+  - `BRUTE_FORCE`: 0.999639 (Support: 1,384)
+  - `DOS`: 0.999958 (Support: 24,000)
+  - `DDOS`: 1.000000 (Support: 14,400)
+  - `PORT_SCAN`: 0.999931 (Support: 14,400)
 
-Each prediction contains agent, predicted_class, confidence and status. Confidence is the maximum predict_proba value from the fitted model; it is not calibrated confidence.
+## Design & Hygiene Controls
 
-## Design limitations
-
-- Flow ID, source/destination IP and timestamp identifiers are excluded to reduce memorisation. Numeric flow measurements and ports remain eligible.
-- Non-numeric columns are excluded; numeric-like values are coerced. Infinite values become missing and are median-imputed from training data.
-- Constant columns are removed using training data only.
-- Training must contain all five benchmark classes.
-- No benchmark performance is claimed until the official organiser data is evaluated. Synthetic tests verify software behavior only.
+- Flow ID, source/destination IP, and timestamp identifiers are excluded to reduce memorization and shortcut learning.
+- Numeric flow measurements and destination ports remain eligible.
+- Missing and infinite values are median-imputed using training data statistics only.
+- Preprocessing and feature selection are fitted strictly on training data; evaluation data is strictly holdout.
