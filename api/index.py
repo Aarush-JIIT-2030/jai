@@ -36,6 +36,7 @@ _pipeline: CyberSentinelPipeline | None = None
 _anomaly_agent: AnomalyDetectionAgent | None = None
 _correlation_agent = TemporalCorrelationAgent()
 _defense_agent = AdaptiveDefenseAgent()
+_LAST_CORRELATION_GROUPS: list[dict[str, Any]] = []
 
 
 class BatchAnalyzeRequest(BaseModel):
@@ -248,6 +249,24 @@ def simulate_replay(payload: ReplaySimulationRequest):
     df = pd.DataFrame(payload.flows)
     results = engine.run_replay(df)
 
+    # Retain only groups produced by this real replay; never substitute demo fixtures.
+    global _LAST_CORRELATION_GROUPS
+    _LAST_CORRELATION_GROUPS = [
+        {
+            "group_id": group.group_id,
+            "attack_type": group.attack_type,
+            "source_identity": group.source_ip,
+            "target_endpoints": list(group.target_endpoints),
+            "member_record_ids": [str(value) for value in group.member_record_ids],
+            "flow_count": group.flow_count,
+            "start_record_id": str(group.start_record_id) if group.start_record_id is not None else None,
+            "end_record_id": str(group.end_record_id) if group.end_record_id is not None else None,
+            "confidence": group.confidence,
+            "evidence": list(group.evidence),
+        }
+        for group in engine.correlation_agent.active_groups.values()
+    ]
+
     # Save to local SQLite
     run_id = f"RUN-{int(time.time())}"
     metrics = results["metrics"]
@@ -295,71 +314,31 @@ def validate_submissions():
 
 @app.get("/api/benchmarks")
 def get_benchmarks():
-    """Return real verified benchmark metrics, confusion matrix, and class profiles."""
+    """Return only metrics loaded from a generated benchmark report."""
     import json
-    report_file = BASE_DIR / "outputs" / "reports" / "eval_benchmark_report.json"
-    if not report_file.is_file():
-        # Fallback to release/day2-final if present
-        report_file = BASE_DIR / "release" / "day2-final" / "eval_benchmark_report.json"
 
-    if report_file.is_file():
-        try:
-            with open(report_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            return {"error": str(e)}
-
-    # Return default verified metrics from holdout evaluation
-    return {
-        "evaluation_dataset": {
-            "path": "data/processed/eval_prepared.parquet",
-            "rows": 114185,
-            "feature_count": 71,
-            "class_counts": {
-                "BENIGN": 60001,
-                "BRUTE_FORCE": 1384,
-                "DOS": 24000,
-                "DDOS": 14400,
-                "PORT_SCAN": 14400
+    candidates = (
+        BASE_DIR / "outputs" / "reports" / "eval_benchmark_report.json",
+        BASE_DIR / "release" / "day2-final" / "eval_benchmark_report.json",
+    )
+    report_file = next((path for path in candidates if path.is_file()), None)
+    if report_file is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "BENCHMARK_NOT_AVAILABLE",
+                "message": "No generated benchmark report is available. Run the permitted benchmark workflow first.",
             },
-            "evaluation_only": True
-        },
-        "agent_1_threat_detection": {
-            "model_type": "random_forest",
-            "training_rows": 456737,
-            "accuracy": 0.9999562114113062,
-            "macro_precision": 0.9999833349998333,
-            "macro_recall": 0.9998110468850353,
-            "macro_f1": 0.9998971631705785,
-            "per_class": {
-                "BENIGN": {"precision": 0.9999166749991667, "recall": 1.0, "f1": 0.9999583357637472, "support": 60001},
-                "BRUTE_FORCE": {"precision": 1.0, "recall": 0.9992774566473989, "f1": 0.9996385977593061, "support": 1384},
-                "DOS": {"precision": 1.0, "recall": 0.9999166666666667, "f1": 0.9999583315971499, "support": 24000},
-                "DDOS": {"precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 14400},
-                "PORT_SCAN": {"precision": 1.0, "recall": 0.9998611111111111, "f1": 0.9999305507326898, "support": 14400}
-            },
-            "confusion_matrix": [
-                [60001, 0, 0, 0, 0],
-                [1, 1383, 0, 0, 0],
-                [2, 0, 23998, 0, 0],
-                [0, 0, 0, 14400, 0],
-                [2, 0, 0, 0, 14398]
-            ],
-            "class_order": ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"],
-            "inference_seconds": 2.706,
-            "inference_ms_per_flow": 0.0237
-        },
-        "agent_2_anomaly_detection": {
-            "algorithm": "IsolationForest",
-            "training_rows": 240000,
-            "threshold": 0.03325,
-            "benign_false_positive_rate": 0.009583,
-            "attack_anomaly_recall": 0.117064,
-            "inference_seconds": 7.644,
-            "inference_ms_per_flow": 0.0669
-        }
-    }
-
+        )
+    try:
+        with report_file.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "BENCHMARK_REPORT_INVALID", "message": f"Benchmark report could not be read: {type(exc).__name__}"},
+        ) from exc
+    return {"source": str(report_file.relative_to(BASE_DIR)), "verified_report": report}
 
 @app.get("/api/submissions/download/{filename}")
 def download_submission_file(filename: str):
@@ -378,71 +357,73 @@ def download_submission_file(filename: str):
 
 @app.get("/api/flows/sample")
 def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None = None):
-    """Retrieve actual evaluation flows with classification and replay actions."""
+    """Return flow features joined to predictions/actions, never ground-truth labels."""
+    if limit < 1 or limit > 200 or offset < 0:
+        raise HTTPException(status_code=422, detail="limit must be 1..200 and offset must be non-negative.")
+
     sub_dir = BASE_DIR / "outputs" / "submission"
     eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
-    if not eval_file.is_file():
-        raise HTTPException(status_code=404, detail="Evaluation dataset not found.")
-
-    df = pd.read_parquet(eval_file)
-    total = len(df)
-    
-    if class_filter and class_filter.upper() != "ALL":
-        target = class_filter.upper()
-        df = df[df["label"].str.upper() == target]
-        total = len(df)
-
-    slice_df = df.iloc[offset : offset + limit]
-
     class_file = sub_dir / "classification.csv"
     replay_file = sub_dir / "replay.csv"
-    class_map: dict[str, Any] = {}
-    replay_map: dict[str, Any] = {}
+    if not eval_file.is_file():
+        raise HTTPException(status_code=404, detail="Evaluation dataset is not installed.")
+    if not class_file.is_file() or not replay_file.is_file():
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "REPLAY_OUTPUTS_NOT_READY", "message": "Generate classification.csv and replay.csv before inspecting evaluated flows."},
+        )
 
-    if class_file.is_file() and replay_file.is_file():
-        try:
-            c_df = pd.read_csv(class_file)
-            r_df = pd.read_csv(replay_file)
-            for idx in slice_df.index:
-                rec_id = str(idx)
-                if idx < len(c_df):
-                    crow = c_df.iloc[idx]
-                    class_map[rec_id] = {
-                        "predicted_class": crow.get("predicted_class", "BENIGN"),
-                        "anomaly_score": crow.get("anomaly score", 0.0),
-                        "evidence_status": crow.get("evidence status", "AGREE"),
-                    }
-                if idx < len(r_df):
-                    rrow = r_df.iloc[idx]
-                    pol_val = rrow.get("applied_policy_id", "")
-                    replay_map[rec_id] = {
-                        "action": rrow.get("action", "ALLOW"),
-                        "applied_policy_id": "" if pd.isna(pol_val) else str(pol_val),
-                    }
-        except Exception:
-            pass
+    try:
+        df = pd.read_parquet(eval_file)
+        classifications = pd.read_csv(class_file, dtype={"record_id": str})
+        replay = pd.read_csv(replay_file, dtype={"record_id": str, "applied_policy_id": str})
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Flow inspection data could not be loaded: {type(exc).__name__}") from exc
+
+    required_class = {"record_id", "predicted_class", "anomaly score", "evidence status"}
+    required_replay = {"record_id", "action", "applied_policy_id"}
+    if not required_class.issubset(classifications.columns) or not required_replay.issubset(replay.columns):
+        raise HTTPException(status_code=503, detail="Generated submission files do not match the official schema.")
+
+    class_map = classifications.set_index("record_id").to_dict(orient="index")
+    replay_map = replay.set_index("record_id").to_dict(orient="index")
+
+    def numeric_from_value(value: Any) -> float:
+        parsed = pd.to_numeric(value, errors="coerce")
+        return float(parsed) if pd.notna(parsed) else 0.0
 
     rows = []
-    for idx, r in slice_df.iterrows():
-        rec_id = str(idx)
-        c_info = class_map.get(rec_id, {})
-        r_info = replay_map.get(rec_id, {})
+    for index, flow in df.iterrows():
+        record_id = str(flow.get("record_id", index))
+        prediction = class_map.get(record_id)
+        decision = replay_map.get(record_id)
+        if prediction is None or decision is None:
+            continue
+        predicted_class = str(prediction.get("predicted_class", ""))
+        if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
+            continue
+        applied = decision.get("applied_policy_id", "")
         rows.append({
-            "record_id": rec_id,
-            "label": str(r.get("label", "UNKNOWN")),
-            "predicted_class": c_info.get("predicted_class", str(r.get("label", "BENIGN"))),
-            "anomaly_score": float(c_info.get("anomaly_score", 0.0)),
-            "evidence_status": c_info.get("evidence_status", "AGREE"),
-            "action": r_info.get("action", "ALLOW"),
-            "applied_policy_id": r_info.get("applied_policy_id", ""),
-            "destination_port": int(r.get("Destination Port", 0)),
-            "flow_duration": float(r.get("Flow Duration", 0.0)),
-            "total_fwd_packets": float(r.get("Total Fwd Packets", 0.0)),
-            "packet_length_mean": float(r.get("Packet Length Mean", 0.0)),
+            "record_id": record_id,
+            "predicted_class": predicted_class,
+            "anomaly_score": numeric_from_value(prediction.get("anomaly score")),
+            "evidence_status": str(prediction.get("evidence status", "INCOMPLETE")),
+            "action": str(decision.get("action", "")),
+            "applied_policy_id": "" if pd.isna(applied) else str(applied),
+            "destination_port": int(numeric_from_value(flow.get("Destination Port", 0))),
+            "flow_duration": numeric_from_value(flow.get("Flow Duration", 0)),
+            "total_fwd_packets": numeric_from_value(flow.get("Total Fwd Packets", 0)),
+            "packet_length_mean": numeric_from_value(flow.get("Packet Length Mean", 0)),
         })
 
-    return {"total": total, "offset": offset, "limit": limit, "flows": rows}
-
+    return {
+        "total": len(rows),
+        "offset": offset,
+        "limit": limit,
+        "flows": rows[offset:offset + limit],
+        "filter_semantics": "predicted_class",
+        "ground_truth_labels_exposed": False,
+    }
 
 @app.get("/api/policies")
 def get_policies(limit: int = 50, offset: int = 0):
@@ -506,53 +487,14 @@ def test_policy_prefilter(payload: dict[str, Any]):
 
 @app.get("/api/correlation/groups")
 def get_correlation_groups(limit: int = 20):
-    """Retrieve verified temporal correlation groups detected during chronological replay."""
-    # Group real incidents based on observed patterns
-    sample_groups = [
-        {
-            "group_id": "GRP-0001",
-            "attack_type": "PORT_SCAN",
-            "source_ip": "192.168.1.105",
-            "target_endpoints": ["10.0.0.1:21", "10.0.0.1:22", "10.0.0.1:80", "10.0.0.1:443", "10.0.0.1:8080"],
-            "flow_count": 18,
-            "evidence": [
-                "Source 192.168.1.105 probed 5 distinct ports within 150-flow window.",
-                "High-speed SYN probe fan-out across common server daemon ports.",
-            ],
-        },
-        {
-            "group_id": "GRP-0002",
-            "attack_type": "DDOS",
-            "source_ip": "Distributed (14 Sources)",
-            "target_endpoints": ["10.0.0.5:80"],
-            "flow_count": 142,
-            "evidence": [
-                "Destination 10.0.0.5:80 targeted by 14 distinct client stack fingerprints.",
-                "Volumetric surge exceeding 45,000 packets/sec on HTTP ingress.",
-            ],
-        },
-        {
-            "group_id": "GRP-0003",
-            "attack_type": "BRUTE_FORCE",
-            "source_ip": "192.168.1.88",
-            "target_endpoints": ["10.0.0.2:22"],
-            "flow_count": 24,
-            "evidence": [
-                "Source 192.168.1.88 executed 24 rapid SSH auth attempts on port 22.",
-                "Repeated FIN/RST packet bursts indicating failed credential handshakes.",
-            ],
-        },
-        {
-            "group_id": "GRP-0004",
-            "attack_type": "DOS",
-            "source_ip": "192.168.2.14",
-            "target_endpoints": ["10.0.0.1:80"],
-            "flow_count": 86,
-            "evidence": [
-                "Source 192.168.2.14 emitted 86 clustered attack flows within 150-record window.",
-                "Slowloris slow-header starvation pattern detected by Agent 1 and Agent 4.",
-            ],
-        },
-    ]
-    return {"groups": sample_groups[:limit], "total": len(sample_groups)}
+    """Return groups observed in the latest completed replay; no fabricated fixtures."""
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 200.")
+    return {
+        "groups": _LAST_CORRELATION_GROUPS[:limit],
+        "total": len(_LAST_CORRELATION_GROUPS),
+        "source": "latest_completed_replay" if _LAST_CORRELATION_GROUPS else "no_replay_in_this_process",
+        "synthetic": False,
+        "note": "Correlation groups are populated only after a real replay in this API process.",
+    }
 
