@@ -361,8 +361,8 @@ export default function App() {
               <div className="panel-head history-head">
                 <div>
                   <div className="panel-kicker">BENCHMARK PERFORMANCE & AUDIT TRAIL</div>
-                  <h3>Official Evaluation Holdout (114,185 Flows)</h3>
-                  <p>Untouched official evaluation split results and user run telemetry.</p>
+                  <h3>Recent Local Replay Runs</h3>
+                  <p>Run history and metrics from the local replay database.</p>
                 </div>
                 <button className="secondary-btn" onClick={loadHistory}><RefreshCw size={14}/> Refresh</button>
               </div>
