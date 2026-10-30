@@ -101,7 +101,9 @@ class ReplayEngine:
                 })
 
         if hasattr(self.anomaly_agent, "score_frame"):
-            anomaly_scores, is_anomalies = self.anomaly_agent.score_frame(df)
+            anomaly_results = self.anomaly_agent.score_frame(df)
+            anomaly_scores = [r.anomaly_score if r.anomaly_score is not None else 0.0 for r in anomaly_results]
+            is_anomalies = [bool(r.is_anomaly) for r in anomaly_results]
         else:
             anomaly_scores = []
             is_anomalies = []

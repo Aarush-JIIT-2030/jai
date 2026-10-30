@@ -72,3 +72,4 @@ def test_defense_policy_expiration():
     # At step 4: Expired!
     pre_expired = agent.evaluate_pre_filter(record_id="rec-4", source_ip=src_ip, current_step=4)
     assert pre_expired is None
+

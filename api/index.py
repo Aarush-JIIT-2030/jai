@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import time
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -18,6 +19,8 @@ from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
 from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
 from cybersentinel.replay import ReplayEngine
+from cybersentinel.replay.submission import SubmissionValidator
+from cybersentinel.storage.history_db import list_runs, record_run
 import pandas as pd
 
 app = FastAPI(
@@ -40,6 +43,7 @@ class BatchAnalyzeRequest(BaseModel):
 
 class ReplaySimulationRequest(BaseModel):
     flows: list[dict[str, Any]] = Field(min_length=1, max_length=5000)
+    dataset_name: str = "custom_replay"
 
 
 def get_pipeline() -> CyberSentinelPipeline | None:
@@ -78,6 +82,16 @@ def health():
         },
         "message": "All 5 multi-agent components operational." if pipeline else "Model artifacts are missing or failed validation.",
     }
+
+
+@app.get("/api/history")
+def get_history(limit: int = 15):
+    """Retrieve runs from local SQLite database."""
+    try:
+        runs = list_runs(limit=limit)
+        return {"runs": runs, "source": "local_sqlite"}
+    except Exception as exc:
+        return {"runs": [], "error": str(exc), "source": "local_sqlite"}
 
 
 @app.get("/api/models/status")
@@ -232,9 +246,47 @@ def simulate_replay(payload: ReplaySimulationRequest):
     )
     df = pd.DataFrame(payload.flows)
     results = engine.run_replay(df)
+
+    # Save to local SQLite
+    run_id = f"RUN-{int(time.time())}"
+    metrics = results["metrics"]
+    record_run(
+        run_id=run_id,
+        dataset_name=payload.dataset_name,
+        total_records=metrics["total_records"],
+        blocked_records=metrics["blocked_records"],
+        allowed_records=metrics["allowed_records"],
+        policies_created=metrics["policies_created"],
+        containment_rate=metrics["containment_rate"],
+        throughput_fps=metrics["throughput_fps"],
+        elapsed_seconds=metrics["elapsed_seconds"],
+        status="COMPLETED",
+    )
+
     return {
-        "metrics": results["metrics"],
+        "run_id": run_id,
+        "metrics": metrics,
         "policies_sample": results["policy_rows"][:20],
         "replay_sample": results["replay_rows"][:30],
         "classification_sample": results["classification_rows"][:30],
     }
+
+
+@app.get("/api/replay/validate")
+def validate_submissions():
+    """Validate submission files in outputs/submission/."""
+    sub_dir = BASE_DIR / "outputs" / "submission"
+    if not (sub_dir / "classification.csv").is_file():
+        return {
+            "valid": False,
+            "status": "NOT_GENERATED",
+            "message": "Submission files have not yet been generated in outputs/submission/.",
+        }
+    # Read record ids from classification.csv
+    import csv
+    with (sub_dir / "classification.csv").open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        records = [r["record_id"] for r in reader]
+
+    report = SubmissionValidator.validate_submission_bundle(sub_dir, records)
+    return report

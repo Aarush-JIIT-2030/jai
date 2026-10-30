@@ -3,13 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "preview": "vite preview" },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "@supabase/supabase-js": "2.95.3",
+    "@types/three": "^0.186.0",
+    "lucide-react": "0.468.0",
     "papaparse": "5.5.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "lucide-react": "0.468.0"
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/papaparse": "5.3.16",

@@ -9,7 +9,8 @@ import {
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { Agent2Console, AgentReadiness, FlowInspector } from "./FlowInspector";
 import { BatchReplay } from "./BatchReplay";
-import { TemporalCorrelationConsole, AdaptiveDefenseConsole, ReplayStudio } from "./Level2Consoles";
+import { TopologyCommandCentre, TemporalCorrelationConsole, AdaptiveDefenseConsole, ReplayStudio } from "./Level2Consoles";
+import { ParticleBackdrop } from "./components/ParticleBackdrop";
 
 type Health = {
   status: string;
@@ -187,6 +188,7 @@ export default function App() {
   </div>;
 
   return <div className="app-shell">
+      <ParticleBackdrop />
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Shield size={21}/></div><span>CYBERSENTINEL</span></div>
       <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14}/></div>
@@ -263,6 +265,8 @@ export default function App() {
         {activeNav === "Temporal correlation" && <TemporalCorrelationConsole />}
         {activeNav === "Adaptive defense" && <AdaptiveDefenseConsole />}
         {activeNav === "Replay & submissions" && <ReplayStudio modelReady={Boolean(health?.model_ready)} />}
+
+        {activeNav === "Overview" && <TopologyCommandCentre />}
 
         <section className="metrics-grid">
           <Metric icon={Database} label="DATASET RECORDS" value={dataset ? formatNumber(dataset.rows) : "114,185"} detail={dataset ? "Loaded in browser" : "Official evaluation holdout"} tone="blue"/>
