@@ -18,8 +18,9 @@ Prior to this hardening phase, the initial Day 2 pipeline completed end-to-end r
 Through rigorous investigation of the root causes:
 1. **Endpoint Ephemerality Repaired:** Identified that synthetic endpoint assignment in `engine.py` was indexed on alternating row modulo (`i % 250`), causing identical flow bursts from the same attack host to receive differing IP identities every millisecond. This prevented active stateful policies from matching subsequent burst flows. Repaired using deterministic client TCP stack fingerprinting (`Init_Win_bytes_forward`, `min_seg_size_forward`, `Fwd Header Length`), revealing 2,484 stable host clusters.
 2. **Consensus Policy Gate Enforced:** Hardened Agent 5's policy generation trigger to require corroborated consensus (`fusion.action == "BLOCK"` or high-confidence attack correlation). Uncorroborated single-agent alerts no longer pollute the active firewall state table.
-3. **Outcome:** Policy count was reduced from **85,749 down to 20,368** (a **76.2% reduction in bloat**), while contained attack flows expanded from **8,035 to 48,264** (**89.1% of all evaluation attacks successfully neutralized**).
-4. **Zero Semantic Violations:** 100% compliance across all 114,185 classification rows, 20,368 policy definitions, and 114,185 replay records. Zero self-blocking triggers, zero unreferenced policies, and zero out-of-range anomaly scores.
+3. **Sliding-Window Eviction & Port Gating:** Repaired `TemporalCorrelationAgent` data structure memory leak. Replaced unbounded sets with exact window-bounded counters, dropping false port scan alarms on benign flows from 22,923 to 34 and reducing false blocks by 76.7% (28,423 down to 6,609).
+4. **Outcome:** Policy count was reduced from **85,749 down to 19,546** (a **77.2% reduction in bloat**), while contained attack flows expanded from **8,035 to 48,219** (**89.0% of all evaluation attacks successfully neutralized**), preserving **53,392 (89.0%) legitimate benign flows**.
+5. **Zero Semantic Violations:** 100% compliance across all 114,185 classification rows, 19,546 policy definitions, and 114,185 replay records. Zero self-blocking triggers, zero unreferenced policies, and zero out-of-range anomaly scores.
 
 ---
 

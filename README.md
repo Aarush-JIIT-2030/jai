@@ -92,10 +92,11 @@ Evaluated strictly on the untouched evaluation holdout dataset (`data/processed/
 The CyberSentinel Causal Replay Engine (`cybersentinel.replay.ReplayEngine`) processes packet streams chronologically without temporal cheating:
 
 * **Total Records Processed:** **114,185 flows**
-* **Replay Execution Time:** **16.08 seconds**
-* **Vectorized Throughput:** **7,101.2 Flows / Second**
-* **Active Policies Activated:** **20,368 rules** (76.2% bloat reduction via consensus gating & TCP stack clustering)
-* **Replay Actions:** **76,687 Blocked** (48,264 confirmed attacks contained — 89.1% containment) | **37,498 Allowed** (31,578 benign flows preserved)
+* **Replay Execution Time:** **17.84 seconds**
+* **Vectorized Throughput:** **6,400.6 Flows / Second**
+* **Active Policies Activated:** **19,546 rules** (77.2% bloat reduction via consensus gating & window-bounded correlation)
+* **Replay Actions:** **54,828 Blocked** (48,219 confirmed attacks contained — 89.0% containment) | **59,357 Allowed** (53,392 benign flows preserved — 89.0% availability)
+* **False Block Reduction:** Reduced false blocks from 28,423 down to **6,609** (76.7% improvement via sliding-window counter eviction)
 
 ### Core Invariants Enforced:
 1. **Pre-Filter Precedence:** When flow $N$ arrives from `source_ip`, active policies activated prior to $N$ ($< N$) apply *before* inspecting the flow.
@@ -112,7 +113,7 @@ Generated via `scripts/generate_submissions.py` and validated via `SubmissionVal
 | Submission File | Rows | Schema Header | Validation Status |
 | :--- | :--- | :--- | :--- |
 | **`classification.csv`** | 114,185 | `record_id,predicted_class,anomaly score,evidence status` | **VALID (0 errors)** |
-| **`policy.csv`** | 20,368 | `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action` | **VALID (0 errors)** |
+| **`policy.csv`** | 19,546 | `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action` | **VALID (0 errors)** |
 | **`replay.csv`** | 114,185 | `record_id,action,applied_policy_id` | **VALID (0 errors)** |
 
 * **Validation Audit:** `outputs/submission/validation_report.json` certifies:
