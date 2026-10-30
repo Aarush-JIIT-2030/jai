@@ -38,10 +38,13 @@ class CyberSentinelPipeline:
     def analyze(self, flow: dict[str, Any]) -> dict[str, Any]:
         started = time.perf_counter()
         if not isinstance(flow, dict) or not flow:
-            return self.fusion_agent.fuse(
+            invalid = self.fusion_agent.fuse(
                 ThreatDetectionResult(None, None, status="error", message="Flow must be a non-empty object."),
                 AnomalyDetectionResult(None, None, status="error", message="Flow must be a non-empty object."),
             )
+            payload = invalid.to_dict()
+            payload["latency_ms"] = round((time.perf_counter() - started) * 1000.0, 4)
+            return payload
 
         try:
             threat = self.threat_agent.predict(flow)
