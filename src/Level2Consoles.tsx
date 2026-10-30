@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Activity, Check, Database, Download, FileSpreadsheet, Fingerprint,
-  Gauge, Layers, LockKeyhole, Pause, Play, RefreshCw,
+  Gauge, Layers, LockKeyhole, Play, RefreshCw,
   ShieldAlert, ShieldCheck, SlidersHorizontal
 } from "lucide-react";
 import { NetworkTopology3D } from "./components/NetworkTopology3D";
@@ -20,6 +20,10 @@ type CorrelationGroupItem = {
   attack_type: string;
   source_identity: string;
   target_endpoints: string[];
+  member_record_ids?: string[];
+  start_record_id?: string | null;
+  end_record_id?: string | null;
+  confidence?: number;
   flow_count: number;
   evidence: string[];
 };
