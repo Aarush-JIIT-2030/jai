@@ -80,3 +80,4 @@ def test_sqlite_history_db(tmp_path):
     assert len(runs) == 1
     assert runs[0]["id"] == "RUN-TEST-001"
     assert runs[0]["total_records"] == 100
+

@@ -199,3 +199,4 @@ class SubmissionValidator:
         report_file = output_dir / "validation_report.json"
         report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
         return report
+

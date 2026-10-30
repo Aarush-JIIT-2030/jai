@@ -55,3 +55,4 @@ The engine strictly enforces the five core Day 2 replay invariants:
 * [x] **0 Self-Blocked Trigger Records**
 * [x] **100% Causal Sequence Verified**
 * [x] **Validated via `SubmissionValidator.validate_submission_bundle`**
+

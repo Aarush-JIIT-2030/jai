@@ -32,3 +32,4 @@ Incoming Flow (record_id = N, Source IP = X)
    [Agent 5: Policy Generator] ──► Confirmed Attack? ──► [YES] ──► Create Policy for LATER records (POL-YYYYY)
                                                          [NO]  ──► Action: ALLOW (applied_policy_id = "")
 ```
+

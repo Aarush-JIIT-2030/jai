@@ -32,3 +32,4 @@
 
 ### 4. Computational & Memory Invariants
 * **Vectorized Batch Processing:** Replay inference leverages precomputed vectorized matrix operations for Agent 1 and Agent 2, achieving >6,700 flows/sec. Replay state history is bounded using a fixed sliding window to maintain steady memory utilization during multi-million flow captures.
+

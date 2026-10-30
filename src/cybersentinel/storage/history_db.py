@@ -98,3 +98,4 @@ def list_runs(limit: int = 15, db_path: Path = DB_PATH) -> list[dict[str, Any]]:
         )
         rows = cursor.fetchall()
         return [dict(r) for r in rows]
+

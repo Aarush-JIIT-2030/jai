@@ -58,3 +58,4 @@ Agent 3 consumes Agent 1 multiclass predictions, confidence scores, and Agent 2 
 1. **Zero Future Lookahead:** No statistics (mean, variance, min/max) computed over evaluation splits are propagated back to model weights.
 2. **Fixed Random Seeds:** Training and evaluation pipelines enforce deterministic RNG seeding (`seed=42`).
 3. **Artifact Integrity:** Production artifacts (`models/threat_detection/model.joblib` and `models/anomaly_detection/model.joblib`) are cryptographically verified and packaged for standalone inference.
+

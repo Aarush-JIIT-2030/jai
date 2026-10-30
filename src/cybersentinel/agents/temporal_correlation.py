@@ -4,3 +4,4 @@ from __future__ import annotations
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
 
 __all__ = ["TemporalCorrelationAgent"]
+
