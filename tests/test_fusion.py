@@ -44,3 +44,12 @@ def test_low_confidence_never_auto_allows_or_blocks():
         AnomalyDetectionResult(-0.1, False),
     )
     assert result.action == "REVIEW"
+
+
+def test_missing_or_nonfinite_anomaly_score_requires_review():
+    result = EvidenceFusionAgent().fuse(
+        ThreatDetectionResult("DOS", 0.99),
+        AnomalyDetectionResult(float("nan"), True),
+    )
+    assert result.action == "REVIEW"
+    assert result.evidence_status == "INCOMPLETE"
