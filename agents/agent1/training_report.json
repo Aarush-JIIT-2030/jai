@@ -1,0 +1,30 @@
+{
+  "dataset_file": "train (2).csv",
+  "rows_uploaded": 288750,
+  "features_used": 75,
+  "train_rows": 231000,
+  "internal_holdout_rows": 57750,
+  "training_seconds": 25.7,
+  "accuracy": 1,
+  "macro_f1": 1,
+  "class_order": [
+    "BENIGN",
+    "BRUTE_FORCE",
+    "DDOS",
+    "DOS",
+    "PORT_SCAN"
+  ],
+  "class_counts": {
+    "BENIGN": 162878,
+    "PORT_SCAN": 57600,
+    "DDOS": 57600,
+    "BRUTE_FORCE": 5537,
+    "DOS": 5135
+  },
+  "caveats": [
+    "Uploaded CSV has 288,750 rows, fewer than 456,737 reported in earlier Colab output.",
+    "Metrics are from a stratified random 80/20 split, not the organiser's untouched evaluation set.",
+    "Perfect score is suspiciously high; investigate duplicates, synthetic separability, and feature/label leakage.",
+    "Model is HistGradientBoostingClassifier, not the repository's Random Forest baseline."
+  ]
+}
