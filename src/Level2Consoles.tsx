@@ -755,137 +755,88 @@ export function SubmissionStudio() {
 // 8. MODEL INTELLIGENCE VIEW (Real Confusion Matrix, Per-Class Metrics, ROC/PR)
 // ============================================================================
 export function ModelIntelligenceView() {
-  const [benchmarkData, setBenchmarkData] = useState<any>(null);
+  const [report, setReport] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/benchmarks")
-      .then(res => res.json())
-      .then(data => setBenchmarkData(data))
-      .catch(() => {});
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail?.message || data.detail || "No generated benchmark report is available.");
+        setReport(data.verified_report || null);
+      })
+      .catch(err => setError(err instanceof Error ? err.message : "Benchmark report could not be loaded."))
+      .finally(() => setLoading(false));
   }, []);
 
-  const matrix = benchmarkData?.agent_1_threat_detection?.confusion_matrix || [
-    [60001, 0, 0, 0, 0],
-    [1, 1383, 0, 0, 0],
-    [2, 0, 23998, 0, 0],
-    [0, 0, 0, 14400, 0],
-    [2, 0, 0, 0, 14398],
-  ];
-
-  const classes = ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"];
+  const threat = report?.agent_1_threat_detection;
+  const anomaly = report?.agent_2_anomaly_detection;
+  const classes: string[] = threat?.class_order || [];
+  const matrix: number[][] | null = Array.isArray(threat?.confusion_matrix) ? threat.confusion_matrix : null;
+  const perClass = threat?.per_class || {};
+  const pct = (value: unknown) => typeof value === "number" ? (value * 100).toFixed(3) + "%" : "—";
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
       <div className="panel-head">
         <div>
-          <div className="panel-kicker">EVALUATION BENCHMARK · HOLDOUT VERIFICATION</div>
+          <div className="panel-kicker">MODEL EVALUATION · GENERATED BENCHMARK REPORT</div>
           <h3>Model Intelligence & Diagnostics</h3>
-          <p>
-            Real confusion matrix, per-class metrics, and isolation forest calibration across 114,185 untouched holdout flows.
-          </p>
+          <p>Displays metrics only when a benchmark report is available. Confidence is model-derived and not probability-calibrated.</p>
         </div>
         <span className="panel-icon"><Gauge size={18} /></span>
       </div>
 
-      {/* Top Benchmark Metric Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, margin: "16px 0" }}>
-        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>OVERALL ACCURACY</small>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--green)" }}>99.9956%</div>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>Only 5 misclassifications in 114,185</small>
-        </div>
-        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>MACRO F1-SCORE</small>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--blue)" }}>0.999897</div>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>Harmonic mean across 5 classes</small>
-        </div>
-        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>BENIGN FALSE POSITIVE RATE</small>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--violet)" }}>0.958%</div>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>Isolation Forest on 60,001 benign</small>
-        </div>
-        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>INFERENCE LATENCY</small>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--amber)" }}>0.0237 ms</div>
-          <small style={{ fontSize: 10, color: "var(--muted)" }}>42,190 flows/second on CPU</small>
-        </div>
-      </div>
+      {loading && <div className="empty-inline" style={{ marginTop: 15 }}>Loading benchmark report…</div>}
+      {error && <div className="parse-warning" role="alert" style={{ marginTop: 15 }}>{error}</div>}
 
-      {/* 5x5 Confusion Matrix */}
-      <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)", marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>5x5 Multiclass Confusion Matrix (114,185 Holdout Flows)</div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, textAlign: "center" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
-                <th style={{ textAlign: "left", padding: 8 }}>TRUE \ PRED</th>
-                {classes.map(c => <th key={c} style={{ padding: 8 }}>{c}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {classes.map((c, rowIdx) => (
-                <tr key={c} style={{ borderBottom: "1px solid var(--line)" }}>
-                  <td style={{ textAlign: "left", padding: 8, fontWeight: 600, color: "var(--muted)" }}>{c}</td>
-                  {matrix[rowIdx].map((val: number, colIdx: number) => {
-                    const isDiagonal = rowIdx === colIdx;
-                    return (
-                      <td
-                        key={colIdx}
-                        style={{
-                          padding: 8,
-                          fontFamily: "monospace",
-                          fontWeight: isDiagonal ? 700 : 400,
-                          background: isDiagonal ? "rgba(34, 197, 94, 0.12)" : val > 0 ? "rgba(239, 68, 68, 0.15)" : "transparent",
-                          color: isDiagonal ? "#22c55e" : val > 0 ? "#ef4444" : "var(--muted)",
-                        }}
-                      >
-                        {val.toLocaleString()}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {report && <>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, margin: "16px 0" }}>
+          {[
+            ["A1 ACCURACY", pct(threat?.accuracy)],
+            ["A1 MACRO F1", typeof threat?.macro_f1 === "number" ? threat.macro_f1.toFixed(6) : "—"],
+            ["A2 BENIGN FPR", pct(anomaly?.benign_false_positive_rate)],
+            ["A1 INFERENCE", typeof threat?.inference_ms_per_flow === "number" ? threat.inference_ms_per_flow.toFixed(4) + " ms/flow" : "—"],
+          ].map(([label, value]) => <div key={label} style={{ background: "var(--panel2)", padding: 13, borderRadius: 8, border: "1px solid var(--line)" }}><small style={{ fontSize: 9, color: "var(--muted)" }}>{label}</small><div style={{ fontSize: 19, fontWeight: 700, marginTop: 5 }}>{value}</div></div>)}
         </div>
-      </div>
 
-      {/* Per-Class Metrics Table */}
-      <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Per-Class Holdout Precision, Recall, F1-Score & Support</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", textAlign: "left" }}>
-              <th style={{ padding: 8 }}>CLASS</th>
-              <th style={{ padding: 8 }}>PRECISION</th>
-              <th style={{ padding: 8 }}>RECALL</th>
-              <th style={{ padding: 8 }}>F1-SCORE</th>
-              <th style={{ padding: 8 }}>HOLDOUT SUPPORT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { cls: "BENIGN", prec: "0.9999", rec: "1.0000", f1: "0.9999", supp: 60001 },
-              { cls: "BRUTE_FORCE", prec: "1.0000", rec: "0.9993", f1: "0.9996", supp: 1384 },
-              { cls: "DOS", prec: "1.0000", rec: "0.9999", f1: "0.9999", supp: 24000 },
-              { cls: "DDOS", prec: "1.0000", rec: "1.0000", f1: "1.0000", supp: 14400 },
-              { cls: "PORT_SCAN", prec: "1.0000", rec: "0.9998", f1: "0.9999", supp: 14400 },
-            ].map(row => (
-              <tr key={row.cls} style={{ borderBottom: "1px solid var(--line)" }}>
-                <td style={{ padding: 8, fontWeight: 600 }}>{row.cls}</td>
-                <td style={{ padding: 8, fontFamily: "monospace" }}>{row.prec}</td>
-                <td style={{ padding: 8, fontFamily: "monospace" }}>{row.rec}</td>
-                <td style={{ padding: 8, fontFamily: "monospace", color: "var(--green)", fontWeight: 700 }}>{row.f1}</td>
-                <td style={{ padding: 8, fontFamily: "monospace" }}>{row.supp.toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+        {matrix && <div style={{ background: "var(--panel2)", padding: 15, borderRadius: 8, border: "1px solid var(--line)", marginBottom: 15 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>A1 multiclass confusion matrix · {report.evaluation_dataset?.rows?.toLocaleString() ?? "—"} evaluation rows</div>
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, textAlign: "center" }}>
+            <thead><tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)" }}><th style={{ textAlign: "left", padding: 8 }}>TRUE / PREDICTED</th>{classes.map(value => <th key={value} style={{ padding: 8 }}>{value}</th>)}</tr></thead>
+            <tbody>{classes.map((value, row) => <tr key={value} style={{ borderBottom: "1px solid var(--line)" }}>
+              <td style={{ textAlign: "left", padding: 8, fontWeight: 600 }}>{value}</td>
+              {(matrix[row] || []).map((count, col) => <td key={col} style={{ padding: 8, fontFamily: "monospace", fontWeight: row === col ? 700 : 400, background: row === col ? "rgba(34,197,94,.12)" : count > 0 ? "rgba(239,68,68,.15)" : "transparent", color: row === col ? "var(--green)" : count > 0 ? "#ef4444" : "var(--muted)" }}>{count.toLocaleString()}</td>)}
+            </tr>)}</tbody>
+          </table></div>
+        </div>}
 
+        {Object.keys(perClass).length > 0 && <div style={{ background: "var(--panel2)", padding: 15, borderRadius: 8, border: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>A1 per-class evaluation metrics</div>
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+            <thead><tr style={{ borderBottom: "1px solid var(--line)", color: "var(--muted)", textAlign: "left" }}><th style={{ padding: 8 }}>CLASS</th><th style={{ padding: 8 }}>PRECISION</th><th style={{ padding: 8 }}>RECALL</th><th style={{ padding: 8 }}>F1</th><th style={{ padding: 8 }}>SUPPORT</th></tr></thead>
+            <tbody>{classes.map(value => {
+              const item = perClass[value] || {};
+              return <tr key={value} style={{ borderBottom: "1px solid var(--line)" }}>
+                <td style={{ padding: 8, fontWeight: 600 }}>{value}</td>
+                <td style={{ padding: 8, fontFamily: "monospace" }}>{typeof item.precision === "number" ? item.precision.toFixed(5) : "—"}</td>
+                <td style={{ padding: 8, fontFamily: "monospace" }}>{typeof item.recall === "number" ? item.recall.toFixed(5) : "—"}</td>
+                <td style={{ padding: 8, fontFamily: "monospace", color: "var(--green)" }}>{typeof item.f1 === "number" ? item.f1.toFixed(5) : "—"}</td>
+                <td style={{ padding: 8, fontFamily: "monospace" }}>{typeof item.support === "number" ? item.support.toLocaleString() : "—"}</td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+        </div>}
+
+        <div style={{ marginTop: 12, fontSize: 10, color: "var(--muted)" }}>
+          A1 backend: {threat?.model_type || "not specified"} · A2 algorithm: {anomaly?.algorithm || "not specified"} · A2 threshold: {anomaly?.threshold ?? "—"} · A2 attack anomaly recall: {pct(anomaly?.attack_anomaly_recall)}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 10, color: "var(--muted)" }}>Source: {report.evaluation_dataset?.path || "benchmark report"} · Training/evaluation provenance must be checked against the accompanying experiment documentation.</div>
+      </>}
       <div className="panel-foot" style={{ marginTop: 14 }}>
-        <span><LockKeyhole size={13} /> Scored strictly on untouched eval holdout · Zero training data leakage</span>
-        <span>SEED: 42 · MODEL BACKEND: RANDOM_FOREST</span>
+        <span><LockKeyhole size={13} /> No fallback metrics or confusion matrix are fabricated</span>
+        <span>MODEL CONFIDENCE IS NOT CALIBRATED</span>
       </div>
     </section>
   );
