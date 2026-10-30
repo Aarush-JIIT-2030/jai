@@ -315,6 +315,103 @@ def simulate_replay(payload: ReplaySimulationRequest):
     }
 
 
+@app.post("/api/replay/run-official")
+def run_official_replay():
+    """Run the installed official evaluation stream and write the three submission CSVs."""
+    pipeline = get_pipeline()
+    if pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MODEL_NOT_READY", "message": "Install and verify both model artifacts before running replay."},
+        )
+    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    if not eval_file.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "EVALUATION_DATASET_NOT_FOUND", "message": "Install the organiser-provided evaluation parquet at data/processed/eval_prepared.parquet."},
+        )
+    try:
+        frame = pd.read_parquet(eval_file)
+        if frame.empty:
+            raise HTTPException(status_code=422, detail="The evaluation dataset is empty.")
+        engine = ReplayEngine(
+            threat_agent=pipeline.threat_agent,
+            anomaly_agent=pipeline.anomaly_agent,
+            fusion_agent=pipeline.fusion_agent,
+        )
+        results = engine.run_replay(frame)
+        output_dir = BASE_DIR / "outputs" / "submission"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        files = {
+            "classification.csv": engine.export_csv(
+                results["classification_rows"],
+                ["record_id", "predicted_class", "anomaly score", "evidence status"],
+            ),
+            "policy.csv": engine.export_csv(
+                results["policy_rows"],
+                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
+            ),
+            "replay.csv": engine.export_csv(
+                results["replay_rows"],
+                ["record_id", "action", "applied_policy_id"],
+            ),
+        }
+        for filename, csv_text in files.items():
+            (output_dir / filename).write_text(csv_text, encoding="utf-8", newline="")
+        record_ids = [str(row["record_id"]) for row in results["classification_rows"]]
+        validation = SubmissionValidator.validate_submission_bundle(output_dir, record_ids)
+
+        global _LAST_CORRELATION_GROUPS
+        _LAST_CORRELATION_GROUPS = [
+            {
+                "group_id": group.group_id,
+                "attack_type": group.attack_type,
+                "source_identity": group.source_ip,
+                "target_endpoints": list(group.target_endpoints),
+                "member_record_ids": [str(value) for value in group.member_record_ids],
+                "flow_count": group.flow_count,
+                "start_record_id": str(group.start_record_id) if group.start_record_id is not None else None,
+                "end_record_id": str(group.end_record_id) if group.end_record_id is not None else None,
+                "confidence": group.confidence,
+                "evidence": list(group.evidence),
+            }
+            for group in engine.correlation_agent.active_groups.values()
+        ]
+
+        metrics = results["metrics"]
+        run_id = f"RUN-{int(time.time())}"
+        record_run(
+            run_id=run_id,
+            dataset_name=eval_file.name,
+            total_records=metrics["total_records"],
+            blocked_records=metrics["blocked_records"],
+            allowed_records=metrics["allowed_records"],
+            policies_created=metrics["policies_created"],
+            containment_rate=metrics.get("containment_rate"),
+            throughput_fps=metrics["throughput_fps"],
+            elapsed_seconds=metrics["elapsed_seconds"],
+            status="COMPLETED" if validation.get("all_valid") else "VALIDATION_FAILED",
+        )
+        return {
+            "run_id": run_id,
+            "metrics": metrics,
+            "validation": validation,
+            "files": {name: {"path": f"outputs/submission/{name}", "rows": len(results[key])}
+                      for name, key in (("classification.csv", "classification_rows"),
+                                        ("policy.csv", "policy_rows"),
+                                        ("replay.csv", "replay_rows"))},
+            "correlation_groups": len(_LAST_CORRELATION_GROUPS),
+            "source": "installed_official_evaluation_dataset",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "OFFICIAL_REPLAY_FAILED", "type": type(exc).__name__, "message": "Official replay failed; inspect backend logs for details."},
+        ) from exc
+
+
 @app.get("/api/replay/validate")
 def validate_submissions():
     """Validate submission files in outputs/submission/."""
