@@ -651,30 +651,52 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
 export function SubmissionStudio() {
   const [validationReport, setValidationReport] = useState<any>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
 
   async function runValidator() {
     setIsValidating(true);
+    setValidationError("");
+    setValidationReport(null);
     try {
-      const res = await fetch("/api/replay/validate");
-      const data = await res.json();
+      const response = await fetch("/api/replay/validate");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail?.message || data.detail || "Validator endpoint unavailable.");
       setValidationReport(data);
-    } catch {
-      setValidationReport({
-        valid: true,
-        status: "READY_FOR_SUBMISSION",
-        total_files: 3,
-        classification: { row_count: 114185, valid: true },
-        policy: { policy_count: 19546, valid: true },
-        replay: { row_count: 114185, allow_count: 59357, block_count: 54828, valid: true },
-      });
+    } catch (err) {
+      setValidationError(err instanceof Error ? err.message : "Validator request failed.");
     } finally {
       setIsValidating(false);
     }
   }
 
-  function triggerDownload(filename: string) {
-    window.open(`/api/submissions/download/${filename}`, "_blank");
+  async function triggerDownload(filename: string) {
+    setDownloadError("");
+    try {
+      const response = await fetch("/api/submissions/download/" + filename);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || filename + " has not been generated.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "Download failed.");
+    }
   }
+
+  const fileCards = [
+    { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly score,evidence status" },
+    { filename: "policy.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policy?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action" },
+    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record with policy references.", rows: validationReport?.replay?.row_count, header: "record_id,action,applied_policy_id" },
+  ];
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
@@ -682,111 +704,48 @@ export function SubmissionStudio() {
         <div>
           <div className="panel-kicker">OFFICIAL COMPETITION FILES · THREE-FILE BUNDLE</div>
           <h3>Submission Studio & Integrity Validator</h3>
-          <p>
-            Export and validate the three official competition CSV files conforming with 100% schema accuracy to the JAI 2026 contract.
-          </p>
+          <p>Download and validate the generated CSV artifacts against the organiser's required headers and replay constraints.</p>
         </div>
         <span className="panel-icon"><Download size={18} /></span>
       </div>
 
-      {/* 3 CSV Cards Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, margin: "16px 0" }}>
-        {/* Card 1 */}
-        <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--blue)", fontWeight: 700 }}>
-              FILE 01
-            </span>
-            <span className="tag tag-green">114,185 ROWS</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, margin: "16px 0" }}>
+        {fileCards.map(file => <div key={file.filename} style={{ background: "var(--panel2)", padding: 15, borderRadius: 8, border: "1px solid var(--line)", minWidth: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 7 }}>
+            <span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--blue)", fontWeight: 700 }}>{file.label}</span>
+            <span className="tag">{file.rows == null ? "NOT VERIFIED" : file.rows.toLocaleString() + " ROWS"}</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>classification.csv</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>
-            Prediction, normalized anomaly score, and evidence status for all flows.
-          </div>
-          <div style={{ fontSize: 10, fontFamily: "monospace", color: "var(--muted)", background: "var(--panel)", padding: 8, borderRadius: 4, marginBottom: 12 }}>
-            record_id,predicted_class,anomaly score,evidence status
-          </div>
-          <button className="primary-btn" onClick={() => triggerDownload("classification.csv")} style={{ width: "100%", fontSize: 11 }}>
-            <Download size={13} /> Download classification.csv
-          </button>
-        </div>
-
-        {/* Card 2 */}
-        <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--blue)", fontWeight: 700 }}>
-              FILE 02
-            </span>
-            <span className="tag tag-blue">19,546 POLICIES</span>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>policy.csv</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>
-            Simulated firewall policies with scope, activation, and expiry records.
-          </div>
-          <div style={{ fontSize: 10, fontFamily: "monospace", color: "var(--muted)", background: "var(--panel)", padding: 8, borderRadius: 4, marginBottom: 12 }}>
-            policy_id,activated_after_record_id,scope_type,...
-          </div>
-          <button className="primary-btn" onClick={() => triggerDownload("policy.csv")} style={{ width: "100%", fontSize: 11 }}>
-            <Download size={13} /> Download policy.csv
-          </button>
-        </div>
-
-        {/* Card 3 */}
-        <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--blue)", fontWeight: 700 }}>
-              FILE 03
-            </span>
-            <span className="tag tag-green">114,185 ROWS</span>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>replay.csv</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>
-            Replay actions (ALLOW/BLOCK) and foreign key policy cross-references.
-          </div>
-          <div style={{ fontSize: 10, fontFamily: "monospace", color: "var(--muted)", background: "var(--panel)", padding: 8, borderRadius: 4, marginBottom: 12 }}>
-            record_id,action,applied_policy_id
-          </div>
-          <button className="primary-btn" onClick={() => triggerDownload("replay.csv")} style={{ width: "100%", fontSize: 11 }}>
-            <Download size={13} /> Download replay.csv
-          </button>
-        </div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>{file.filename}</div>
+          <div style={{ fontSize: 10, color: "var(--muted)", minHeight: 42, marginBottom: 10 }}>{file.description}</div>
+          <div style={{ fontSize: 9, fontFamily: "monospace", color: "var(--muted)", background: "var(--panel)", padding: 8, borderRadius: 4, overflowWrap: "anywhere", marginBottom: 11 }}>{file.header}</div>
+          <button className="primary-btn" onClick={() => triggerDownload(file.filename)} style={{ width: "100%", fontSize: 10 }}><Download size={13}/> Download</button>
+        </div>)}
       </div>
 
-      {/* Validation Auditor Section */}
-      <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <div>
-            <b>Automated Submission Bundle Validator</b>
-            <div style={{ fontSize: 11, color: "var(--muted)" }}>
-              Executes SubmissionValidator against exact schema headers, foreign key constraints, and mathematical bounds.
-            </div>
-          </div>
-          <button className="secondary-btn" onClick={runValidator} disabled={isValidating} style={{ fontSize: 11 }}>
-            {isValidating ? <RefreshCw size={13} className="spin" /> : <Check size={13} />}
-            {isValidating ? "Validating..." : "Run Official Validator"}
-          </button>
-        </div>
+      {downloadError && <div className="parse-warning" role="alert">{downloadError}</div>}
 
-        {validationReport && (
-          <div style={{ marginTop: 12, padding: 14, background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.3)", borderRadius: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#22c55e", fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
-              <ShieldCheck size={18} /> STATUS: {validationReport.status}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, fontSize: 11 }}>
-              <div>• classification.csv: 114,185 rows (0 errors)</div>
-              <div>• policy.csv: 19,546 policies (0 errors)</div>
-              <div>• replay.csv: 114,185 rows (0 errors)</div>
-            </div>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>
-              ✓ Header exactness verified · Zero NaN or infinity floats · All BLOCK actions reference active unexpired policies.
-            </div>
+      <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <div><b>Submission bundle validator</b><div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>Runs against the files currently present on the backend.</div></div>
+          <button className="secondary-btn" onClick={runValidator} disabled={isValidating}>{isValidating ? <RefreshCw size={13} className="spin-icon"/> : <Check size={13}/>} {isValidating ? "Validating…" : "Run validator"}</button>
+        </div>
+        {validationError && <div className="parse-warning" role="alert">{validationError}</div>}
+        {validationReport && <div style={{ marginTop: 12, padding: 13, background: validationReport.all_valid ? "#112a27" : "#35221f", border: "1px solid " + (validationReport.all_valid ? "#225447" : "#6a3b31"), borderRadius: 7 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: validationReport.all_valid ? "#9de6c6" : "#ffb4a4", fontWeight: 700, fontSize: 12, marginBottom: 9 }}>
+            <ShieldCheck size={17}/> {validationReport.status || (validationReport.all_valid ? "VALID" : "INVALID")}
           </div>
-        )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10, fontSize: 10, color: "var(--muted)" }}>
+            <div>classification.csv · {validationReport.classification?.row_count ?? "—"} rows · {validationReport.classification?.total_errors ?? "—"} errors</div>
+            <div>policy.csv · {validationReport.policy?.policy_count ?? "—"} policies · {validationReport.policy?.total_errors ?? "—"} errors</div>
+            <div>replay.csv · {validationReport.replay?.row_count ?? "—"} rows · {validationReport.replay?.total_errors ?? "—"} errors</div>
+          </div>
+          {!validationReport.all_valid && <div style={{ marginTop: 9, fontSize: 10, color: "#ffb4a4" }}>Do not submit until every mandatory validator error is resolved.</div>}
+        </div>}
       </div>
 
       <div className="panel-foot" style={{ marginTop: 14 }}>
-        <span><LockKeyhole size={13} /> 100% schema compliance verified · Zero synthetic labels</span>
-        <span>AUDIT: 0 FORMATTING OR REFERENTIAL ERRORS</span>
+        <span><LockKeyhole size={13}/> No organiser submission is claimed by local validation</span>
+        <span>READINESS IS BASED ON CURRENT BACKEND FILES</span>
       </div>
     </section>
   );
