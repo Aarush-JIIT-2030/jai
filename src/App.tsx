@@ -3,7 +3,7 @@ import Papa from "papaparse";
 import {
   Activity, AlertTriangle, ArrowRight, ArrowUpRight, Bell, Check,
   ChevronDown, CircleHelp, CloudUpload, Cpu, Database, Download, FileSpreadsheet, Fingerprint,
-  Gauge, Layers, LockKeyhole, LogOut, Network, Play, RefreshCw, Shield,
+  Gauge, Layers, LockKeyhole, LogOut, Menu, X, Network, Play, RefreshCw, Shield,
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
@@ -62,6 +62,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [activeNav, setActiveNav] = useState("Overview");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -200,7 +201,8 @@ export default function App() {
   </div>;
 
   return <div className="app-shell">
-    <aside className="sidebar">
+    {mobileNavOpen && <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+    <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
       <div className="brand"><div className="brand-mark"><Shield size={21} /></div><span>CYBERSENTINEL</span></div>
       <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14} /></div>
       <div className="nav-label">COMMAND WORKSPACE</div>
@@ -220,7 +222,9 @@ export default function App() {
         <button
           key={name}
           className={"nav-item " + (activeNav === name ? "active" : "")}
-          onClick={() => setActiveNav(name)}
+          aria-label={String(name)}
+          title={String(name)}
+          onClick={() => { setActiveNav(name); setMobileNavOpen(false); }}
         >
           <Icon size={16} />
           {name}
@@ -244,6 +248,7 @@ export default function App() {
     </aside>
     <main className="main-content">
       <header className="topbar">
+        <button type="button" className="mobile-menu-btn" aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(v => !v)}>{mobileNavOpen ? <X size={18}/> : <Menu size={18}/>}</button>
         <div className="crumb"><span>Workspace</span><span>/</span><b>{activeNav}</b></div>
         <div className="top-actions">
           <div className="env-pill"><span className="pulse-dot" /> OFFLINE REPLAY MODE</div>
@@ -264,7 +269,7 @@ export default function App() {
             <button className="primary-btn" onClick={() => inputRef.current?.click()}><CloudUpload size={16} /> Inspect dataset</button>
           </div>
         </section>
-        {notice && <div className="notice"><Check size={15} />{notice}<button onClick={() => setNotice("")}><X size={15} /></button></div>}
+        {notice && <div className="notice" role="status" aria-live="polite"><Check size={15} />{notice}<button onClick={() => setNotice("")}><X size={15} /></button></div>}
 
         {activeNav === "Overview" && (
           <>
@@ -377,9 +382,9 @@ export default function App() {
                       <td><b>Completed chronological replay</b></td>
                       <td>{formatNumber(overview.metrics.total_records)}</td>
                       <td><span className="tag tag-green">Artifacts present</span></td>
-                      <td>{formatNumber(overview.metrics.blocked_records)} blocked</td>
-                      <td>{formatNumber(overview.metrics.allowed_records)} allowed</td>
-                      <td>{formatNumber(overview.metrics.policies_created)} policies</td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>{(100 - overview.metrics.benign_preservation_rate).toFixed(2)}% benign false blocks</td>
                     </tr>}
                     {history.map(row=>(
                       <tr key={row.id}>
