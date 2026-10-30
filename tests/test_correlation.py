@@ -90,3 +90,18 @@ def test_brute_force_correlation():
     assert result.attack_type == "BRUTE_FORCE"
     assert "rapid auth" in result.evidence[0]
 
+
+
+def test_ddos_convergence_requires_observed_destination_identity():
+    agent = TemporalCorrelationAgent(window_size=50)
+    result = None
+    for index in range(12):
+        flow = {
+            "Init_Win_bytes_forward": 64000 + index,
+            "min_seg_size_forward": 20,
+            "Fwd Header Length": 40,
+            "Destination Port": 80,
+        }
+        result = agent.correlate(f"record-{index}", flow, threat_class="DDOS")
+    assert result is not None
+    assert result.correlated is False
