@@ -52,3 +52,21 @@ def test_batch_endpoint_returns_aggregated_actions(monkeypatch):
     assert response.status_code == 200
     assert response.json()["total_analyzed"] == 2
     assert response.json()["actions"]["ALLOW"] == 2
+
+
+def test_dedicated_vercel_function_routes(monkeypatch):
+    from api.health import app as health_app
+    from api.models.status import app as models_app
+    from api.analyze.index import app as analyze_app
+    from api.analyze.batch import app as batch_app
+
+    monkeypatch.setattr(index, "_pipeline", ReadyPipeline())
+    client_health = TestClient(health_app)
+    client_models = TestClient(models_app)
+    client_analyze = TestClient(analyze_app)
+    client_batch = TestClient(batch_app)
+
+    assert client_health.get("/").status_code == 200
+    assert client_models.get("/").json()["models_ready"] is True
+    assert client_analyze.post("/", json={"flow": {"Flow Duration": 100}}).json()["action"] == "ALLOW"
+    assert client_batch.post("/", json={"flows": [{"Flow Duration": 100}]}).json()["total_analyzed"] == 1
