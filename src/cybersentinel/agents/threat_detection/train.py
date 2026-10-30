@@ -1,9 +1,10 @@
 """Train Agent 1 on organiser training data; validation is evaluation-only."""
-import argparse, json
+import argparse
+import json
 from pathlib import Path
 import pandas as pd
 from .model import BENCHMARK_CLASSES, ThreatDetectionModel
-from .evaluate import evaluate_predictions
+from .metrics import evaluate_predictions
 
 def load_label_mapping(path, observed_labels):
     """Accept only canonical labels or an explicit organiser-supplied mapping."""
