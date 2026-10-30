@@ -163,7 +163,9 @@ class ReplayEngine:
                 "record_id": record_id,
                 "predicted_class": fusion.final_class or t_class or "BENIGN",
                 "anomaly score": round(a_score, 5),
+                "anomaly_score": round(a_score, 5),
                 "evidence status": fusion.evidence_status,
+                "evidence_status": fusion.evidence_status,
             })
 
             # Check pre-filter against active policies
@@ -277,7 +279,7 @@ class ReplayEngine:
     def export_csv(rows: list[dict[str, Any]], fieldnames: list[str]) -> str:
         """Serialize rows to CSV string with specified fieldnames."""
         output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n")
+        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n", extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
         return output.getvalue()

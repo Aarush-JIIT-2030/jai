@@ -58,6 +58,29 @@ def test_submission_validator_catches_invalid_class(tmp_path):
     assert report["status"] == "VALIDATION_FAILED"
 
 
+def test_submission_validator_accepts_underscore_headers(tmp_path):
+    sub_dir = tmp_path / "submission_underscore"
+    sub_dir.mkdir()
+
+    with (sub_dir / "classification.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["record_id", "predicted_class", "anomaly_score", "evidence_status"])
+        writer.writerow(["rec-1", "BENIGN", "0.01000", "AGREE"])
+
+    with (sub_dir / "policy.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"])
+
+    with (sub_dir / "replay.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["record_id", "action", "applied_policy_id"])
+        writer.writerow(["rec-1", "ALLOW", ""])
+
+    report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1"])
+    assert report["all_valid"] is True
+    assert report["status"] == "READY_FOR_SUBMISSION"
+
+
 def test_sqlite_history_db(tmp_path):
     db_file = tmp_path / "test_history.db"
     init_db(db_file)
@@ -80,4 +103,3 @@ def test_sqlite_history_db(tmp_path):
     assert len(runs) == 1
     assert runs[0]["id"] == "RUN-TEST-001"
     assert runs[0]["total_records"] == 100
-

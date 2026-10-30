@@ -37,16 +37,19 @@ class SubmissionValidator:
 
         with file_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            required_cols = ["record_id", "predicted_class", "anomaly score", "evidence status"]
-            if reader.fieldnames != required_cols:
-                issues.append(f"Header mismatch. Expected {required_cols}, found {reader.fieldnames}")
+            valid_headers = [
+                ["record_id", "predicted_class", "anomaly score", "evidence status"],
+                ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
+            ]
+            if reader.fieldnames not in valid_headers:
+                issues.append(f"Header mismatch. Expected one of {valid_headers}, found {reader.fieldnames}")
 
             for idx, row in enumerate(reader):
                 row_count += 1
                 rec_id = row.get("record_id")
                 pred = row.get("predicted_class")
-                score_str = row.get("anomaly score")
-                ev_status = row.get("evidence status")
+                score_str = row.get("anomaly score") if "anomaly score" in row else row.get("anomaly_score")
+                ev_status = row.get("evidence status") if "evidence status" in row else row.get("evidence_status")
 
                 if rec_id in seen_records:
                     issues.append(f"Row {idx}: Duplicate record_id '{rec_id}'")
@@ -199,4 +202,3 @@ class SubmissionValidator:
         report_file = output_dir / "validation_report.json"
         report_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
         return report
-
