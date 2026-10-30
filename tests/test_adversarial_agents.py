@@ -54,7 +54,7 @@ class TestAgent1Adversarial:
         assert 0.0 <= res.confidence <= 1.0
 
     def test_feature_order_invariance(self):
-        agent = ThreatDetectionAgent.load("models/threat_detection/model.joblib")
+        agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
         cols = list(agent.model.feature_columns)
         rev_cols = list(reversed(cols))
         
@@ -67,7 +67,7 @@ class TestAgent1Adversarial:
         assert math.isclose(res1.confidence, res2.confidence, rel_tol=1e-5)
 
     def test_unknown_and_extraneous_features_ignored(self):
-        agent = ThreatDetectionAgent.load("models/threat_detection/model.joblib")
+        agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
         polluted_flow = {
             "Destination Port": 443,
             "ATTACKER_INJECTED_FLAG": "MALICIOUS",
@@ -90,7 +90,7 @@ class TestAgent2Adversarial:
         assert res.anomaly_score is None
 
     def test_extreme_outlier_flow_flagged(self):
-        agent = AnomalyDetectionAgent.load("models/anomaly_detection/model.joblib")
+        agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         # Extreme volumetric and packet length explosion
         wild_flow = {
             "Destination Port": 9999,
@@ -106,7 +106,7 @@ class TestAgent2Adversarial:
         assert len(res.evidence) > 0
 
     def test_anomaly_score_bounded_and_finite(self):
-        agent = AnomalyDetectionAgent.load("models/anomaly_detection/model.joblib")
+        agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         res = agent.score({"Destination Port": 80, "Flow Duration": 500})
         assert res.status == "success"
         assert isinstance(res.anomaly_score, float)
