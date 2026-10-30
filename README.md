@@ -90,8 +90,6 @@ python -m cybersentinel.data.cleaning \
 
 The preprocessor learns feature selection and fill values from training only, excludes `record_id` from model inputs, preserves every row, and applies the same rules to eval. The output and fitted preprocessing state go under `data/processed/`, which is git-ignored. Never commit raw or processed challenge data unless organisers explicitly permit redistribution.
 
-The progress Q&A based on work completed to date is in [`docs/day1-progress-questionnaire.md`](docs/day1-progress-questionnaire.md). It is a working status document, not an organiser-provided form.
-
 ## Train, evaluate and run the agents
 
 After preparing the organiser Parquet files with the Member 1 command above, train the agents locally:
@@ -126,15 +124,6 @@ The evaluation command reports measured five-class accuracy, macro-F1, per-class
 The `analysis_runs` table stores per-user run metadata and measured metrics only. RLS restricts access to the authenticated row owner. Raw flow records and datasets are not stored in Supabase.
 
 The Python API is in `api/index.py`. `GET /api/health` reports service readiness. `POST /api/analyze` remains fail-closed with `MODEL_NOT_READY` until the complete real inference pipeline and model artifacts are integrated.
-
-## Team ownership
-
-| Workstream | Suggested owner | Main paths |
-|---|---|---|
-| Data inspection and preprocessing | Member 1 | `src/cybersentinel/data/` |
-| Supervised threat classifier | Member 2 | `src/cybersentinel/agents/threat_detection/` |
-| Independent anomaly detector | Member 3 | `src/cybersentinel/agents/anomaly_detection.py` |
-| Fusion, integration and submission | Team lead / integrator | `src/cybersentinel/agents/fusion.py`, `pipeline.py`, `evaluation/` |
 
 ## Metrics and disclosure
 
