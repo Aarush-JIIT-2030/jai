@@ -93,11 +93,52 @@ def test_benchmarks_endpoint():
     response = TestClient(index.app).get("/api/benchmarks")
     assert response.status_code == 200
     data = response.json()
-    assert "agent_1_threat_detection" in data
-    assert data["agent_1_threat_detection"]["accuracy"] > 0.99
+    assert "source" in data
+    assert "verified_report" in data
+    assert isinstance(data["verified_report"], dict)
 
 
 def test_submission_download_invalid_file():
     response = TestClient(index.app).get("/api/submissions/download/malicious.sh")
     assert response.status_code == 400
 
+
+
+def test_fusion_simulator_uses_production_agent_contract():
+    response = TestClient(index.app).post(
+        "/api/fusion/simulate",
+        json={
+            "predicted_class": "DOS",
+            "confidence": 0.95,
+            "anomaly_score": -0.2,
+            "is_anomaly": True,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "BLOCK"
+    assert payload["evidence_status"] == "AGREE"
+    assert payload["final_class"] == "DOS"
+
+
+def test_fusion_simulator_rejects_invalid_confidence():
+    response = TestClient(index.app).post(
+        "/api/fusion/simulate",
+        json={
+            "predicted_class": "DOS",
+            "confidence": 1.5,
+            "anomaly_score": 0.2,
+            "is_anomaly": True,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_correlation_groups_never_return_demo_fixtures(monkeypatch):
+    monkeypatch.setattr(index, "_LAST_CORRELATION_GROUPS", [])
+    response = TestClient(index.app).get("/api/correlation/groups")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["groups"] == []
+    assert payload["total"] == 0
+    assert payload["synthetic"] is False
