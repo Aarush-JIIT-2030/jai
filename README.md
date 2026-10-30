@@ -52,7 +52,7 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                          └─────────────────────────┘
 ```
 
-1. **Agent 1 (Threat Detection):** Supervised multiclass Random Forest (100 estimators) classifying flows into `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN` with calibrated confidence.
+1. **Agent 1 (Threat Detection):** Supervised multiclass Random Forest (100 estimators) classifying flows into `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN` with model confidence from predict_proba (not probability-calibrated).
 2. **Agent 2 (Anomaly Detection):** Independent, unsupervised Isolation Forest ($c=0.05$) scoring continuous statistical deviations to catch zero-day attacks without label access.
 3. **Agent 3 (Evidence Fusion):** Tactical arbiter combining classification and anomaly signals into deterministic `ALLOW`, `BLOCK`, or `REVIEW` decisions (`AGREE`, `DISAGREE`, `INCOMPLETE`). Disagreements are explicitly routed to analyst review.
 4. **Agent 4 (Temporal Correlation):** Stateful chronological correlator maintaining a 150-flow sliding window to detect distributed Port Scans ($\ge 5$ distinct destination ports), DDoS volumetric surges, and repeated SSH/FTP authentication sweeps.
@@ -60,9 +60,9 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
 
 ---
 
-## 2. Verified Benchmark Metrics (114,185 Holdout Flows)
+## 2. Historical Baseline Metrics (114,185 Holdout Flows — Pre-Correction)
 
-Evaluated strictly on the untouched evaluation holdout dataset (`data/processed/eval_prepared.parquet`) with fixed seed 42 and zero future lookahead.
+The following values are copied from the previous local baseline report and predate the shared TCP-stack identity correction and metric-semantics fixes. They are historical reference values, **not current release verification**. Regenerate the three CSVs and all replay metrics using the current branch before submission. The dataset and model binaries are not committed to this public repository.
 
 ### Agent 1: Multiclass Classification
 * **Overall Accuracy:** `99.9956%` (114,180 / 114,185 correct flows)
@@ -127,7 +127,7 @@ Generated via `scripts/generate_submissions.py` and validated via `SubmissionVal
 
 ## 5. WebGL 3D SOC Command Center
 
-The frontend provides a polished, dark SOC command platform with 11 dedicated operational consoles:
+The frontend provides a dark SOC command platform with 11 operational consoles. Screens show actual backend data when available and explicit unavailable/empty states otherwise; fabricated fallback incidents, policy rows, benchmark matrices, and replay progress are not presented. The console includes:
 1. **Overview / SOC Command Center:** WebGL 3D network topology with 5-agent satellite orbits, interactive pointer tilt, threat-level toggle (`LOW`, `ELEVATED`, `CRITICAL`), real aggregate telemetry, and 2D canvas fallback.
 2. **Five-Agent Architecture:** Deep-dive cards showing model parameters, input/output schemas, and microsecond latencies for Agents 1–5.
 3. **Flow Inspector:** Granular flow lookup by ID, preset attack injections (Slowloris DoS, PortScan probe, SSH Brute), feature importance, and multi-agent evidence breakdown.
@@ -170,7 +170,7 @@ $env:PYTHONPATH="src"; python scripts/reproduce_benchmarks.py
 $env:PYTHONPATH="src"; python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
 ```
 
-### 4. Run Pytest Suite (41 Tests)
+### 4. Run the Pytest Suite
 ```bash
 $env:PYTHONPATH="src"; python -m pytest tests -q
 ```
@@ -194,8 +194,25 @@ uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload
 
 ---
 
+
+
+### Backend endpoints added for the final SOC workflow
+
+- `GET /api/system/diagnostics` — reports actual local model, dataset, SQLite and submission artifact presence.
+- `GET /api/overview` — computes evaluation KPIs from the installed labelled evaluation dataset and generated CSVs; labels are used only for offline metrics.
+- `POST /api/fusion/simulate` — invokes the production Python Agent 3 fusion contract.
+- `POST /api/replay/run-official` — runs the installed evaluation parquet chronologically and writes the three official CSVs.
+- `GET /api/correlation/groups` — returns groups from the latest completed replay in the current API process, or an empty list when none exist.
+
+If the dataset or models are missing, the API returns an explicit unavailable response. It does not substitute synthetic benchmark values or sample incidents.
+
+### SOURCE_IP identity limitation
+
+The prepared feature dataset may not contain native Layer 3 source IP fields. In that case the system derives a synthetic, stable identity from TCP-stack fingerprint fields. This is not an observed IP address and can collide for clients with identical fingerprints. If the required fingerprint fields are missing, policy creation fails closed rather than inventing a host identity. See `release/final-red-team-verification/source-ip-scope-audit.md`.
+
 ## 7. Open-Source Attribution & AI Disclosure
 
 * **Core Libraries:** `scikit-learn`, `pandas`, `numpy`, `joblib`, `fastapi`, `pydantic`, `three`, `react`, `lucide-react`, `vite`.
 * **Dataset:** CICIDS2017 flow data provided by Canadian Institute for Cybersecurity and JAI 2026 Hackathon Organizers.
-* **AI Assistance Disclosure:** Autonomous coding agents (Antigravity by Google DeepMind) were used for code refactoring, test scaffolding, and WebGL Three.js shader integration in full compliance with JAI 2026 Hackathon Rulebook Section 4.
+* **AI Assistance Disclosure:** Antigravity and ChatGPT were used for code review, debugging, test design, documentation, and UI implementation assistance. Team members remain responsible for understanding and presenting the submitted code.
+* **UI/UX Reference Disclosure:** The user-supplied CICRCombined-main archive was reviewed as a design-pattern reference for accessible focus states, reduced-motion support, responsive navigation, async states, and restrained transitions. Its README identifies the project as ISC-licensed; no CICR source files or components were copied into CyberSentinel. The patterns were independently implemented in CyberSentinel's existing React/Three.js application.

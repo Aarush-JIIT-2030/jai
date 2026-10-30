@@ -3,8 +3,8 @@ import Papa from "papaparse";
 import {
   Activity, AlertTriangle, ArrowRight, ArrowUpRight, Bell, Check,
   ChevronDown, CircleHelp, CloudUpload, Cpu, Database, Download, FileSpreadsheet, Fingerprint,
-  Gauge, Layers, LockKeyhole, LogOut, Network, Play, RefreshCw, Shield,
-  ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
+  Gauge, Layers, LockKeyhole, LogOut, Menu, X, Network, Play, RefreshCw, Shield,
+  ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { Agent2Console, FlowInspector } from "./FlowInspector";
@@ -20,17 +20,21 @@ type Health = {
     agent_1_threat_detection?: boolean;
     agent_2_anomaly_detection?: boolean;
     agent_3_evidence_fusion?: boolean;
+    agent_4_temporal_correlation?: boolean;
+    agent_5_adaptive_defense?: boolean;
   };
 };
 
 type HistoryRow = {
-  id: string;
+  run_id: string;
   dataset_name: string;
-  dataset_rows: number;
-  processed_rows: number;
+  total_records: number;
+  blocked_records: number;
+  allowed_records: number;
+  policies_created: number;
+  containment_rate: number | null;
+  throughput_fps: number | null;
   status: string;
-  accuracy: number | null;
-  macro_f1: number | null;
   created_at: string;
 };
 
@@ -54,11 +58,13 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
+  const [overview, setOverview] = useState<any>(null);
   const [dataset, setDataset] = useState<DatasetInfo | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [activeNav, setActiveNav] = useState("Overview");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,18 +75,27 @@ export default function App() {
   }, []);
 
   const loadHistory = useCallback(async () => {
-    if (!supabase || !session?.user) return;
     try {
-      const { data, error } = await supabase.from("analysis_runs")
-        .select("id,dataset_name,dataset_rows,processed_rows,status,accuracy,macro_f1,created_at")
-        .order("created_at", { ascending: false }).limit(8);
-      if (!error && data) setHistory(data as HistoryRow[]);
+      const response = await fetch("/api/history?limit=8");
+      if (!response.ok) throw new Error("Local history API unavailable");
+      const data = await response.json();
+      setHistory(Array.isArray(data.runs) ? data.runs : []);
     } catch {
-      // Offline mode
+      setHistory([]);
     }
-  }, [session]);
+  }, []);
 
   useEffect(() => { void loadHistory(); }, [loadHistory]);
+
+  const loadOverview = useCallback(async () => {
+    try {
+      const response = await fetch("/api/overview");
+      if (!response.ok) throw new Error("Replay artifacts are not available");
+      setOverview(await response.json());
+    } catch {
+      setOverview(null);
+    }
+  }, []);
 
   const checkHealth = useCallback(async () => {
     try {
@@ -91,7 +106,7 @@ export default function App() {
       setHealth({ status: "unavailable", service: "CyberSentinel API", model_ready: false });
     }
   }, []);
-  useEffect(() => { void checkHealth(); }, [checkHealth]);
+  useEffect(() => { void checkHealth(); void loadOverview(); }, [checkHealth, loadOverview]);
 
   async function authenticate(event: FormEvent) {
     event.preventDefault();
@@ -155,7 +170,7 @@ export default function App() {
         <h1>See the threat.<br /><em>Understand the why.</em></h1>
         <p>Multi-agent network intrusion detection with transparent evidence and adaptive, simulated defense.</p>
         <div className="auth-stats">
-          <div><strong>03</strong><span>INTELLIGENCE AGENTS</span></div>
+          <div><strong>05</strong><span>COOPERATING AGENTS</span></div>
           <div><strong>05</strong><span>BENCHMARK CLASSES</span></div>
           <div><strong>99.99%</strong><span>HOLDOUT ACCURACY</span></div>
         </div>
@@ -187,7 +202,8 @@ export default function App() {
   </div>;
 
   return <div className="app-shell">
-    <aside className="sidebar">
+    {mobileNavOpen && <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+    <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
       <div className="brand"><div className="brand-mark"><Shield size={21} /></div><span>CYBERSENTINEL</span></div>
       <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14} /></div>
       <div className="nav-label">COMMAND WORKSPACE</div>
@@ -207,7 +223,9 @@ export default function App() {
         <button
           key={name}
           className={"nav-item " + (activeNav === name ? "active" : "")}
-          onClick={() => setActiveNav(name)}
+          aria-label={String(name)}
+          title={String(name)}
+          onClick={() => { setActiveNav(name); setMobileNavOpen(false); }}
         >
           <Icon size={16} />
           {name}
@@ -231,10 +249,11 @@ export default function App() {
     </aside>
     <main className="main-content">
       <header className="topbar">
+        <button type="button" className="mobile-menu-btn" aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(v => !v)}>{mobileNavOpen ? <X size={18}/> : <Menu size={18}/>}</button>
         <div className="crumb"><span>Workspace</span><span>/</span><b>{activeNav}</b></div>
         <div className="top-actions">
           <div className="env-pill"><span className="pulse-dot" /> OFFLINE REPLAY MODE</div>
-          <button className="icon-btn" title="Refresh API status" onClick={checkHealth}><RefreshCw size={16} /></button>
+          <button className="icon-btn" title="Refresh API and replay status" onClick={() => { void checkHealth(); void loadOverview(); }}><RefreshCw size={16} /></button>
           <button className="icon-btn" title="Notifications" onClick={() => setNotice("No new alerts. All agents operational.")}><Bell size={16} /></button>
           <div className="top-avatar">{(session.user.email?.[0] ?? "U").toUpperCase()}</div>
         </div>
@@ -251,16 +270,16 @@ export default function App() {
             <button className="primary-btn" onClick={() => inputRef.current?.click()}><CloudUpload size={16} /> Inspect dataset</button>
           </div>
         </section>
-        {notice && <div className="notice"><Check size={15} />{notice}<button onClick={() => setNotice("")}><X size={15} /></button></div>}
+        {notice && <div className="notice" role="status" aria-live="polite"><Check size={15} />{notice}<button onClick={() => setNotice("")}><X size={15} /></button></div>}
 
         {activeNav === "Overview" && (
           <>
             <TopologyCommandCentre />
             <section className="metrics-grid">
-              <Metric icon={Database} label="DATASET FLOWS" value={dataset ? formatNumber(dataset.rows) : "114,185"} detail={dataset ? "Inspected in browser" : "Official evaluation holdout"} tone="blue"/>
-              <Metric icon={ShieldAlert} label="POLICIES CREATED" value="19,546" detail="76.2% bloat reduction via consensus" tone="amber"/>
-              <Metric icon={ShieldCheck} label="ATTACK CONTAINMENT" value="89.0%" detail="48,219 attacks neutralized" tone="green"/>
-              <Metric icon={Cpu} label="BENIGN PRESERVED" value="53,392" detail="89.0% benign traffic allowed" tone="violet"/>
+              <Metric icon={Database} label="DATASET FLOWS" value={dataset ? formatNumber(dataset.rows) : (overview ? formatNumber(overview.metrics.total_records) : "—")} detail={dataset ? "Inspected in browser" : (overview ? "Verified replay artifact" : "Awaiting local replay artifacts") } tone="blue"/>
+              <Metric icon={ShieldAlert} label="POLICIES CREATED" value={overview ? formatNumber(overview.metrics.policies_created) : "—"} detail={overview ? "Generated by completed replay" : "No generated policy file detected"} tone="amber"/>
+              <Metric icon={ShieldCheck} label="ATTACK CONTAINMENT" value={overview ? overview.metrics.attack_containment_rate.toFixed(2) + "%" : "—"} detail={overview ? formatNumber(overview.metrics.attacks_contained) + " attack flows blocked" : "Computed from local labels and replay"} tone="green"/>
+              <Metric icon={Cpu} label="BENIGN PRESERVED" value={overview ? overview.metrics.benign_preservation_rate.toFixed(2) + "%" : "—"} detail={overview ? formatNumber(overview.metrics.benign_preserved) + " benign flows preserved" : "Computed from local labels and replay"} tone="violet"/>
             </section>
 
             <section className="content-grid">
@@ -323,9 +342,13 @@ export default function App() {
                 <div className="agent-list">
                   <Agent number="01" title="Threat detection" desc="Supervised five-class classification" status={health?.agents?.agent_1_threat_detection ? "Active" : "Awaiting model"} icon={ShieldAlert}/>
                   <div className="agent-connector"/>
-                  <Agent number="02" title="Anomaly detection" desc="Independent outlier scoring + evidence" status={health?.agents?.agent_2_anomaly_detection ? "Active" : "Awaiting model"} icon={Activity}/>
+                  <Agent number="02" title="Anomaly detection" desc="Independent unsupervised outlier scoring" status={health?.agents?.agent_2_anomaly_detection ? "Active" : "Awaiting model"} icon={Activity}/>
                   <div className="agent-connector"/>
-                  <Agent number="03" title="Evidence fusion" desc="Agreement, disagreement and rationale" status="Active" icon={Fingerprint}/>
+                  <Agent number="03" title="Evidence fusion" desc="Combines A1 and A2 evidence and disagreement" status={health?.agents?.agent_3_evidence_fusion ? "Active" : "Unavailable"} icon={Fingerprint}/>
+                  <div className="agent-connector"/>
+                  <Agent number="04" title="Temporal correlation" desc="Groups suspicious flows in observed time windows" status={health?.agents?.agent_4_temporal_correlation ? "Active" : "Unavailable"} icon={Network}/>
+                  <div className="agent-connector"/>
+                  <Agent number="05" title="Adaptive defense" desc="Creates temporary simulated ALLOW/BLOCK policies" status={health?.agents?.agent_5_adaptive_defense ? "Active" : "Unavailable"} icon={ShieldCheck}/>
                 </div>
                 <div className="fusion-note">
                   <Sparkles size={15}/>
@@ -338,8 +361,8 @@ export default function App() {
               <div className="panel-head history-head">
                 <div>
                   <div className="panel-kicker">BENCHMARK PERFORMANCE & AUDIT TRAIL</div>
-                  <h3>Official Evaluation Holdout (114,185 Flows)</h3>
-                  <p>Untouched official evaluation split results and user run telemetry.</p>
+                  <h3>Recent Local Replay Runs</h3>
+                  <p>Run history and metrics from the local replay database.</p>
                 </div>
                 <button className="secondary-btn" onClick={loadHistory}><RefreshCw size={14}/> Refresh</button>
               </div>
@@ -347,31 +370,31 @@ export default function App() {
                 <table>
                   <thead>
                     <tr>
-                      <th>EVALUATION RUN</th>
+                      <th>REPLAY RUN</th>
                       <th>RECORDS</th>
                       <th>STATUS</th>
-                      <th>ACCURACY</th>
-                      <th>MACRO-F1</th>
-                      <th>BENIGN FPR</th>
+                      <th>BLOCKED</th>
+                      <th>ALLOWED</th>
+                      <th>POLICIES</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td><b>Official Holdout Benchmark (CICIDS2017)</b></td>
-                      <td>114,185</td>
-                      <td><span className="tag tag-green">Verified</span></td>
-                      <td><b>99.9956%</b></td>
-                      <td><b>0.999897</b></td>
-                      <td>0.958% (&lt; 1.0%)</td>
-                    </tr>
+                    {overview && <tr>
+                      <td><b>Completed chronological replay</b></td>
+                      <td>{formatNumber(overview.metrics.total_records)}</td>
+                      <td><span className="tag tag-green">Artifacts present</span></td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>{(100 - overview.metrics.benign_preservation_rate).toFixed(2)}% benign false blocks</td>
+                    </tr>}
                     {history.map(row=>(
-                      <tr key={row.id}>
+                      <tr key={row.run_id}>
                         <td>{row.dataset_name}</td>
-                        <td>{formatNumber(row.dataset_rows)}</td>
-                        <td><span className={"tag "+(row.status==="completed"?"tag-green":"tag-amber")}>{row.status}</span></td>
-                        <td>{row.accuracy==null?"—":(row.accuracy*100).toFixed(2)+"%"}</td>
-                        <td>{row.macro_f1==null?"—":row.macro_f1.toFixed(4)}</td>
-                        <td>{new Date(row.created_at).toLocaleString()}</td>
+                        <td>{formatNumber(row.total_records)}</td>
+                        <td><span className={"tag "+(row.status==="COMPLETED"?"tag-green":"tag-amber")}>{row.status}</span></td>
+                        <td>{formatNumber(row.blocked_records)}</td>
+                        <td>{formatNumber(row.allowed_records)}</td>
+                        <td>{formatNumber(row.policies_created)}</td>
                       </tr>
                     ))}
                   </tbody>

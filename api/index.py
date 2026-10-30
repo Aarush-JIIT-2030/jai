@@ -16,6 +16,8 @@ if str(SOURCE_DIR) not in sys.path:
     sys.path.insert(0, str(SOURCE_DIR))
 
 from cybersentinel.pipeline import CyberSentinelPipeline
+from cybersentinel.agents.fusion import EvidenceFusionAgent
+from cybersentinel.contracts import ThreatDetectionResult, AnomalyDetectionResult
 from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
 from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
@@ -36,6 +38,7 @@ _pipeline: CyberSentinelPipeline | None = None
 _anomaly_agent: AnomalyDetectionAgent | None = None
 _correlation_agent = TemporalCorrelationAgent()
 _defense_agent = AdaptiveDefenseAgent()
+_LAST_CORRELATION_GROUPS: list[dict[str, Any]] = []
 
 
 class BatchAnalyzeRequest(BaseModel):
@@ -85,12 +88,56 @@ def health():
     }
 
 
+@app.get("/api/system/diagnostics")
+def system_diagnostics():
+    """Expose actual local artifact presence without inventing readiness."""
+    dataset = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    history_db = BASE_DIR / "data" / "cybersentinel_history.db"
+    submission = BASE_DIR / "outputs" / "submission"
+    model_status = {
+        "agent_1_model": THREAT_MODEL.is_file(),
+        "agent_2_model": ANOMALY_MODEL.is_file(),
+        "agent_3_fusion_code": True,
+        "agent_4_correlation_code": True,
+        "agent_5_defense_code": True,
+    }
+    files = {}
+    for filename in ("classification.csv", "policy.csv", "replay.csv"):
+        path = submission / filename
+        files[filename] = {
+            "present": path.is_file(),
+            "bytes": path.stat().st_size if path.is_file() else None,
+        }
+    return {
+        "api": {"available": True, "mode": "offline-replay"},
+        "models": model_status,
+        "model_sizes": {
+            "agent_1_bytes": THREAT_MODEL.stat().st_size if THREAT_MODEL.is_file() else None,
+            "agent_2_bytes": ANOMALY_MODEL.stat().st_size if ANOMALY_MODEL.is_file() else None,
+        },
+        "models_ready": get_pipeline() is not None,
+        "evaluation_dataset": {
+            "present": dataset.is_file(),
+            "bytes": dataset.stat().st_size if dataset.is_file() else None,
+            "path": "data/processed/eval_prepared.parquet",
+        },
+        "submission_artifacts": files,
+        "history_database": {"present": history_db.is_file()},
+        "source_identity": "native source IP when present; otherwise TCP-stack-derived synthetic identity; unavailable identity fails closed",
+        "firewall": {"mode": "simulated-only", "host_firewall_modified": False},
+    }
+
+
 @app.get("/api/history")
 def get_history(limit: int = 15):
     """Retrieve runs from local SQLite database."""
     try:
         runs = list_runs(limit=limit)
-        return {"runs": runs, "source": "local_sqlite"}
+        normalized = [
+            {**run, "run_id": run.get("id"), "id": run.get("id")}
+            for run in runs
+        ]
+        return {"runs": normalized, "source": "local_sqlite"}
     except Exception as exc:
         return {"runs": [], "error": str(exc), "source": "local_sqlite"}
 
@@ -231,6 +278,27 @@ def analyze_batch(payload: BatchAnalyzeRequest):
     return {"total_analyzed": len(results), "actions": actions, "results": results}
 
 
+@app.post("/api/fusion/simulate")
+def simulate_fusion(payload: dict[str, Any]):
+    """Run the production Agent 3 fusion contract against explicit A1/A2 evidence."""
+    predicted = str(payload.get("predicted_class", "")).upper()
+    confidence = payload.get("confidence")
+    anomaly_score = payload.get("anomaly_score")
+    is_anomaly = payload.get("is_anomaly")
+    if predicted not in {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}:
+        raise HTTPException(status_code=422, detail="predicted_class must be one of the five official classes.")
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= float(confidence) <= 1:
+        raise HTTPException(status_code=422, detail="confidence must be a number between 0 and 1.")
+    if isinstance(anomaly_score, bool) or not isinstance(anomaly_score, (int, float)) or not pd.notna(anomaly_score):
+        raise HTTPException(status_code=422, detail="anomaly_score must be a finite number.")
+    if not isinstance(is_anomaly, bool):
+        raise HTTPException(status_code=422, detail="is_anomaly must be a boolean from Agent 2.")
+    threat = ThreatDetectionResult(predicted_class=predicted, confidence=float(confidence))
+    anomaly = AnomalyDetectionResult(anomaly_score=float(anomaly_score), is_anomaly=is_anomaly)
+    result = EvidenceFusionAgent().fuse(threat, anomaly)
+    return result.to_dict()
+
+
 @app.post("/api/replay/simulate")
 def simulate_replay(payload: ReplaySimulationRequest):
     """Run causal chronological replay over provided flow sequence."""
@@ -248,8 +316,26 @@ def simulate_replay(payload: ReplaySimulationRequest):
     df = pd.DataFrame(payload.flows)
     results = engine.run_replay(df)
 
+    # Retain only groups produced by this real replay; never substitute demo fixtures.
+    global _LAST_CORRELATION_GROUPS
+    _LAST_CORRELATION_GROUPS = [
+        {
+            "group_id": group.group_id,
+            "attack_type": group.attack_type,
+            "source_identity": group.source_ip,
+            "target_endpoints": list(group.target_endpoints),
+            "member_record_ids": [str(value) for value in group.member_record_ids],
+            "flow_count": group.flow_count,
+            "start_record_id": str(group.start_record_id) if group.start_record_id is not None else None,
+            "end_record_id": str(group.end_record_id) if group.end_record_id is not None else None,
+            "confidence": group.confidence,
+            "evidence": list(group.evidence),
+        }
+        for group in engine.correlation_agent.active_groups.values()
+    ]
+
     # Save to local SQLite
-    run_id = f"RUN-{int(time.time())}"
+    run_id = f"RUN-{time.time_ns()}"
     metrics = results["metrics"]
     record_run(
         run_id=run_id,
@@ -273,6 +359,103 @@ def simulate_replay(payload: ReplaySimulationRequest):
     }
 
 
+@app.post("/api/replay/run-official")
+def run_official_replay():
+    """Run the installed official evaluation stream and write the three submission CSVs."""
+    pipeline = get_pipeline()
+    if pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MODEL_NOT_READY", "message": "Install and verify both model artifacts before running replay."},
+        )
+    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    if not eval_file.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "EVALUATION_DATASET_NOT_FOUND", "message": "Install the organiser-provided evaluation parquet at data/processed/eval_prepared.parquet."},
+        )
+    try:
+        frame = pd.read_parquet(eval_file)
+        if frame.empty:
+            raise HTTPException(status_code=422, detail="The evaluation dataset is empty.")
+        engine = ReplayEngine(
+            threat_agent=pipeline.threat_agent,
+            anomaly_agent=pipeline.anomaly_agent,
+            fusion_agent=pipeline.fusion_agent,
+        )
+        results = engine.run_replay(frame)
+        output_dir = BASE_DIR / "outputs" / "submission"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        files = {
+            "classification.csv": engine.export_csv(
+                results["classification_rows"],
+                ["record_id", "predicted_class", "anomaly score", "evidence status"],
+            ),
+            "policy.csv": engine.export_csv(
+                results["policy_rows"],
+                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
+            ),
+            "replay.csv": engine.export_csv(
+                results["replay_rows"],
+                ["record_id", "action", "applied_policy_id"],
+            ),
+        }
+        for filename, csv_text in files.items():
+            (output_dir / filename).write_text(csv_text, encoding="utf-8", newline="")
+        record_ids = [str(row["record_id"]) for row in results["classification_rows"]]
+        validation = SubmissionValidator.validate_submission_bundle(output_dir, record_ids)
+
+        global _LAST_CORRELATION_GROUPS
+        _LAST_CORRELATION_GROUPS = [
+            {
+                "group_id": group.group_id,
+                "attack_type": group.attack_type,
+                "source_identity": group.source_ip,
+                "target_endpoints": list(group.target_endpoints),
+                "member_record_ids": [str(value) for value in group.member_record_ids],
+                "flow_count": group.flow_count,
+                "start_record_id": str(group.start_record_id) if group.start_record_id is not None else None,
+                "end_record_id": str(group.end_record_id) if group.end_record_id is not None else None,
+                "confidence": group.confidence,
+                "evidence": list(group.evidence),
+            }
+            for group in engine.correlation_agent.active_groups.values()
+        ]
+
+        metrics = results["metrics"]
+        run_id = f"RUN-{int(time.time())}"
+        record_run(
+            run_id=run_id,
+            dataset_name=eval_file.name,
+            total_records=metrics["total_records"],
+            blocked_records=metrics["blocked_records"],
+            allowed_records=metrics["allowed_records"],
+            policies_created=metrics["policies_created"],
+            containment_rate=metrics.get("containment_rate"),
+            throughput_fps=metrics["throughput_fps"],
+            elapsed_seconds=metrics["elapsed_seconds"],
+            status="COMPLETED" if validation.get("all_valid") else "VALIDATION_FAILED",
+        )
+        return {
+            "run_id": run_id,
+            "metrics": metrics,
+            "validation": validation,
+            "files": {name: {"path": f"outputs/submission/{name}", "rows": len(results[key])}
+                      for name, key in (("classification.csv", "classification_rows"),
+                                        ("policy.csv", "policy_rows"),
+                                        ("replay.csv", "replay_rows"))},
+            "correlation_groups": len(_LAST_CORRELATION_GROUPS),
+            "source": "installed_official_evaluation_dataset",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "OFFICIAL_REPLAY_FAILED", "type": type(exc).__name__, "message": "Official replay failed; inspect backend logs for details."},
+        ) from exc
+
+
 @app.get("/api/replay/validate")
 def validate_submissions():
     """Validate submission files in outputs/submission/."""
@@ -293,73 +476,109 @@ def validate_submissions():
     return report
 
 
-@app.get("/api/benchmarks")
-def get_benchmarks():
-    """Return real verified benchmark metrics, confusion matrix, and class profiles."""
-    import json
-    report_file = BASE_DIR / "outputs" / "reports" / "eval_benchmark_report.json"
-    if not report_file.is_file():
-        # Fallback to release/day2-final if present
-        report_file = BASE_DIR / "release" / "day2-final" / "eval_benchmark_report.json"
+@app.get("/api/overview")
+def get_overview():
+    """Compute SOC KPIs from actual replay artifacts; labels are evaluation-only."""
+    import csv
 
-    if report_file.is_file():
-        try:
-            with open(report_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            return {"error": str(e)}
+    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    sub_dir = BASE_DIR / "outputs" / "submission"
+    class_file = sub_dir / "classification.csv"
+    replay_file = sub_dir / "replay.csv"
+    policy_file = sub_dir / "policy.csv"
+    required = (eval_file, class_file, replay_file, policy_file)
+    missing = [str(path.relative_to(BASE_DIR)) for path in required if not path.is_file()]
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "OVERVIEW_ARTIFACTS_NOT_READY", "missing": missing,
+                    "message": "Overview metrics are unavailable until the evaluation dataset and replay artifacts are installed."},
+        )
+    try:
+        flows = pd.read_parquet(eval_file)
+        classifications = pd.read_csv(class_file, dtype={"record_id": str})
+        replay = pd.read_csv(replay_file, dtype={"record_id": str, "applied_policy_id": str})
+        policies = pd.read_csv(policy_file)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "OVERVIEW_READ_FAILED", "type": type(exc).__name__}) from exc
 
-    # Return default verified metrics from holdout evaluation
+    if "label" not in flows.columns:
+        raise HTTPException(status_code=503, detail="Evaluation labels are required only for offline metric calculation.")
+    flow_ids = [str(value) for value in flows["record_id"].tolist()] if "record_id" in flows.columns else [str(value) for value in flows.index]
+    if len(set(flow_ids)) != len(flow_ids):
+        raise HTTPException(status_code=503, detail="Evaluation record IDs are not unique.")
+    if classifications["record_id"].astype(str).duplicated().any() or replay["record_id"].astype(str).duplicated().any():
+        raise HTTPException(status_code=503, detail="Submission artifacts contain duplicate record IDs.")
+
+    class_ids = set(classifications["record_id"].astype(str))
+    replay_ids = set(replay["record_id"].astype(str))
+    expected_ids = set(flow_ids)
+    if class_ids != expected_ids or replay_ids != expected_ids:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "OVERVIEW_RECORD_MISMATCH", "expected": len(expected_ids),
+                    "classification": len(class_ids), "replay": len(replay_ids)},
+        )
+
+    truth = dict(zip(flow_ids, flows["label"].astype(str).str.upper().tolist()))
+    actions = dict(zip(replay["record_id"].astype(str), replay["action"].astype(str).str.upper()))
+    total = len(flow_ids)
+    blocked = sum(action == "BLOCK" for action in actions.values())
+    allowed = sum(action == "ALLOW" for action in actions.values())
+    attacks = sum(label != "BENIGN" for label in truth.values())
+    benign = total - attacks
+    attack_blocks = sum(actions[rid] == "BLOCK" and truth[rid] != "BENIGN" for rid in flow_ids)
+    false_blocks = sum(actions[rid] == "BLOCK" and truth[rid] == "BENIGN" for rid in flow_ids)
+    benign_preserved = sum(actions[rid] == "ALLOW" and truth[rid] == "BENIGN" for rid in flow_ids)
+    attack_misses = attacks - attack_blocks
+
     return {
-        "evaluation_dataset": {
-            "path": "data/processed/eval_prepared.parquet",
-            "rows": 114185,
-            "feature_count": 71,
-            "class_counts": {
-                "BENIGN": 60001,
-                "BRUTE_FORCE": 1384,
-                "DOS": 24000,
-                "DDOS": 14400,
-                "PORT_SCAN": 14400
-            },
-            "evaluation_only": True
+        "source": "local_evaluation_dataset_and_generated_submission_csvs",
+        "labels_used_for": "offline_metric_calculation_only",
+        "metrics": {
+            "total_records": total, "blocked_records": blocked, "allowed_records": allowed,
+            "policies_created": int(len(policies)), "attack_records": attacks, "benign_records": benign,
+            "attacks_contained": attack_blocks, "attacks_allowed": attack_misses,
+            "false_blocks": false_blocks, "benign_preserved": benign_preserved,
+            "attack_containment_rate": round(100 * attack_blocks / max(1, attacks), 2),
+            "benign_preservation_rate": round(100 * benign_preserved / max(1, benign), 2),
+            "block_precision": round(100 * attack_blocks / max(1, blocked), 2),
         },
-        "agent_1_threat_detection": {
-            "model_type": "random_forest",
-            "training_rows": 456737,
-            "accuracy": 0.9999562114113062,
-            "macro_precision": 0.9999833349998333,
-            "macro_recall": 0.9998110468850353,
-            "macro_f1": 0.9998971631705785,
-            "per_class": {
-                "BENIGN": {"precision": 0.9999166749991667, "recall": 1.0, "f1": 0.9999583357637472, "support": 60001},
-                "BRUTE_FORCE": {"precision": 1.0, "recall": 0.9992774566473989, "f1": 0.9996385977593061, "support": 1384},
-                "DOS": {"precision": 1.0, "recall": 0.9999166666666667, "f1": 0.9999583315971499, "support": 24000},
-                "DDOS": {"precision": 1.0, "recall": 1.0, "f1": 1.0, "support": 14400},
-                "PORT_SCAN": {"precision": 1.0, "recall": 0.9998611111111111, "f1": 0.9999305507326898, "support": 14400}
-            },
-            "confusion_matrix": [
-                [60001, 0, 0, 0, 0],
-                [1, 1383, 0, 0, 0],
-                [2, 0, 23998, 0, 0],
-                [0, 0, 0, 14400, 0],
-                [2, 0, 0, 0, 14398]
-            ],
-            "class_order": ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"],
-            "inference_seconds": 2.706,
-            "inference_ms_per_flow": 0.0237
+        "integrity": {
+            "classification_rows": len(classifications), "replay_rows": len(replay),
+            "policy_rows": len(policies), "record_ids_match": True,
+            "action_conservation": total == blocked + allowed,
         },
-        "agent_2_anomaly_detection": {
-            "algorithm": "IsolationForest",
-            "training_rows": 240000,
-            "threshold": 0.03325,
-            "benign_false_positive_rate": 0.009583,
-            "attack_anomaly_recall": 0.117064,
-            "inference_seconds": 7.644,
-            "inference_ms_per_flow": 0.0669
-        }
     }
 
+
+@app.get("/api/benchmarks")
+def get_benchmarks():
+    """Return only metrics loaded from a generated benchmark report."""
+    import json
+
+    candidates = (
+        BASE_DIR / "outputs" / "reports" / "eval_benchmark_report.json",
+        BASE_DIR / "release" / "day2-final" / "eval_benchmark_report.json",
+    )
+    report_file = next((path for path in candidates if path.is_file()), None)
+    if report_file is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "BENCHMARK_NOT_AVAILABLE",
+                "message": "No generated benchmark report is available. Run the permitted benchmark workflow first.",
+            },
+        )
+    try:
+        with report_file.open("r", encoding="utf-8") as handle:
+            report = json.load(handle)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "BENCHMARK_REPORT_INVALID", "message": f"Benchmark report could not be read: {type(exc).__name__}"},
+        ) from exc
+    return {"source": str(report_file.relative_to(BASE_DIR)), "verified_report": report}
 
 @app.get("/api/submissions/download/{filename}")
 def download_submission_file(filename: str):
@@ -378,71 +597,73 @@ def download_submission_file(filename: str):
 
 @app.get("/api/flows/sample")
 def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None = None):
-    """Retrieve actual evaluation flows with classification and replay actions."""
+    """Return flow features joined to predictions/actions, never ground-truth labels."""
+    if limit < 1 or limit > 200 or offset < 0:
+        raise HTTPException(status_code=422, detail="limit must be 1..200 and offset must be non-negative.")
+
     sub_dir = BASE_DIR / "outputs" / "submission"
     eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
-    if not eval_file.is_file():
-        raise HTTPException(status_code=404, detail="Evaluation dataset not found.")
-
-    df = pd.read_parquet(eval_file)
-    total = len(df)
-    
-    if class_filter and class_filter.upper() != "ALL":
-        target = class_filter.upper()
-        df = df[df["label"].str.upper() == target]
-        total = len(df)
-
-    slice_df = df.iloc[offset : offset + limit]
-
     class_file = sub_dir / "classification.csv"
     replay_file = sub_dir / "replay.csv"
-    class_map: dict[str, Any] = {}
-    replay_map: dict[str, Any] = {}
+    if not eval_file.is_file():
+        raise HTTPException(status_code=404, detail="Evaluation dataset is not installed.")
+    if not class_file.is_file() or not replay_file.is_file():
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "REPLAY_OUTPUTS_NOT_READY", "message": "Generate classification.csv and replay.csv before inspecting evaluated flows."},
+        )
 
-    if class_file.is_file() and replay_file.is_file():
-        try:
-            c_df = pd.read_csv(class_file)
-            r_df = pd.read_csv(replay_file)
-            for idx in slice_df.index:
-                rec_id = str(idx)
-                if idx < len(c_df):
-                    crow = c_df.iloc[idx]
-                    class_map[rec_id] = {
-                        "predicted_class": crow.get("predicted_class", "BENIGN"),
-                        "anomaly_score": crow.get("anomaly score", 0.0),
-                        "evidence_status": crow.get("evidence status", "AGREE"),
-                    }
-                if idx < len(r_df):
-                    rrow = r_df.iloc[idx]
-                    pol_val = rrow.get("applied_policy_id", "")
-                    replay_map[rec_id] = {
-                        "action": rrow.get("action", "ALLOW"),
-                        "applied_policy_id": "" if pd.isna(pol_val) else str(pol_val),
-                    }
-        except Exception:
-            pass
+    try:
+        df = pd.read_parquet(eval_file)
+        classifications = pd.read_csv(class_file, dtype={"record_id": str})
+        replay = pd.read_csv(replay_file, dtype={"record_id": str, "applied_policy_id": str})
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Flow inspection data could not be loaded: {type(exc).__name__}") from exc
+
+    required_class = {"record_id", "predicted_class", "anomaly score", "evidence status"}
+    required_replay = {"record_id", "action", "applied_policy_id"}
+    if not required_class.issubset(classifications.columns) or not required_replay.issubset(replay.columns):
+        raise HTTPException(status_code=503, detail="Generated submission files do not match the official schema.")
+
+    class_map = classifications.set_index("record_id").to_dict(orient="index")
+    replay_map = replay.set_index("record_id").to_dict(orient="index")
+
+    def numeric_from_value(value: Any) -> float:
+        parsed = pd.to_numeric(value, errors="coerce")
+        return float(parsed) if pd.notna(parsed) else 0.0
 
     rows = []
-    for idx, r in slice_df.iterrows():
-        rec_id = str(idx)
-        c_info = class_map.get(rec_id, {})
-        r_info = replay_map.get(rec_id, {})
+    for index, flow in df.iterrows():
+        record_id = str(flow.get("record_id", index))
+        prediction = class_map.get(record_id)
+        decision = replay_map.get(record_id)
+        if prediction is None or decision is None:
+            continue
+        predicted_class = str(prediction.get("predicted_class", ""))
+        if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
+            continue
+        applied = decision.get("applied_policy_id", "")
         rows.append({
-            "record_id": rec_id,
-            "label": str(r.get("label", "UNKNOWN")),
-            "predicted_class": c_info.get("predicted_class", str(r.get("label", "BENIGN"))),
-            "anomaly_score": float(c_info.get("anomaly_score", 0.0)),
-            "evidence_status": c_info.get("evidence_status", "AGREE"),
-            "action": r_info.get("action", "ALLOW"),
-            "applied_policy_id": r_info.get("applied_policy_id", ""),
-            "destination_port": int(r.get("Destination Port", 0)),
-            "flow_duration": float(r.get("Flow Duration", 0.0)),
-            "total_fwd_packets": float(r.get("Total Fwd Packets", 0.0)),
-            "packet_length_mean": float(r.get("Packet Length Mean", 0.0)),
+            "record_id": record_id,
+            "predicted_class": predicted_class,
+            "anomaly_score": numeric_from_value(prediction.get("anomaly score")),
+            "evidence_status": str(prediction.get("evidence status", "INCOMPLETE")),
+            "action": str(decision.get("action", "")),
+            "applied_policy_id": "" if pd.isna(applied) else str(applied),
+            "destination_port": int(numeric_from_value(flow.get("Destination Port", 0))),
+            "flow_duration": numeric_from_value(flow.get("Flow Duration", 0)),
+            "total_fwd_packets": numeric_from_value(flow.get("Total Fwd Packets", 0)),
+            "packet_length_mean": numeric_from_value(flow.get("Packet Length Mean", 0)),
         })
 
-    return {"total": total, "offset": offset, "limit": limit, "flows": rows}
-
+    return {
+        "total": len(rows),
+        "offset": offset,
+        "limit": limit,
+        "flows": rows[offset:offset + limit],
+        "filter_semantics": "predicted_class",
+        "ground_truth_labels_exposed": False,
+    }
 
 @app.get("/api/policies")
 def get_policies(limit: int = 50, offset: int = 0):
@@ -506,53 +727,14 @@ def test_policy_prefilter(payload: dict[str, Any]):
 
 @app.get("/api/correlation/groups")
 def get_correlation_groups(limit: int = 20):
-    """Retrieve verified temporal correlation groups detected during chronological replay."""
-    # Group real incidents based on observed patterns
-    sample_groups = [
-        {
-            "group_id": "GRP-0001",
-            "attack_type": "PORT_SCAN",
-            "source_ip": "192.168.1.105",
-            "target_endpoints": ["10.0.0.1:21", "10.0.0.1:22", "10.0.0.1:80", "10.0.0.1:443", "10.0.0.1:8080"],
-            "flow_count": 18,
-            "evidence": [
-                "Source 192.168.1.105 probed 5 distinct ports within 150-flow window.",
-                "High-speed SYN probe fan-out across common server daemon ports.",
-            ],
-        },
-        {
-            "group_id": "GRP-0002",
-            "attack_type": "DDOS",
-            "source_ip": "Distributed (14 Sources)",
-            "target_endpoints": ["10.0.0.5:80"],
-            "flow_count": 142,
-            "evidence": [
-                "Destination 10.0.0.5:80 targeted by 14 distinct client stack fingerprints.",
-                "Volumetric surge exceeding 45,000 packets/sec on HTTP ingress.",
-            ],
-        },
-        {
-            "group_id": "GRP-0003",
-            "attack_type": "BRUTE_FORCE",
-            "source_ip": "192.168.1.88",
-            "target_endpoints": ["10.0.0.2:22"],
-            "flow_count": 24,
-            "evidence": [
-                "Source 192.168.1.88 executed 24 rapid SSH auth attempts on port 22.",
-                "Repeated FIN/RST packet bursts indicating failed credential handshakes.",
-            ],
-        },
-        {
-            "group_id": "GRP-0004",
-            "attack_type": "DOS",
-            "source_ip": "192.168.2.14",
-            "target_endpoints": ["10.0.0.1:80"],
-            "flow_count": 86,
-            "evidence": [
-                "Source 192.168.2.14 emitted 86 clustered attack flows within 150-record window.",
-                "Slowloris slow-header starvation pattern detected by Agent 1 and Agent 4.",
-            ],
-        },
-    ]
-    return {"groups": sample_groups[:limit], "total": len(sample_groups)}
+    """Return groups observed in the latest completed replay; no fabricated fixtures."""
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 200.")
+    return {
+        "groups": _LAST_CORRELATION_GROUPS[:limit],
+        "total": len(_LAST_CORRELATION_GROUPS),
+        "source": "latest_completed_replay" if _LAST_CORRELATION_GROUPS else "no_replay_in_this_process",
+        "synthetic": False,
+        "note": "Correlation groups are populated only after a real replay in this API process.",
+    }
 

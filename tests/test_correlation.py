@@ -14,17 +14,41 @@ def test_endpoint_extraction():
     assert port == 80
 
 
-def test_synthetic_endpoint_fallback():
+def test_tcp_stack_fingerprint_identity_is_stable():
     agent = TemporalCorrelationAgent()
-    flow = {
+    first = {
+        "Init_Win_bytes_forward": 64240,
+        "min_seg_size_forward": 20,
+        "Fwd Header Length": 40,
         "Destination Port": 443,
         "Flow Duration": 50000,
-        "Total Fwd Packets": 10,
     }
+    second = {
+        "Init_Win_bytes_forward": 64240,
+        "min_seg_size_forward": 20,
+        "Fwd Header Length": 40,
+        "Destination Port": 22,
+        "Flow Duration": 10,
+    }
+    src1, dst1, port1 = agent.extract_endpoints(first)
+    src2, dst2, port2 = agent.extract_endpoints(second)
+    assert src1 == src2
+    assert src1.startswith("10.")
+    assert dst1 == dst2 == ""
+    assert port1 == 443
+    assert port2 == 22
+
+
+def test_missing_source_identity_fails_closed():
+    agent = TemporalCorrelationAgent()
+    flow = {"Destination Port": 443, "Flow Duration": 50000, "Total Fwd Packets": 10}
     src, dst, port = agent.extract_endpoints(flow)
-    assert src.startswith("192.168.1.")
-    assert dst == "10.0.0.1"
+    assert src == ""
+    assert dst == ""
     assert port == 443
+    result = agent.correlate("rec-unknown", flow, threat_class="DOS")
+    assert result.correlated is False
+    assert result.status == "not_ready"
 
 
 def test_port_scan_correlation():
@@ -66,3 +90,18 @@ def test_brute_force_correlation():
     assert result.attack_type == "BRUTE_FORCE"
     assert "rapid auth" in result.evidence[0]
 
+
+
+def test_ddos_convergence_requires_observed_destination_identity():
+    agent = TemporalCorrelationAgent(window_size=50)
+    result = None
+    for index in range(12):
+        flow = {
+            "Init_Win_bytes_forward": 64000 + index,
+            "min_seg_size_forward": 20,
+            "Fwd Header Length": 40,
+            "Destination Port": 80,
+        }
+        result = agent.correlate(f"record-{index}", flow, threat_class="DDOS")
+    assert result is not None
+    assert result.correlated is False

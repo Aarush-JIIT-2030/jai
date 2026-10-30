@@ -7,6 +7,7 @@ import math
 import pytest
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 from cybersentinel.contracts import (
     AnomalyDetectionResult,
@@ -22,6 +23,13 @@ from cybersentinel.agents.correlation import TemporalCorrelationAgent
 from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
 
 
+def load_model_or_skip(agent_class, artifact_path):
+    """Model binaries are intentionally excluded from Git; test them when installed."""
+    if not Path(artifact_path).is_file():
+        pytest.skip(f"Local model artifact is not present in this checkout: {artifact_path}")
+    return agent_class.load(artifact_path)
+
+
 # ============================================================================
 # AGENT 1: ADVERSARIAL & BOUNDARY TESTS
 # ============================================================================
@@ -32,7 +40,7 @@ class TestAgent1Adversarial:
             agent.predict({"Flow Duration": 100})
 
     def test_infinite_and_nan_features_gracefully_imputed(self):
-        agent = ThreatDetectionAgent.load("models/threat_detection/model.joblib")
+        agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
         adversarial_flow = {
             "Destination Port": 80,
             "Flow Duration": float("inf"),
@@ -46,7 +54,7 @@ class TestAgent1Adversarial:
         assert 0.0 <= res.confidence <= 1.0
 
     def test_feature_order_invariance(self):
-        agent = ThreatDetectionAgent.load("models/threat_detection/model.joblib")
+        agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
         cols = list(agent.model.feature_columns)
         rev_cols = list(reversed(cols))
         
@@ -59,7 +67,7 @@ class TestAgent1Adversarial:
         assert math.isclose(res1.confidence, res2.confidence, rel_tol=1e-5)
 
     def test_unknown_and_extraneous_features_ignored(self):
-        agent = ThreatDetectionAgent.load("models/threat_detection/model.joblib")
+        agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
         polluted_flow = {
             "Destination Port": 443,
             "ATTACKER_INJECTED_FLAG": "MALICIOUS",
@@ -76,13 +84,13 @@ class TestAgent1Adversarial:
 # ============================================================================
 class TestAgent2Adversarial:
     def test_empty_flow_returns_error_status(self):
-        agent = AnomalyDetectionAgent.load("models/anomaly_detection/model.joblib")
+        agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         res = agent.score({})
         assert res.status == "error"
         assert res.anomaly_score is None
 
     def test_extreme_outlier_flow_flagged(self):
-        agent = AnomalyDetectionAgent.load("models/anomaly_detection/model.joblib")
+        agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         # Extreme volumetric and packet length explosion
         wild_flow = {
             "Destination Port": 9999,
@@ -98,7 +106,7 @@ class TestAgent2Adversarial:
         assert len(res.evidence) > 0
 
     def test_anomaly_score_bounded_and_finite(self):
-        agent = AnomalyDetectionAgent.load("models/anomaly_detection/model.joblib")
+        agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         res = agent.score({"Destination Port": 80, "Flow Duration": 500})
         assert res.status == "success"
         assert isinstance(res.anomaly_score, float)
@@ -181,12 +189,15 @@ class TestAgent4CorrelationAdversarial:
             )
         assert len(agent.history) == 5
 
-    def test_missing_endpoints_use_deterministic_fallback(self):
-        # Empty flow with no IP or port
+    def test_missing_endpoints_fail_closed_without_inventing_identity(self):
+        # Empty flow must not become a fabricated host or destination.
         src, dst, port = self.agent.extract_endpoints({})
-        assert src.startswith("192.168.1.")
-        assert dst == "10.0.0.1"
+        assert src == ""
+        assert dst == ""
         assert port == 0
+        result = self.agent.correlate("missing-endpoints", {})
+        assert result.correlated is False
+        assert result.status == "not_ready"
 
 
 # ============================================================================

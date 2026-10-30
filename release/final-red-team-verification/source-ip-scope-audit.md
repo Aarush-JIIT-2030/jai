@@ -1,80 +1,72 @@
-# CyberSentinel — SOURCE_IP Scope Audit & Identity Derivation Analysis
+# CyberSentinel — SOURCE_IP Scope & Derived Identity Disclosure (Corrected)
 
-**Document ID:** CS-VERIFY-04  
-**Project:** CyberSentinel — Multi-Agent Network Intrusion Detection & Adaptive Defense  
-**Track:** JAI 2026 Hackathon | Track 1: Agentic AI for Cybersecurity  
-**Audit Status:** AUDITED & DISCLOSED — 100% TRANSPARENCY ON DERIVED IP IDENTITIES  
-**Target Dataset:** `data/eval_prepared.parquet` (114,185 records, 72 features)  
+**Status:** Corrected against the current replay and correlation source. Final cluster counts and false-block attribution must be regenerated after this identity change.
 
----
+## 1. Dataset limitation
 
-## 1. Executive Summary & Mandatory Disclosure
+The prepared evaluation parquet is documented as containing 71 numeric flow features and one label column. The current source code does not rely on native `source_ip` or `destination_ip` fields being present.
 
-**Mandatory Hackathon Disclosure:**  
-The benchmark evaluation dataset provided for this competition (`eval_prepared.parquet`) contains 71 preprocessed numeric flow features and 1 label column (`label`). **It contains zero native Layer 3 IP address columns** (neither `source_ip` nor `destination_ip` exist in the parquet schema).
+The Day 2 scored interface requires `scope_type=SOURCE_IP`. Where the input dataset contains no native source IP, CyberSentinel must disclose that its policy scope value is a derived identifier, not an observed Layer 3 address.
 
-To enable adaptive firewall policy generation (`BLOCK <SOURCE_IP>`) and temporal correlation without violating replay constraints, CyberSentinel derives stable host identities using **client TCP/IP stack fingerprinting**. This document provides an exhaustive architectural audit of this derivation, its statistical validity, collision profiles, and security implications.
+## 2. Current source identity derivation
 
----
+The current implementation is in:
 
-## 2. Dataset Schema Verification
+- `src/cybersentinel/agents/correlation.py` — `TemporalCorrelationAgent.derive_source_identity()`
+- `src/cybersentinel/replay/engine.py` — calls the same helper for flows without a native source IP.
 
-Inspection of `data/eval_prepared.parquet` confirms the following schema composition:
+Derivation order:
 
-- **Total Rows:** 114,185 flows
-- **Total Columns:** 72 columns
-  - 71 numeric flow statistics: e.g., `Destination Port`, `Flow Duration`, `Total Fwd Packets`, `Total Backward Packets`, `Fwd Packet Length Max`, `Init_Win_bytes_forward`, `min_seg_size_forward`, `Fwd Header Length`, etc.
-  - 1 target classification string: `label` (`BENIGN`, `DOS`, `PORT_SCAN`, `DDOS`, `BRUTE_FORCE`)
-- **Native IP Columns Present:** **0** (Zero raw IP strings or integers).
+1. If a non-empty native source IP field exists, use it.
+2. Otherwise require the TCP-stack feature tuple:
+   - `Init_Win_bytes_forward`
+   - `min_seg_size_forward`
+   - `Fwd Header Length`
+3. Hash the normalized tuple with SHA-256 and render the first three digest bytes as a private-address-shaped value in `10.x.y.z`.
+4. If the required fingerprint fields are absent, return no source identity. A5 must not create a broad policy for an empty identity.
 
----
+This value is a **synthetic TCP-stack-derived identity**, not a native or observed IP address. It is stable for identical fingerprint tuples, including across records and replay runs.
 
-## 3. Client TCP/IP Stack Fingerprinting Architecture
+## 3. Important corrections to earlier reports
 
-In real-world network forensics, when IP addresses are obscured by Carrier-Grade NAT (CGNAT) or proxy layers, security analysts rely on passive OS fingerprinting invariants. TCP implementations vary across operating systems, socket libraries, and network stacks:
+Earlier versions of this dossier described a different arithmetic formula and asserted exact counts of 2,484 clusters, 254 collision clusters and 5,812 false blocks attributed to collisions. Those figures are not supported by the current derivation and must not be repeated as current measurements without rerunning the exact current implementation against the actual evaluation dataset.
 
-1. **Initial TCP Window Size (`Init_Win_bytes_forward`):** Reflects OS TCP receive buffer defaults (e.g., Windows typically initializes at 8192 or 65535, Linux at 29200 or 14600).
-2. **Minimum Segment Size (`min_seg_size_forward`):** Reflects kernel-level TCP options and MTU negotiation offsets.
-3. **Forward Header Length (`Fwd Header Length`):** Indicates IPv4 options, TCP timestamps, and SACK-permitted options.
-4. **Source Port Range Clustering:** Ephemeral port allocation strategies characteristic of specific attacker toolkits (e.g., Nmap, Metasploit, slowloris).
+The earlier implementation also had a weak fallback that hashed destination port, flow duration and forward-packet count into a small address range. That could make a per-flow pattern look like a stable host identity. The current implementation removes that fallback and fails closed when a complete TCP fingerprint is unavailable.
 
-CyberSentinel maps these deterministic TCP parameters into consistent synthetic IP addresses formatted as:
-$$\text{Synthetic IP} = 10.\lfloor f_1 \bmod 254 \rfloor.\lfloor f_2 \bmod 254 \rfloor.\lfloor f_3 \bmod 254 + 1 \rfloor$$
+The previous replay implementation assigned synthetic addresses by encounter-order mapping, while the standalone correlation helper used a different fallback. The current replay and correlation paths now call the same identity derivation helper.
 
-This produces **2,484 distinct host identity clusters** across the 114,185 evaluation flows.
+## 4. Collision and operational risks
 
----
+- Two devices with identical TCP-stack fingerprint values map to the same derived identity.
+- Different identities can theoretically collide in the finite 24-bit rendered address space.
+- NAT, proxies, virtualisation and shared OS/network-stack defaults can reduce identity uniqueness.
+- A policy on a derived identity can therefore block benign records from another client sharing that fingerprint.
+- No destination IP is inferred when the dataset lacks one. DDoS destination-convergence correlation is not asserted without an observed destination identity.
 
-## 4. Host Cluster Distribution & Behavioral Validity
+These limitations must be included in the judge explanation.
 
-| Cluster Metric | Measured Value | Operational Interpretation |
-|---|---|---|
-| **Total Distinct Host Clusters** | **2,484** | Representative of a mid-sized enterprise network segment |
-| **Pure Attacker Clusters** | **812** | Hosts exhibiting exclusively malicious flow behaviors |
-| **Pure Benign Clusters** | **1,418** | Hosts exhibiting exclusively legitimate background traffic |
-| **Mixed / Collision Clusters** | **254** | Fingerprint collisions between benign clients and attack tools |
+## 5. Scored interface and organiser clarification
 
----
+The policy CSV continues to use the required schema values:
 
-## 5. Collision Risks & False-Block Correlation
+- `scope_type=SOURCE_IP`
+- `policy_action=BLOCK`
 
-### The Nature of Fingerprint Collisions
-Because synthetic IPs are derived from client stack configurations, two distinct machines sharing identical operating systems and network driver configurations can map to the same host cluster. When an attacker operates on a platform sharing characteristics with corporate workstations:
+The `scope_value` is a synthetic fingerprint-derived identity when no native source IP exists. Do not describe it as a real source IP.
 
-1. The attacker launches an exploit burst, triggering an adaptive firewall block on that cluster IP.
-2. A legitimate workstation sharing that fingerprint subsequently transmits a benign flow while the policy is active.
-3. The pre-filter drops the flow, recording a **false block**.
+If the organiser interprets `SOURCE_IP` as requiring a literal observed source address, the prepared dataset alone cannot satisfy that semantic requirement. Seek an organiser clarification rather than inventing or misrepresenting an address.
 
-### Empirical Quantification
-- Of the **6,609 false blocks** observed across the 114,185 flows, **5,812 (87.9%)** occurred within the 254 mixed collision clusters.
-- This demonstrates that false blocks in CyberSentinel are not random hallucinations, but the direct, mathematically predictable consequence of identity ambiguity in anonymized network datasets.
+## 6. Required rerun before final submission
 
----
+Because identity derivation changed, regenerate the three CSVs with the current code and rerun:
 
-## 6. Real-World Production Translation
+- unique derived identity count,
+- fingerprint collision profile,
+- policies created,
+- attack containment,
+- benign preservation,
+- false blocks,
+- policy match and expiry invariants,
+- full official CSV validation.
 
-In a production enterprise deployment with raw PCAP or NetFlow feeds:
-- CyberSentinel directly ingests the physical Layer 3 `src_ip` from the IP header (`ip.src`).
-- The TCP stack fingerprint is retained as an auxiliary identity vector to detect IP-spoofing and MAC-address pivoting.
-- The policy engine's containment rate ($88.99\%$) translates directly to physical network firewalls (Palo Alto, Fortinet, AWS Security Groups), while false blocks decrease substantially due to true IP uniqueness.
-
+Do not reuse old CSV hashes or the earlier collision attribution as evidence for the current implementation.

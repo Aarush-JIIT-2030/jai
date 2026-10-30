@@ -73,3 +73,18 @@ def test_defense_policy_expiration():
     pre_expired = agent.evaluate_pre_filter(record_id="rec-4", source_ip=src_ip, current_step=4)
     assert pre_expired is None
 
+
+
+def test_defense_does_not_create_policy_without_source_identity():
+    agent = AdaptiveDefenseAgent(default_duration=10)
+    decision = agent.handle_post_analysis(
+        record_id="rec-no-source",
+        source_ip="",
+        current_step=0,
+        attack_detected=True,
+        attack_type="DOS",
+        confidence=0.99,
+    )
+    assert decision.action == "ALLOW"
+    assert decision.new_policy_created is None
+    assert agent.all_policies == []

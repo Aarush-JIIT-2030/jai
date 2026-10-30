@@ -72,7 +72,7 @@ class AdaptiveDefenseAgent:
 
         new_policy: DefensePolicy | None = None
 
-        if attack_detected and attack_type and attack_type != "BENIGN":
+        if attack_detected and attack_type and attack_type != "BENIGN" and source_ip.strip():
             # Generate a new policy for subsequent matching records if one isn't already active
             if source_ip not in self.active_policies:
                 self.policy_counter += 1

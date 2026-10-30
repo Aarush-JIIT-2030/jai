@@ -1,76 +1,70 @@
-# CyberSentinel — Final Acceptance Report & Hackathon Release Sign-Off
+# CyberSentinel — Corrected Release Status & Acceptance Gate
 
-**Document ID:** CS-VERIFY-11  
-**Project:** CyberSentinel — Multi-Agent Network Intrusion Detection & Adaptive Defense  
-**Track:** JAI 2026 Hackathon | Track 1: Agentic AI for Cybersecurity  
-**Final Release Commit SHA:** `f29cb03` (and verification merge)  
-**Verification Branch:** `redteam/final-verification-lockdown`  
-**Overall Verdict:** PASSED — 100% ACCEPTANCE CRITERIA SATISFIED  
-**Sign-Off Timestamp:** 2026-10-31T01:00:00+05:30  
+**Status:** The earlier `f29cb03` / `7a369ea` sign-off is historical and is superseded by the corrective branch `fix/final-compliance-and-soc-ui`. Do not treat this document as a current final sign-off until CI and a fresh local full-dataset replay pass.
 
----
+## 1. Why the earlier sign-off was superseded
 
-## 1. Executive Summary
+A source-level review found several material inconsistencies that required correction:
 
-This Final Acceptance Report serves as the definitive sign-off for CyberSentinel in Track 1 of the JAI 2026 Hackathon. Through rigorous red-team auditing, automated stress testing, mathematical identity proofs, and UI/UX performance profiling, CyberSentinel has been verified as a complete, resilient, and presentation-ready autonomous cybersecurity platform.
+1. Earlier red-team documents assigned the wrong responsibilities to Agents 3–5. The official mapping is A3 Evidence Fusion, A4 Temporal Correlation, A5 Adaptive Defense.
+2. Earlier submission-contract documentation described columns that do not match the official Day 2 brief. The corrected contract is documented in `submission-contract-results.md`.
+3. The frontend contained hard-coded sample correlation groups, sample policy rows, benchmark fallbacks, replay progress/results and confusion-matrix fallbacks. These could make unavailable data appear real.
+4. The Evidence Fusion workbench used frontend logic with a different confidence threshold from the Python fusion agent. It now calls the production backend fusion contract.
+5. The flow sample API exposed the evaluation label and could fall back to the true label as the predicted class. The endpoint now joins prediction/action CSVs and does not expose ground truth.
+6. The API returned hard-coded benchmark metrics when a report was missing. It now fails closed when no generated report exists.
+7. The replay metric `containment_rate` used blocked records as its denominator, which is block precision, not attack containment. The engine now reports separate attack containment, block precision, benign preservation and false-block rates.
+8. Source identity derivation and the earlier scope disclosure were inconsistent. The replay and correlation paths now share the same TCP-stack fingerprint helper and do not invent a policy identity when required fingerprint fields are absent.
+9. The earlier source-IP dossier contained an unsupported formula and collision attribution. It has been corrected and requires a fresh measurement.
 
----
+## 2. Official five-agent mapping
 
-## 2. Comprehensive Acceptance Matrix
+| Agent | Correct responsibility |
+|---|---|
+| A1 | Supervised five-class threat detection |
+| A2 | Independent anomaly detection |
+| A3 | Evidence fusion |
+| A4 | Temporal correlation |
+| A5 | Adaptive simulated defense |
 
-| Requirement / Milestone | Verified State | Evaluation Evidence | Sign-Off Status |
-|---|---|---|---|
-| **Five-Agent Core System** | 5 functional agents with strict role boundaries | Full inter-agent contracts tested; LightGBM + iForest + Windowed Correlation + Policy Engine + Reporter | **PASSED** |
-| **Causal Chronological Replay** | Zero temporal lookahead; strictly sequential ($t=0 \dots 114,184$) | `ReplayEngine` pre-filters before scoring; 0 self-blocking violations | **PASSED** |
-| **Reproducible Metrics** | 88.99% attack containment; 88.99% benign preservation; 87.95% block precision | Verified on 114,185 parquet records; all 6 mathematical identities hold | **PASSED** |
-| **Submission Artifacts** | `classification.csv`, `policy.csv`, `replay.csv` generated & valid | `SubmissionValidator` returns `READY_FOR_SUBMISSION` with 0 errors | **PASSED** |
-| **Cryptographic Integrity** | Deterministic SHA-256 hashes registered | Hashes verified and locked in release dossiers | **PASSED** |
-| **Automated Test Suite** | 60/60 passing tests across unit & adversarial suites | 19 dedicated adversarial fixtures passing in 11.95s | **PASSED** |
-| **Frontend & WebGL SOC** | 11 dedicated SOC consoles + 3D WebGL topology | Three.js raycasting, 60 FPS rendering, 2D SVG fallback, 0 TS build errors | **PASSED** |
-| **Transparency & Ethics** | Explicit disclosure of derived TCP stack fingerprinting | Detailed analysis in `source-ip-scope-audit.md` | **PASSED** |
-| **Operational Safety** | Offline simulation; 0 host firewall tampering | All policies enforced strictly in-memory | **PASSED** |
+## 3. Historical benchmark figures
 
----
+The previous local release report recorded 114,185 flows, 19,546 policies, 48,219 attack blocks, 53,392 benign allows, 6,609 false blocks and 6,400.6 flows/second. Those figures describe the earlier generated artifacts only.
 
-## 3. Verified Performance & Accuracy Summary
+**They are not current verified metrics after the identity and replay changes on the corrective branch.** The three CSVs, their hashes, collision counts, policy counts and evaluation rates must be regenerated from the actual local dataset and model artifacts.
 
-```
-================================================================================
-                    CYBERSENTINEL FINAL EVALUATION SCORECARD
-================================================================================
-Total Flows Evaluated:         114,185 flows (100.00%)
-Total Attacks in Dataset:       54,184 flows  (47.45%)
-Total Benign in Dataset:        60,001 flows  (52.55%)
---------------------------------------------------------------------------------
-Attacks Successfully Blocked:   48,219 flows  (88.99% Containment Rate)
-Attacks Permitted (Misses):      5,965 flows  (11.01% Leakage Rate)
-Benign Flows Preserved:         53,392 flows  (88.99% Availability Rate)
-False Blocks on Benign:          6,609 flows  (11.01% False Block Rate)
---------------------------------------------------------------------------------
-Adaptive Policies Created:      19,546 temporary simulated firewall rules
-Active Blocking Policies:        7,787 rules (39.84% utilization)
-Overall Block Precision:        87.95% of drops were confirmed threats
-Replay Processing Speed:        6,400.6 flows/sec (17.84 seconds total)
-================================================================================
-Mathematical Identities:        6 / 6 PASSED [100% CONSERVATION VERIFIED]
-Automated Test Suite:          60 / 60 PASSED [100% UNIT + ADVERSARIAL PASS]
-Submission Validation:          READY_FOR_SUBMISSION [0 ERRORS, 0 WARNINGS]
-================================================================================
-```
+## 4. Corrected implementation work on this branch
 
----
+- Removed fabricated correlation-group API responses.
+- Removed hard-coded benchmark fallback values.
+- Removed ground-truth label exposure from the flow sample API.
+- Added an overview endpoint that derives evaluation KPIs from actual local dataset and generated CSVs.
+- Added an Agent 3 endpoint using the production Python fusion implementation.
+- Added an official local replay endpoint that runs the installed evaluation parquet and writes the three CSVs.
+- Corrected replay rate denominators.
+- Replaced fabricated frontend correlation groups, policies, replay progress and benchmark matrices with backend-driven data and explicit empty/unavailable states.
+- Added a real mobile navigation drawer, keyboard focus states, reduced-motion handling and restrained entrance transitions.
+- Added tests for metric semantics, production fusion API, empty correlation groups, stable fingerprint identity, missing identity and no broad policy creation.
+- Corrected documentation and disclosed the user-supplied CICR design-pattern reference.
 
-## 4. Known Limitations & Engineering Honesty
+## 5. Remaining release gates
 
-1. **Synthetic Client IP Scope:** As transparently disclosed, the benchmark evaluation parquet provides 71 flow features but no native IP headers. CyberSentinel maps client TCP stack configurations into 2,484 host identity clusters. In production networks, native Layer 3 IP headers provide true host uniqueness, which further suppresses fingerprint collisions.
-2. **Offline Replay Horizon:** Policies in this release are evaluated within an offline simulation filter. Production deployment would stream rules into physical firewall APIs (e.g., Palo Alto PAN-OS, AWS WAF, iptables/ipset).
-3. **Model Retraining:** LightGBM and Isolation Forest models are frozen for the duration of the 114k evaluation run to guarantee deterministic benchmarking. In continuous production, online incremental retraining would adapt to concept drift.
+| Gate | Required evidence |
+|---|---|
+| Python test suite | Latest CI run on this corrective branch |
+| Frontend production build | Latest CI run on this corrective branch |
+| Full official replay | Fresh run with the actual evaluation parquet and model artifacts |
+| CSV contract | Current validator returns all valid for the freshly generated files |
+| Causality | Current replay tests and record-level invariants pass |
+| Metrics | Recomputed from the current outputs using correct denominators |
+| Source identity | Fresh collision/cluster analysis for current SHA-256 fingerprint derivation |
+| Browser QA | All 11 consoles exercised against a running local backend |
+| Organiser API | Actual response after endpoint/link is announced |
+| GitHub | Corrective branch merged only after required checks pass |
 
----
+## 6. Rulebook compliance
 
-## 5. Final Release Recommendation
+The JAI rulebook permits AI tools and open-source libraries but requires disclosure (T5–T6), genuine commit history (T2), accurate metrics (F8), and disclosure of mocked or hard-coded demo elements (F7). The README has been updated to disclose Antigravity, ChatGPT and the CICR design reference. No organiser submission success is claimed here.
 
-CyberSentinel satisfies all functional, architectural, adversarial, and aesthetic requirements for Track 1 of the JAI 2026 Hackathon. The implementation demonstrates architectural excellence, high technical competence, empirical rigor, and professional presentation standards.
+## 7. Verdict
 
-**Final Release Verdict:** **APPROVED FOR SUBMISSION & EVALUATION PANEL PRESENTATION**
-
+**NOT YET SIGNED OFF.** The corrective implementation is in progress. A final READY_FOR_SUBMISSION verdict requires a successful fresh replay and validation using the actual permitted dataset and model artifacts, plus passing CI and browser QA. Do not reuse historical hashes or metrics as evidence for the corrected branch.
