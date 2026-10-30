@@ -13,6 +13,7 @@ type BatchResponse = {
   total_analyzed: number;
   actions: Record<"ALLOW" | "BLOCK" | "REVIEW", number>;
   results: ReplayRow[];
+  class_counts: Record<string, number>;
 };
 
 export function BatchReplay({ modelReady }: { modelReady: boolean }) {
@@ -68,6 +69,7 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
       total_analyzed: 0,
       actions: { ALLOW: 0, BLOCK: 0, REVIEW: 0 },
       results: [],
+      class_counts: {},
     };
     try {
       const chunkSize = 1000;
@@ -86,9 +88,13 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
         for (const action of ["ALLOW", "BLOCK", "REVIEW"] as const) {
           aggregate.actions[action] += Number(payload.actions?.[action] || 0);
         }
-        aggregate.results.push(...(payload.results || []));
+        for (const row of (payload.results || []) as ReplayRow[]) {
+          const className = row.final_class ?? "UNCONFIRMED";
+          aggregate.class_counts[className] = (aggregate.class_counts[className] || 0) + 1;
+          if (aggregate.results.length < 20) aggregate.results.push(row);
+        }
         setProgress(Math.min(rows.length, offset + chunk.length));
-        setSummary({ ...aggregate, results: [...aggregate.results] });
+        setSummary({ ...aggregate, results: [...aggregate.results], class_counts: { ...aggregate.class_counts } });
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Batch replay stopped unexpectedly.");
@@ -97,11 +103,7 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
     }
   }
 
-  const classes = summary?.results.reduce<Record<string, number>>((counts, row) => {
-    const key = row.final_class ?? "UNCONFIRMED";
-    counts[key] = (counts[key] || 0) + 1;
-    return counts;
-  }, {}) ?? {};
+  const classes = summary?.class_counts ?? {};
 
   return <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
     <div className="panel-head">
