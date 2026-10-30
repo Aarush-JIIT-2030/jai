@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Cpu, LockKeyhole, Network, Sparkles } from "lucide-react";
+import { Activity, ArrowRight, Cpu, LockKeyhole, Network, Sparkles } from "lucide-react";
 
 type FlowResult = {
   final_class: string | null;
@@ -252,3 +252,78 @@ export function AgentReadiness({ health }: { health: { model_ready: boolean; age
     </div>
   </section>;
 }
+
+
+
+type AnomalyResult = {
+  anomaly_score: number | null;
+  is_anomaly: boolean | null;
+  evidence: string[];
+  status: string;
+  message?: string | null;
+};
+
+export function Agent2Console({ ready }: { ready: boolean }) {
+  const [flowJson, setFlowJson] = useState("{}");
+  const [result, setResult] = useState<AnomalyResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function score() {
+    let flow: Record<string, unknown>;
+    try {
+      flow = JSON.parse(flowJson);
+      if (!flow || Array.isArray(flow) || typeof flow !== "object" || !Object.keys(flow).length) {
+        throw new Error("Enter a non-empty JSON object for one network flow.");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Invalid JSON.");
+      return;
+    }
+    setBusy(true); setError(""); setResult(null);
+    try {
+      const response = await fetch("/api/agents/anomaly/score", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flow }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Agent 2 scoring failed."));
+      setResult(payload as AnomalyResult);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Agent 2 could not score this flow.");
+    } finally { setBusy(false); }
+  }
+
+  return <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
+    <div className="panel-head">
+      <div><div className="panel-kicker">AGENT 02 · INDEPENDENT ANOMALY DETECTION</div><h3>Use Agent 2</h3>
+        <p>Score one network flow against the benign-only Isolation Forest baseline. This runs Agent 2 independently of Agent 1 and fusion.</p></div>
+      <span className="panel-icon"><Activity size={18}/></span>
+    </div>
+    <textarea aria-label="Network flow JSON for Agent 2" value={flowJson} onChange={event => setFlowJson(event.target.value)}
+      spellCheck={false} placeholder='{"Flow Duration": 1200, "Flow Packets/s": 15}'
+      style={{ width: "100%", minHeight: 170, resize: "vertical", padding: 15, borderRadius: 9,
+        border: "1px solid var(--line)", background: "var(--panel2)", color: "var(--text)",
+        fontFamily: "monospace", fontSize: 12, lineHeight: 1.6 }} />
+    <div className="panel-foot">
+      <span><LockKeyhole size={13}/> Offline scoring only · No live network changes</span>
+      <button className="primary-btn" disabled={!ready || busy} onClick={score}>
+        {busy ? "Scoring…" : "Run Agent 2"} <ArrowRight size={14}/>
+      </button>
+    </div>
+    {!ready && <div className="empty-inline">Agent 2 is not ready yet. Install the trained anomaly model at models/anomaly_detection/model.joblib and refresh API status.</div>}
+    {error && <div className="parse-warning" role="alert">{error}</div>}
+    {result && <div className="dataset-loaded" style={{ marginTop: 18 }}>
+      <div className="dataset-facts">
+        <div><small>ANOMALY RESULT</small><b>{result.is_anomaly ? "Anomaly flagged" : "Baseline-like"}</b></div>
+        <div><small>ANOMALY SCORE</small><b>{result.anomaly_score == null ? "—" : result.anomaly_score.toFixed(5)}</b></div>
+        <div><small>STATUS</small><b>{result.status}</b></div>
+      </div>
+      <b>Feature evidence</b>
+      {result.evidence.length ? <ul>{result.evidence.map((item, index) => <li key={index}>{item.replaceAll("_", " ")}</li>)}</ul>
+        : <div className="empty-inline">No out-of-range feature evidence was returned for this flow.</div>}
+      <small className="muted">The anomaly score is interpreted against Agent 2's learned threshold; it is not a probability.</small>
+    </div>}
+  </section>;
+}
+

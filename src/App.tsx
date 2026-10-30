@@ -7,7 +7,7 @@ import {
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { AgentReadiness, FlowInspector } from "./FlowInspector";
+import { Agent2Console, AgentReadiness, FlowInspector } from "./FlowInspector";
 import { BatchReplay } from "./BatchReplay";
 
 type Health = {
@@ -233,20 +233,19 @@ export default function App() {
           </div>
         </section>
         {notice && <div className="notice"><Check size={15}/>{notice}<button onClick={()=>setNotice("")}><X size={15}/></button></div>}
-
         {activeNav === "Flow analysis" && (
           <>
             <FlowInspector modelReady={Boolean(health?.model_ready)} />
+            <Agent2Console ready={Boolean(health?.agents?.agent_2_anomaly_detection)} />
             <BatchReplay modelReady={Boolean(health?.model_ready)} />
           </>
         )}
-
         {activeNav === "Agent intelligence" && <AgentReadiness health={health} />}
 
         <section className="metrics-grid">
           <Metric icon={Database} label="DATASET RECORDS" value={dataset ? formatNumber(dataset.rows) : "114,185"} detail={dataset ? "Loaded in browser" : "Official evaluation holdout"} tone="blue"/>
           <Metric icon={ShieldCheck} label="THREAT CLASSES" value="05" detail="BENIGN, DoS, DDoS, PortScan, BruteForce" tone="green"/>
-          <Metric icon={Cpu} label="ACTIVE AGENTS" value="03" detail="Tri-agent pipeline operational" tone="violet"/>
+          <Metric icon={Cpu} label="ACTIVE AGENTS" value="03" detail={`${[health?.agents?.agent_1_threat_detection, health?.agents?.agent_2_anomaly_detection, health?.agents?.agent_3_evidence_fusion].filter(Boolean).length}/3 components ready`} tone="violet"/>
           <Metric icon={Gauge} label="MODEL READINESS" value={health?.model_ready ? "Active" : "Pending"} detail={health?.model_ready ? "Both models verified" : "Model artifacts missing"} tone={health?.model_ready ? "green" : "amber"}/>
         </section>
 

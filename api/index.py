@@ -14,6 +14,7 @@ if str(SOURCE_DIR) not in sys.path:
     sys.path.insert(0, str(SOURCE_DIR))
 
 from cybersentinel.pipeline import CyberSentinelPipeline
+from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 
 app = FastAPI(
     title="CyberSentinel API",
@@ -24,6 +25,7 @@ app = FastAPI(
 THREAT_MODEL = BASE_DIR / "models" / "threat_detection" / "model.joblib"
 ANOMALY_MODEL = BASE_DIR / "models" / "anomaly_detection" / "model.joblib"
 _pipeline: CyberSentinelPipeline | None = None
+_anomaly_agent: AnomalyDetectionAgent | None = None
 
 
 class BatchAnalyzeRequest(BaseModel):
@@ -99,6 +101,32 @@ def models_status():
             "evidence_fusion": {"simulated_actions": ["ALLOW", "BLOCK", "REVIEW"]},
         },
     }
+
+
+@app.post("/api/agents/anomaly/score")
+def score_anomaly(payload: dict[str, Any]):
+    """Run Agent 2 independently without requiring Agent 1 or evidence fusion."""
+    global _anomaly_agent
+    if _anomaly_agent is None:
+        if not ANOMALY_MODEL.is_file():
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "AGENT_2_NOT_READY", "message": "Agent 2 model artifact is not installed."},
+            )
+        try:
+            _anomaly_agent = AnomalyDetectionAgent.load(ANOMALY_MODEL)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "AGENT_2_NOT_READY", "message": f"Agent 2 model could not be loaded: {type(exc).__name__}"},
+            )
+    flow = payload.get("flow", payload)
+    if not isinstance(flow, dict) or not flow:
+        raise HTTPException(status_code=422, detail="Provide a non-empty flow object.")
+    result = _anomaly_agent.score(flow)
+    if result.status != "success":
+        raise HTTPException(status_code=422, detail={"code": "AGENT_2_SCORING_ERROR", "message": result.message or "Anomaly scoring failed."})
+    return result.to_dict()
 
 
 @app.post("/api/analyze")
