@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Papa from "papaparse";
 import {
-  Activity, AlertTriangle, ArrowDownToLine, ArrowRight, ArrowUpRight, Bell, Check,
+  Activity, AlertTriangle, ArrowRight, ArrowUpRight, Bell, Check,
   ChevronDown, CircleHelp, CloudUpload, Cpu, Database, FileSpreadsheet, Fingerprint,
-  Gauge, Github, LockKeyhole, LogOut, Menu, Network, RefreshCw, Search, Shield,
-  ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, Terminal, X, Zap
+  Gauge, LockKeyhole, LogOut, Network, RefreshCw, Shield,
+  ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles, X
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
@@ -58,7 +58,7 @@ export default function App() {
   }, []);
   useEffect(() => { void checkHealth(); }, [checkHealth]);
 
-  async function authenticate(event: React.FormEvent) {
+  async function authenticate(event: FormEvent) {
     event.preventDefault();
     if (!supabase) return;
     setAuthBusy(true); setAuthError("");
