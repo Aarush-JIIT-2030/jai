@@ -43,6 +43,9 @@ class EvidenceFusionAgent:
                 final_class=self._get(threat, "predicted_class") if t_ok else None,
                 evidence_status="INCOMPLETE",
                 action="REVIEW",
+                agent_agreement="INCOMPLETE",
+                confidence=float(self._get(threat, "confidence")) if t_ok else 0.0,
+                supporting_evidence=self._get(anomaly, "evidence", []) if anomaly is not None else [],
                 rationale=[
                     "One or more agents did not return valid evidence.",
                     "Simulated action defaulted to REVIEW; analyst verification is required.",
@@ -58,12 +61,15 @@ class EvidenceFusionAgent:
 
         if evidence_status == "AGREE" and predicted == "BENIGN":
             action = "ALLOW" if confidence >= HIGH_CONFIDENCE else "REVIEW"
+            agreement = "BENIGN_CONFIRMED"
             rationale = ["Classifier predicts BENIGN and anomaly detector reports baseline-consistent traffic."]
         elif evidence_status == "AGREE":
             action = "BLOCK" if confidence >= HIGH_CONFIDENCE else "REVIEW"
+            agreement = "ATTACK_CONFIRMED"
             rationale = ["Classifier predicts an attack and anomaly detector independently flags the flow."]
         else:
             action = "REVIEW"
+            agreement = "DISAGREE"
             rationale = ["Classifier and anomaly detector disagree; human review is required."]
 
         rationale.append(f"Classifier confidence: {confidence:.4f}.")
@@ -73,7 +79,10 @@ class EvidenceFusionAgent:
             final_class=predicted,
             evidence_status=evidence_status,
             action=action,
+            agent_agreement=agreement,
+            confidence=confidence,
             rationale=rationale,
+            supporting_evidence=self._get(anomaly, "evidence", []),
             threat_detection=threat_result,
             anomaly_detection=anomaly_result,
         )
