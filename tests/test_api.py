@@ -60,13 +60,16 @@ def test_dedicated_vercel_function_routes(monkeypatch):
     from api.analyze.index import app as analyze_app
     from api.analyze.batch import app as batch_app
 
-    monkeypatch.setattr(index, "_pipeline", ReadyPipeline())
+    monkeypatch.setattr(index, "THREAT_MODEL", index.BASE_DIR / "missing-threat-artifact.joblib")
+    monkeypatch.setattr(index, "ANOMALY_MODEL", index.BASE_DIR / "missing-anomaly-artifact.joblib")
+    monkeypatch.setattr(index, "_pipeline", None)
     client_health = TestClient(health_app)
     client_models = TestClient(models_app)
     client_analyze = TestClient(analyze_app)
     client_batch = TestClient(batch_app)
 
     assert client_health.get("/").status_code == 200
-    assert client_models.get("/").json()["models_ready"] is True
+    assert client_models.get("/").json()["models_ready"] is False
+    monkeypatch.setattr(index, "_pipeline", ReadyPipeline())
     assert client_analyze.post("/", json={"flow": {"Flow Duration": 100}}).json()["action"] == "ALLOW"
     assert client_batch.post("/", json={"flows": [{"Flow Duration": 100}]}).json()["total_analyzed"] == 1
