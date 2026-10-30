@@ -60,9 +60,9 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
 
 ---
 
-## 2. Verified Benchmark Metrics (114,185 Holdout Flows)
+## 2. Historical Baseline Metrics (114,185 Holdout Flows — Pre-Correction)
 
-Evaluated strictly on the untouched evaluation holdout dataset (`data/processed/eval_prepared.parquet`) with fixed seed 42 and zero future lookahead.
+The following values are copied from the previous local baseline report and predate the shared TCP-stack identity correction and metric-semantics fixes. They are historical reference values, **not current release verification**. Regenerate the three CSVs and all replay metrics using the current branch before submission. The dataset and model binaries are not committed to this public repository.
 
 ### Agent 1: Multiclass Classification
 * **Overall Accuracy:** `99.9956%` (114,180 / 114,185 correct flows)
@@ -170,7 +170,7 @@ $env:PYTHONPATH="src"; python scripts/reproduce_benchmarks.py
 $env:PYTHONPATH="src"; python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
 ```
 
-### 4. Run Pytest Suite (41 Tests)
+### 4. Run the Pytest Suite
 ```bash
 $env:PYTHONPATH="src"; python -m pytest tests -q
 ```
@@ -193,6 +193,22 @@ uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
+
+
+
+### Backend endpoints added for the final SOC workflow
+
+- `GET /api/system/diagnostics` — reports actual local model, dataset, SQLite and submission artifact presence.
+- `GET /api/overview` — computes evaluation KPIs from the installed labelled evaluation dataset and generated CSVs; labels are used only for offline metrics.
+- `POST /api/fusion/simulate` — invokes the production Python Agent 3 fusion contract.
+- `POST /api/replay/run-official` — runs the installed evaluation parquet chronologically and writes the three official CSVs.
+- `GET /api/correlation/groups` — returns groups from the latest completed replay in the current API process, or an empty list when none exist.
+
+If the dataset or models are missing, the API returns an explicit unavailable response. It does not substitute synthetic benchmark values or sample incidents.
+
+### SOURCE_IP identity limitation
+
+The prepared feature dataset may not contain native Layer 3 source IP fields. In that case the system derives a synthetic, stable identity from TCP-stack fingerprint fields. This is not an observed IP address and can collide for clients with identical fingerprints. If the required fingerprint fields are missing, policy creation fails closed rather than inventing a host identity. See `release/final-red-team-verification/source-ip-scope-audit.md`.
 
 ## 7. Open-Source Attribution & AI Disclosure
 
