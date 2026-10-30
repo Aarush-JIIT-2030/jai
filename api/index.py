@@ -1,4 +1,4 @@
-"""Fail-closed FastAPI endpoints for offline CyberSentinel flow replay."""
+"""Fail-closed FastAPI endpoints for offline CyberSentinel 5-agent flow replay."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,21 +15,31 @@ if str(SOURCE_DIR) not in sys.path:
 
 from cybersentinel.pipeline import CyberSentinelPipeline
 from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
+from cybersentinel.agents.correlation import TemporalCorrelationAgent
+from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
+from cybersentinel.replay import ReplayEngine
+import pandas as pd
 
 app = FastAPI(
     title="CyberSentinel API",
-    version="0.2.0",
-    description="Offline network-flow analysis with simulated policy recommendations only.",
+    version="1.0.0",
+    description="Offline 5-agent network-flow intrusion detection and adaptive defense replay system.",
 )
 
 THREAT_MODEL = BASE_DIR / "models" / "threat_detection" / "model.joblib"
 ANOMALY_MODEL = BASE_DIR / "models" / "anomaly_detection" / "model.joblib"
 _pipeline: CyberSentinelPipeline | None = None
 _anomaly_agent: AnomalyDetectionAgent | None = None
+_correlation_agent = TemporalCorrelationAgent()
+_defense_agent = AdaptiveDefenseAgent()
 
 
 class BatchAnalyzeRequest(BaseModel):
     flows: list[dict[str, Any]] = Field(min_length=1, max_length=1000)
+
+
+class ReplaySimulationRequest(BaseModel):
+    flows: list[dict[str, Any]] = Field(min_length=1, max_length=5000)
 
 
 def get_pipeline() -> CyberSentinelPipeline | None:
@@ -41,7 +51,6 @@ def get_pipeline() -> CyberSentinelPipeline | None:
     try:
         _pipeline = CyberSentinelPipeline.load_default(THREAT_MODEL, ANOMALY_MODEL)
     except Exception:
-        # Never mark the service ready when artifacts are corrupt or incompatible.
         _pipeline = None
     return _pipeline
 
@@ -57,15 +66,17 @@ def health():
     return {
         "status": "ok",
         "service": "CyberSentinel API",
-        "version": "0.2.0",
+        "version": "1.0.0",
         "mode": "offline-replay",
         "model_ready": pipeline is not None,
         "agents": {
             "agent_1_threat_detection": threat_present,
             "agent_2_anomaly_detection": anomaly_present,
             "agent_3_evidence_fusion": True,
+            "agent_4_temporal_correlation": True,
+            "agent_5_adaptive_defense": True,
         },
-        "message": "Both model artifacts loaded." if pipeline else "Model artifacts are missing or failed validation.",
+        "message": "All 5 multi-agent components operational." if pipeline else "Model artifacts are missing or failed validation.",
     }
 
 
@@ -80,6 +91,8 @@ def models_status():
                 "threat_detection": {"artifact_present": THREAT_MODEL.is_file()},
                 "anomaly_detection": {"artifact_present": ANOMALY_MODEL.is_file()},
                 "evidence_fusion": {"ready": True},
+                "temporal_correlation": {"ready": True},
+                "adaptive_defense": {"ready": True},
             },
         }
     return {
@@ -99,6 +112,8 @@ def models_status():
                 "threshold": pipeline.anomaly_agent.threshold,
             },
             "evidence_fusion": {"simulated_actions": ["ALLOW", "BLOCK", "REVIEW"]},
+            "temporal_correlation": {"window_size": _correlation_agent.window_size},
+            "adaptive_defense": {"scope_type": "SOURCE_IP", "action": "BLOCK"},
         },
     }
 
@@ -141,7 +156,48 @@ def analyze(payload: dict[str, Any]):
     flow = payload.get("flow", payload)
     if not isinstance(flow, dict) or not flow:
         raise HTTPException(status_code=422, detail="Provide a non-empty flow object.")
-    return pipeline.analyze(flow)
+
+    # Run Tri-Agent pipeline
+    analysis = pipeline.analyze(flow)
+
+    # Correlate with Agent 4
+    correlation = _correlation_agent.correlate(
+        record_id=flow.get("record_id", "live-flow"),
+        flow=flow,
+        threat_class=analysis.get("final_class"),
+        confidence=analysis.get("confidence"),
+    )
+
+    # Evaluate with Agent 5
+    src_ip, _, _ = TemporalCorrelationAgent.extract_endpoints(flow)
+    is_attack = analysis.get("action") == "BLOCK" or (correlation.correlated and correlation.attack_type != "BENIGN")
+    defense = _defense_agent.handle_post_analysis(
+        record_id=flow.get("record_id", "live-flow"),
+        source_ip=src_ip,
+        current_step=len(_correlation_agent.history),
+        attack_detected=is_attack,
+        attack_type=correlation.attack_type or analysis.get("final_class"),
+        confidence=analysis.get("confidence"),
+    )
+
+    analysis["temporal_correlation"] = {
+        "correlated": correlation.correlated,
+        "group_id": correlation.group_id,
+        "attack_type": correlation.attack_type,
+        "evidence": correlation.evidence,
+    }
+    analysis["adaptive_defense"] = {
+        "action": defense.action,
+        "applied_policy_id": defense.applied_policy_id,
+        "new_policy": {
+            "policy_id": defense.new_policy_created.policy_id,
+            "scope_type": defense.new_policy_created.scope_type,
+            "scope_value": defense.new_policy_created.scope_value,
+            "expires_after_record_id": defense.new_policy_created.expires_after_record_id,
+        } if defense.new_policy_created else None,
+        "rationale": defense.rationale,
+    }
+    return analysis
 
 
 @app.post("/api/analyze/batch")
@@ -158,3 +214,27 @@ def analyze_batch(payload: BatchAnalyzeRequest):
     for result in results:
         actions[result["action"]] += 1
     return {"total_analyzed": len(results), "actions": actions, "results": results}
+
+
+@app.post("/api/replay/simulate")
+def simulate_replay(payload: ReplaySimulationRequest):
+    """Run causal chronological replay over provided flow sequence."""
+    pipeline = get_pipeline()
+    if pipeline is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MODEL_NOT_READY", "message": "Both verified model artifacts are required for replay."},
+        )
+    engine = ReplayEngine(
+        threat_agent=pipeline.threat_agent,
+        anomaly_agent=pipeline.anomaly_agent,
+        fusion_agent=pipeline.fusion_agent,
+    )
+    df = pd.DataFrame(payload.flows)
+    results = engine.run_replay(df)
+    return {
+        "metrics": results["metrics"],
+        "policies_sample": results["policy_rows"][:20],
+        "replay_sample": results["replay_rows"][:30],
+        "classification_sample": results["classification_rows"][:30],
+    }

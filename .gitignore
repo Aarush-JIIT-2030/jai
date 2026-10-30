@@ -18,3 +18,8 @@ models/*
 reports/generated/*
 !reports/generated/.gitkeep
 .DS_Store
+dist/
+*.zip
+*.docx
+submissions/
+submissions_test/

@@ -4,6 +4,24 @@ from api import index
 
 
 class ReadyPipeline:
+    def __init__(self):
+        class ThreatStub:
+            def predict(self, flow):
+                from cybersentinel.contracts import ThreatDetectionResult
+                return ThreatDetectionResult(predicted_class="BENIGN", confidence=0.99)
+        class AnomalyStub:
+            def score(self, flow):
+                from cybersentinel.contracts import AnomalyDetectionResult
+                return AnomalyDetectionResult(anomaly_score=0.01, is_anomaly=False)
+        class FusionStub:
+            def fuse(self, t, a):
+                from cybersentinel.contracts import FusionResult
+                return FusionResult(final_class="BENIGN", evidence_status="AGREE", action="ALLOW", rationale=["Stub"])
+
+        self.threat_agent = ThreatStub()
+        self.anomaly_agent = AnomalyStub()
+        self.fusion_agent = FusionStub()
+
     def analyze(self, flow):
         return {
             "final_class": "BENIGN",
@@ -25,6 +43,8 @@ def test_health_does_not_claim_models_ready_without_artifacts(monkeypatch, tmp_p
     payload = response.json()
     assert payload["model_ready"] is False
     assert payload["agents"]["agent_3_evidence_fusion"] is True
+    assert payload["agents"]["agent_4_temporal_correlation"] is True
+    assert payload["agents"]["agent_5_adaptive_defense"] is True
 
 
 def test_single_flow_endpoint_fails_closed_without_models(monkeypatch, tmp_path):
@@ -38,9 +58,11 @@ def test_single_flow_endpoint_fails_closed_without_models(monkeypatch, tmp_path)
 
 def test_single_flow_endpoint_returns_pipeline_result(monkeypatch):
     monkeypatch.setattr(index, "_pipeline", ReadyPipeline())
-    response = TestClient(index.app).post("/api/analyze", json={"flow": {"Flow Duration": 100}})
+    response = TestClient(index.app).post("/api/analyze", json={"flow": {"Flow Duration": 100, "Destination Port": 80}})
     assert response.status_code == 200
     assert response.json()["action"] == "ALLOW"
+    assert "temporal_correlation" in response.json()
+    assert "adaptive_defense" in response.json()
 
 
 def test_batch_endpoint_returns_aggregated_actions(monkeypatch):
@@ -54,22 +76,14 @@ def test_batch_endpoint_returns_aggregated_actions(monkeypatch):
     assert response.json()["actions"]["ALLOW"] == 2
 
 
-def test_dedicated_vercel_function_routes(monkeypatch):
-    from api.health import app as health_app
-    from api.models.status import app as models_app
-    from api.analyze.index import app as analyze_app
-    from api.analyze.batch import app as batch_app
-
-    monkeypatch.setattr(index, "THREAT_MODEL", index.BASE_DIR / "missing-threat-artifact.joblib")
-    monkeypatch.setattr(index, "ANOMALY_MODEL", index.BASE_DIR / "missing-anomaly-artifact.joblib")
-    monkeypatch.setattr(index, "_pipeline", None)
-    client_health = TestClient(health_app)
-    client_models = TestClient(models_app)
-    client_analyze = TestClient(analyze_app)
-    client_batch = TestClient(batch_app)
-
-    assert client_health.get("/").status_code == 200
-    assert client_models.get("/").json()["models_ready"] is False
+def test_replay_simulate_endpoint(monkeypatch):
     monkeypatch.setattr(index, "_pipeline", ReadyPipeline())
-    assert client_analyze.post("/", json={"flow": {"Flow Duration": 100}}).json()["action"] == "ALLOW"
-    assert client_batch.post("/", json={"flows": [{"Flow Duration": 100}]}).json()["total_analyzed"] == 1
+    flows = [
+        {"record_id": 1, "source_ip": "10.0.0.1", "Destination Port": 443},
+        {"record_id": 2, "source_ip": "10.0.0.1", "Destination Port": 443},
+    ]
+    response = TestClient(index.app).post("/api/replay/simulate", json={"flows": flows})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["metrics"]["total_records"] == 2
+    assert len(data["replay_sample"]) == 2

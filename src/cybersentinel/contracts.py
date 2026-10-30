@@ -36,3 +36,46 @@ class FusionResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+@dataclass
+class CorrelationGroup:
+    group_id: str
+    attack_type: str | None
+    source_ip: str | None
+    target_endpoints: list[str] = field(default_factory=list)
+    member_record_ids: list[str | int] = field(default_factory=list)
+    flow_count: int = 0
+    start_record_id: str | int | None = None
+    end_record_id: str | int | None = None
+    confidence: float = 0.0
+    evidence: list[str] = field(default_factory=list)
+
+@dataclass
+class CorrelationResult:
+    correlated: bool
+    group_id: str | None = None
+    attack_type: str | None = None
+    group_size: int = 0
+    evidence: list[str] = field(default_factory=list)
+    status: AgentStatus = "success"
+    message: str | None = None
+
+@dataclass
+class DefensePolicy:
+    policy_id: str
+    activated_after_record_id: str | int
+    scope_type: Literal["SOURCE_IP"] = "SOURCE_IP"
+    scope_value: str = ""
+    expires_after_record_id: str | int = 0
+    policy_action: Literal["BLOCK"] = "BLOCK"
+    reason: str = ""
+    created_at_step: int = 0
+
+@dataclass
+class DefenseDecision:
+    record_id: str | int
+    action: Literal["ALLOW", "BLOCK"]
+    applied_policy_id: str | None = None
+    is_pre_filtered: bool = False
+    new_policy_created: DefensePolicy | None = None
+    rationale: str = ""

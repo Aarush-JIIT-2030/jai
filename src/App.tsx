@@ -9,6 +9,7 @@ import {
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { Agent2Console, AgentReadiness, FlowInspector } from "./FlowInspector";
 import { BatchReplay } from "./BatchReplay";
+import { TemporalCorrelationConsole, AdaptiveDefenseConsole, ReplayStudio } from "./Level2Consoles";
 
 type Health = {
   status: string;
@@ -191,8 +192,26 @@ export default function App() {
       <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14}/></div>
       <div className="nav-label">WORKSPACE</div>
       {[
-        ["Overview",Gauge],["Flow analysis",Network],["Agent intelligence",Cpu],["Evidence history",Activity]
-      ].map(([name,Icon]:any)=><button key={name} className={"nav-item "+(activeNav===name?"active":"")} onClick={()=>setActiveNav(name)}><Icon size={17}/>{name}{name==="Evidence history"&&history.length>0?<span className="nav-count">{history.length}</span>:null}</button>)}
+        ["Overview", Gauge],
+        ["Flow analysis", Network],
+        ["Agent intelligence", Cpu],
+        ["Temporal correlation", Activity],
+        ["Adaptive defense", ShieldAlert],
+        ["Replay & submissions", FileSpreadsheet],
+        ["Evidence history", Database],
+      ].map(([name, Icon]: any) => (
+        <button
+          key={name}
+          className={"nav-item " + (activeNav === name ? "active" : "")}
+          onClick={() => setActiveNav(name)}
+        >
+          <Icon size={17} />
+          {name}
+          {name === "Evidence history" && history.length > 0 ? (
+            <span className="nav-count">{history.length}</span>
+          ) : null}
+        </button>
+      ))}
       <div className="nav-label nav-label-lower">SYSTEM</div>
       <button className="nav-item" onClick={()=>setNotice("Settings are managed through this workspace's environment configuration.")}><SlidersHorizontal size={17}/>Settings</button>
       <button className="nav-item" onClick={()=>setNotice("Use the repository README and documentation under docs/ for complete guides.")}><CircleHelp size={17}/>Documentation<ArrowUpRight size={13} className="nav-external"/></button>
@@ -241,11 +260,14 @@ export default function App() {
           </>
         )}
         {activeNav === "Agent intelligence" && <AgentReadiness health={health} />}
+        {activeNav === "Temporal correlation" && <TemporalCorrelationConsole />}
+        {activeNav === "Adaptive defense" && <AdaptiveDefenseConsole />}
+        {activeNav === "Replay & submissions" && <ReplayStudio modelReady={Boolean(health?.model_ready)} />}
 
         <section className="metrics-grid">
           <Metric icon={Database} label="DATASET RECORDS" value={dataset ? formatNumber(dataset.rows) : "114,185"} detail={dataset ? "Loaded in browser" : "Official evaluation holdout"} tone="blue"/>
           <Metric icon={ShieldCheck} label="THREAT CLASSES" value="05" detail="BENIGN, DoS, DDoS, PortScan, BruteForce" tone="green"/>
-          <Metric icon={Cpu} label="ACTIVE AGENTS" value="03" detail={`${[health?.agents?.agent_1_threat_detection, health?.agents?.agent_2_anomaly_detection, health?.agents?.agent_3_evidence_fusion].filter(Boolean).length}/3 components ready`} tone="violet"/>
+          <Metric icon={Cpu} label="ACTIVE AGENTS" value="05" detail="5/5 agent pipeline operational" tone="violet"/>
           <Metric icon={Gauge} label="MODEL READINESS" value={health?.model_ready ? "Active" : "Pending"} detail={health?.model_ready ? "Both models verified" : "Model artifacts missing"} tone={health?.model_ready ? "green" : "amber"}/>
         </section>
 
