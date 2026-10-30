@@ -7,6 +7,7 @@ import math
 import pytest
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
 from cybersentinel.contracts import (
     AnomalyDetectionResult,
@@ -22,6 +23,13 @@ from cybersentinel.agents.correlation import TemporalCorrelationAgent
 from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
 
 
+def load_model_or_skip(agent_class, artifact_path):
+    """Model binaries are intentionally excluded from Git; test them when installed."""
+    if not Path(artifact_path).is_file():
+        pytest.skip(f"Local model artifact is not present in this checkout: {artifact_path}")
+    return agent_class.load(artifact_path)
+
+
 # ============================================================================
 # AGENT 1: ADVERSARIAL & BOUNDARY TESTS
 # ============================================================================
@@ -32,7 +40,7 @@ class TestAgent1Adversarial:
             agent.predict({"Flow Duration": 100})
 
     def test_infinite_and_nan_features_gracefully_imputed(self):
-        agent = ThreatDetectionAgent.load("models/threat_detection/model.joblib")
+        agent = load_model_or_skip(ThreatDetectionAgent, "models/threat_detection/model.joblib")
         adversarial_flow = {
             "Destination Port": 80,
             "Flow Duration": float("inf"),
@@ -76,7 +84,7 @@ class TestAgent1Adversarial:
 # ============================================================================
 class TestAgent2Adversarial:
     def test_empty_flow_returns_error_status(self):
-        agent = AnomalyDetectionAgent.load("models/anomaly_detection/model.joblib")
+        agent = load_model_or_skip(AnomalyDetectionAgent, "models/anomaly_detection/model.joblib")
         res = agent.score({})
         assert res.status == "error"
         assert res.anomaly_score is None
@@ -181,12 +189,15 @@ class TestAgent4CorrelationAdversarial:
             )
         assert len(agent.history) == 5
 
-    def test_missing_endpoints_use_deterministic_fallback(self):
-        # Empty flow with no IP or port
+    def test_missing_endpoints_fail_closed_without_inventing_identity(self):
+        # Empty flow must not become a fabricated host or destination.
         src, dst, port = self.agent.extract_endpoints({})
-        assert src.startswith("192.168.1.")
-        assert dst == "10.0.0.1"
+        assert src == ""
+        assert dst == ""
         assert port == 0
+        result = self.agent.correlate("missing-endpoints", {})
+        assert result.correlated is False
+        assert result.status == "not_ready"
 
 
 # ============================================================================
