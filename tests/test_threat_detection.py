@@ -43,7 +43,7 @@ def test_batch_output_has_required_fields():
 def test_training_requires_all_five_classes():
     x, y = sample_data()
     with pytest.raises(ValueError, match="all five"):
-        ThreatDetectionModel(n_estimators=10).fit(x, y[:-12])
+        ThreatDetectionModel(n_estimators=10).fit(x.iloc[:-12], y[:-12])
 
 def test_mapping_does_not_guess_original_attack_names():
     with pytest.raises(ValueError, match="organiser mapping"):
