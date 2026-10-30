@@ -140,7 +140,7 @@ export function FlowInspector({ modelReady }: { modelReady: boolean }) {
   return <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
     <div className="panel-head">
       <div>
-        <div className="panel-kicker">LIVE MODEL INFERENCE</div>
+        <div className="panel-kicker">LOCAL MODEL INFERENCE</div>
         <h3>Single flow inspector</h3>
         <p>Analyze a real network-flow record. Presets represent verified challenge traffic distributions.</p>
       </div>
