@@ -40,8 +40,10 @@ def _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if not isinstance(frame, pd.DataFrame):
         frame = pd.DataFrame(frame)
     data = frame.loc[:, ~frame.columns.duplicated()].copy()
-    excluded = {"record_id", "label", "flow id", "source ip", "destination ip", "timestamp"}
-    data = data.drop(columns=[c for c in data.columns if str(c).strip().casefold() in excluded], errors="ignore")
+    excluded = {"recordid", "label", "flowid", "sourceip", "destinationip", "srcip", "dstip", "timestamp"}
+    def normalized(name: Any) -> str:
+        return "".join(ch for ch in str(name).casefold() if ch.isalnum())
+    data = data.drop(columns=[c for c in data.columns if normalized(c) in excluded], errors="ignore")
     numeric = {}
     for col in data.columns:
         values = pd.to_numeric(data[col], errors="coerce").replace([np.inf, -np.inf], np.nan)
