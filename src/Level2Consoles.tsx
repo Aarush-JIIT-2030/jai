@@ -937,85 +937,79 @@ export function AuditHistoryView() {
 // 10. SETTINGS & SYSTEM HEALTH VIEW
 // ============================================================================
 export function SystemHealthView({ health }: { health: any }) {
+  const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function loadDiagnostics() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/system/diagnostics");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Diagnostics endpoint unavailable.");
+      setDiagnostics(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load system diagnostics.");
+      setDiagnostics(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadDiagnostics(); }, []);
+
+  const statusTag = (ready: boolean | undefined, label = "READY") => <span className={"tag " + (ready ? "tag-green" : "tag-amber")}>{ready ? label : "NOT AVAILABLE"}</span>;
+  const mb = (bytes: number | null | undefined) => typeof bytes === "number" ? (bytes / (1024 * 1024)).toFixed(2) + " MB" : "—";
+
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
       <div className="panel-head">
         <div>
           <div className="panel-kicker">SYSTEM INTEGRITY · DIAGNOSTICS & HEALTH</div>
           <h3>System Settings & Readiness Status</h3>
-          <p>
-            Verify model availability, local storage, API routing, and environmental constraints.
-          </p>
+          <p>Every status is read from the local backend. Missing models, datasets or generated files are shown as unavailable.</p>
         </div>
-        <span className="panel-icon"><SlidersHorizontal size={18} /></span>
+        <button className="secondary-btn" type="button" onClick={loadDiagnostics} disabled={loading}><RefreshCw size={14}/> Refresh diagnostics</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, margin: "16px 0" }}>
-        {/* Service Readiness */}
-        <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Service Health & API Status</div>
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>FastAPI Replay Backend</span>
-              <span className={`tag ${health?.status === "ok" ? "tag-green" : "tag-red"}`}>
-                {health?.status === "ok" ? "ONLINE" : "UNAVAILABLE"}
-              </span>
+      {loading && <div className="empty-inline">Reading local artifact and service status…</div>}
+      {error && <div className="parse-warning" role="alert">{error}</div>}
+
+      {diagnostics && <>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 14, margin: "16px 0" }}>
+          <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Service & Agent Readiness</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>FastAPI backend</span>{statusTag(diagnostics.api?.available && health?.status === "ok", "ONLINE")}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>A1 Threat Detection model · {mb(diagnostics.models?.agent_1_model ? diagnostics.model_sizes?.agent_1_bytes : null)}</span>{statusTag(diagnostics.models?.agent_1_model)}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>A2 Anomaly Detection model · {mb(diagnostics.models?.agent_2_model ? diagnostics.model_sizes?.agent_2_bytes : null)}</span>{statusTag(diagnostics.models?.agent_2_model)}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>A3 Evidence Fusion implementation</span>{statusTag(diagnostics.models?.agent_3_fusion_code)}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>A4 Temporal Correlation implementation</span>{statusTag(diagnostics.models?.agent_4_correlation_code)}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>A5 Adaptive Defense implementation</span>{statusTag(diagnostics.models?.agent_5_defense_code)}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>SQLite history database</span>{statusTag(diagnostics.history_database?.present, "PRESENT")}</div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Agent 1 Threat Model</span>
-              <span className={`tag ${health?.agents?.agent_1_threat_detection ? "tag-green" : "tag-amber"}`}>
-                {health?.agents?.agent_1_threat_detection ? "READY (4.3 MB)" : "MISSING"}
-              </span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Agent 2 Anomaly Model</span>
-              <span className={`tag ${health?.agents?.agent_2_anomaly_detection ? "tag-green" : "tag-amber"}`}>
-                {health?.agents?.agent_2_anomaly_detection ? "READY (6.7 MB)" : "MISSING"}
-              </span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Offline SQLite History DB</span>
-              <span className="tag tag-green">OPERATIONAL</span>
+          </div>
+
+          <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Dataset & Submission Artifacts</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>Evaluation parquet · {mb(diagnostics.evaluation_dataset?.bytes)}</span>{statusTag(diagnostics.evaluation_dataset?.present, "INSTALLED")}</div>
+              {Object.entries(diagnostics.submission_artifacts || {}).map(([filename, file]: [string, any]) => <div key={filename} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>{filename} · {mb(file.bytes)}</span>{statusTag(file.present, "GENERATED")}</div>)}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>Execution mode</span><span className="tag tag-blue">OFFLINE REPLAY</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11 }}>Host firewall</span><span className="tag tag-green">NOT MODIFIED</span></div>
             </div>
           </div>
         </div>
 
-        {/* Dataset Verification */}
-        <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Dataset Partitions & Integrity</div>
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Evaluation Holdout Split</span>
-              <span className="tag tag-green">114,185 FLOWS</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Training Set Baseline</span>
-              <span className="tag tag-blue">456,737 FLOWS</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Feature Dimension</span>
-              <span className="tag tag-blue">71 FEATURES</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12 }}>Execution Mode</span>
-              <span className="tag tag-green">OFFLINE REPLAY ONLY</span>
-            </div>
-          </div>
+        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)", marginBottom: 5 }}>SOURCE IDENTITY DISCLOSURE</div>
+          <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>{diagnostics.source_identity}</p>
         </div>
-      </div>
-
-      {/* Safety & Compliance Card */}
-      <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)", marginBottom: 4 }}>
-          JAI 2026 TRACK 1 SAFETY GUARANTEES
-        </div>
-        <p style={{ fontSize: 11, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
-          CyberSentinel is an offline traffic replay and intrusion detection evaluation product. All ALLOW, BLOCK, and REVIEW actions represent simulated tactical responses. The software never probes live computer networks, manipulates production OS firewall tables, or intercepts live socket interfaces.
-        </p>
-      </div>
+      </>}
 
       <div className="panel-foot" style={{ marginTop: 14 }}>
-        <span><LockKeyhole size={13} /> Fail-closed security architecture</span>
+        <span><LockKeyhole size={13}/> Simulated policies only · No live network access</span>
         <span>ENVIRONMENT: LOCAL OFFLINE REPLAY</span>
       </div>
     </section>
