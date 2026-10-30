@@ -34,7 +34,7 @@ Python 3.10+ is recommended.
 python -m venv .venv
 # Windows: .venv\\Scripts\\activate
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 Put organiser-provided files under `data/raw/` (this directory is git-ignored). Never commit the dataset unless the organisers explicitly permit redistribution.
