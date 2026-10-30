@@ -430,211 +430,123 @@ export function TemporalCorrelationConsole() {
 // 5. ADAPTIVE DEFENSE CONSOLE (Agent 5 Policy Management & Pre-Filter)
 // ============================================================================
 export function AdaptiveDefenseConsole() {
-  const [policies, setPolicies] = useState<Policy[]>([
-    {
-      policy_id: "POL-00001",
-      activated_after_record_id: 12,
-      scope_type: "SOURCE_IP",
-      scope_value: "192.168.1.12",
-      expires_after_record_id: 162,
-      policy_action: "BLOCK",
-    },
-    {
-      policy_id: "POL-00002",
-      activated_after_record_id: 13,
-      scope_type: "SOURCE_IP",
-      scope_value: "192.168.1.13",
-      expires_after_record_id: 163,
-      policy_action: "BLOCK",
-    },
-    {
-      policy_id: "POL-00003",
-      activated_after_record_id: 14,
-      scope_type: "SOURCE_IP",
-      scope_value: "192.168.1.14",
-      expires_after_record_id: 164,
-      policy_action: "BLOCK",
-    },
-    {
-      policy_id: "POL-00004",
-      activated_after_record_id: 15,
-      scope_type: "SOURCE_IP",
-      scope_value: "192.168.1.15",
-      expires_after_record_id: 165,
-      policy_action: "BLOCK",
-    },
-    {
-      policy_id: "POL-00005",
-      activated_after_record_id: 16,
-      scope_type: "SOURCE_IP",
-      scope_value: "192.168.1.16",
-      expires_after_record_id: 166,
-      policy_action: "BLOCK",
-    },
-  ]);
-
-  const [totalPolicies, setTotalPolicies] = useState(19546);
-  const [testIp, setTestIp] = useState("192.168.1.12");
-  const [testStep, setTestStep] = useState(50);
-  const [matchResult, setMatchResult] = useState<string | null>(null);
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [totalPolicies, setTotalPolicies] = useState<number | null>(null);
+  const [overview, setOverview] = useState<any>(null);
+  const [testIdentity, setTestIdentity] = useState("");
+  const [testStep, setTestStep] = useState(0);
+  const [matchResult, setMatchResult] = useState<any>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetch("/api/policies?limit=15")
-      .then(res => res.json())
-      .then(data => {
-        if (data.policies && data.policies.length > 0) {
-          setPolicies(data.policies);
-          if (data.total) setTotalPolicies(data.total);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  async function loadPolicies() {
+    setLoading(true);
+    setError("");
+    try {
+      const [policyResponse, overviewResponse] = await Promise.all([
+        fetch("/api/policies?limit=20"),
+        fetch("/api/overview"),
+      ]);
+      const policyData = await policyResponse.json();
+      if (!policyResponse.ok) throw new Error(policyData.detail?.message || policyData.detail || "Policy data unavailable.");
+      setPolicies(Array.isArray(policyData.policies) ? policyData.policies : []);
+      setTotalPolicies(Number(policyData.total ?? 0));
+      if (overviewResponse.ok) setOverview(await overviewResponse.json());
+      else setOverview(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load policy data.");
+      setPolicies([]);
+      setTotalPolicies(null);
+      setOverview(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadPolicies(); }, []);
 
   async function testFilter() {
-    if (!testIp.trim()) return;
+    if (!testIdentity.trim()) {
+      setMatchResult({ error: "Enter a SOURCE_IP scope value from a generated policy." });
+      return;
+    }
     setIsTesting(true);
     setMatchResult(null);
     try {
-      const res = await fetch("/api/policies/test", {
+      const response = await fetch("/api/policies/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_ip: testIp.trim(), current_step: testStep }),
+        body: JSON.stringify({ source_ip: testIdentity.trim(), current_step: testStep }),
       });
-      const data = await res.json();
-      if (data.matched) {
-        setMatchResult(`[PRE-FILTER BLOCKED]: ${data.message}`);
-      } else {
-        setMatchResult(`[PRE-FILTER ALLOWED]: ${data.message}`);
-      }
-    } catch {
-      // Offline fallback check
-      const match = policies.find(p => p.scope_value === testIp.trim());
-      if (match) {
-        setMatchResult(`[PRE-FILTER BLOCKED]: Matches ${match.policy_id} (Active until record ${match.expires_after_record_id})`);
-      } else {
-        setMatchResult("[PRE-FILTER ALLOWED]: No active policy match. Flow permitted for agent inspection.");
-      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail?.message || data.detail || "Policy matcher unavailable.");
+      setMatchResult(data);
+    } catch (err) {
+      setMatchResult({ error: err instanceof Error ? err.message : "Policy matcher request failed." });
     } finally {
       setIsTesting(false);
     }
   }
 
+  const metric = overview?.metrics;
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
       <div className="panel-head">
         <div>
-          <div className="panel-kicker">AGENT 05 · ADAPTIVE DEFENSE & SIMULATED FIREWALL</div>
-          <h3>Simulated Defense Policies</h3>
-          <p>
-            Agent 5 creates temporary, time-bounded host quarantine policies that apply before deep packet inspection.
-          </p>
+          <div className="panel-kicker">AGENT 05 · ADAPTIVE DEFENSE & SIMULATED POLICIES</div>
+          <h3>Policy Lifecycle & Pre-Filter</h3>
+          <p>Displays policies created by an actual replay. All actions are simulated and remain inside the application.</p>
         </div>
-        <span className="panel-icon"><ShieldAlert size={18} /></span>
+        <button className="secondary-btn" type="button" onClick={loadPolicies} disabled={loading}><RefreshCw size={14}/> Refresh</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, margin: "14px 0" }}>
-        <div style={{ background: "var(--panel2)", padding: 12, borderRadius: 6, border: "1px solid var(--line)" }}>
-          <small style={{ color: "var(--muted)", fontSize: 10 }}>POLICIES ACTIVATED</small>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--blue)" }}>{totalPolicies.toLocaleString()}</div>
-          <small style={{ color: "var(--muted)", fontSize: 11 }}>76.2% bloat reduction</small>
-        </div>
-        <div style={{ background: "var(--panel2)", padding: 12, borderRadius: 6, border: "1px solid var(--line)" }}>
-          <small style={{ color: "var(--muted)", fontSize: 10 }}>ATTACKS CONTAINED</small>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--green)" }}>48,219</div>
-          <small style={{ color: "var(--muted)", fontSize: 11 }}>89.0% containment rate</small>
-        </div>
-        <div style={{ background: "var(--panel2)", padding: 12, borderRadius: 6, border: "1px solid var(--line)" }}>
-          <small style={{ color: "var(--muted)", fontSize: 10 }}>BENIGN PRESERVED</small>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--violet)" }}>53,392</div>
-          <small style={{ color: "var(--muted)", fontSize: 11 }}>89.0% benign traffic allowed</small>
-        </div>
-        <div style={{ background: "var(--panel2)", padding: 12, borderRadius: 6, border: "1px solid var(--line)" }}>
-          <small style={{ color: "var(--muted)", fontSize: 10 }}>FALSE BLOCKS</small>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--amber)" }}>6,609</div>
-          <small style={{ color: "var(--muted)", fontSize: 11 }}>76.7% reduction vs baseline</small>
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, margin: "14px 0" }}>
+        {[
+          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policy.csv"],
+          ["ATTACKS CONTAINED", metric ? metric.attacks_contained.toLocaleString() : "—", metric ? metric.attack_containment_rate.toFixed(2) + "% of attack records" : "Requires labelled evaluation data"],
+          ["BENIGN PRESERVED", metric ? metric.benign_preserved.toLocaleString() : "—", metric ? metric.benign_preservation_rate.toFixed(2) + "% of benign records" : "Requires labelled evaluation data"],
+          ["FALSE BLOCKS", metric ? metric.false_blocks.toLocaleString() : "—", metric ? (100 - metric.benign_preservation_rate).toFixed(2) + "% of benign records" : "Requires labelled evaluation data"],
+        ].map(([label, value, detail]) => <div key={label} style={{ background: "var(--panel2)", padding: 12, borderRadius: 7, border: "1px solid var(--line)" }}><small style={{ color: "var(--muted)", fontSize: 9 }}>{label}</small><div style={{ fontSize: 19, fontWeight: 700, margin: "5px 0" }}>{value}</div><small style={{ color: "var(--muted)", fontSize: 10 }}>{detail}</small></div>)}
       </div>
 
-      <div style={{ overflowX: "auto", marginBottom: 16 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid var(--line)", textAlign: "left", color: "var(--muted)" }}>
-              <th style={{ padding: "6px 8px" }}>POLICY ID</th>
-              <th style={{ padding: "6px 8px" }}>SCOPE TYPE</th>
-              <th style={{ padding: "6px 8px" }}>SOURCE IP</th>
-              <th style={{ padding: "6px 8px" }}>ACTIVATED AFTER</th>
-              <th style={{ padding: "6px 8px" }}>EXPIRES AFTER</th>
-              <th style={{ padding: "6px 8px" }}>ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            {policies.slice(0, 8).map(p => (
-              <tr key={p.policy_id} style={{ borderBottom: "1px solid var(--line)" }}>
-                <td style={{ padding: "8px", fontFamily: "monospace", fontWeight: 600 }}>{p.policy_id}</td>
-                <td style={{ padding: "8px" }}>{p.scope_type}</td>
-                <td style={{ padding: "8px", fontFamily: "monospace" }}>{p.scope_value}</td>
-                <td style={{ padding: "8px" }}>{p.activated_after_record_id}</td>
-                <td style={{ padding: "8px" }}>{p.expires_after_record_id}</td>
-                <td style={{ padding: "8px" }}>
-                  <span className="tag tag-red" style={{ fontWeight: 700 }}>{p.policy_action}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+      {error && <div className="parse-warning" role="alert">{error}</div>}
+      {loading && <div className="empty-inline">Loading generated policy records…</div>}
+      {!loading && !error && policies.length === 0 && <div className="empty-history"><div className="empty-history-icon"><ShieldAlert size={18}/></div><div><b>No generated policies available</b><span>Run the official chronological replay to populate this console. No sample policies are inserted.</span></div></div>}
+
+      {policies.length > 0 && <div style={{ overflowX: "auto", marginBottom: 16 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <thead><tr style={{ borderBottom: "1px solid var(--line)", textAlign: "left", color: "var(--muted)" }}>
+            <th style={{ padding: "7px 8px" }}>POLICY ID</th><th style={{ padding: "7px 8px" }}>SCOPE</th><th style={{ padding: "7px 8px" }}>SOURCE IDENTITY</th><th style={{ padding: "7px 8px" }}>ACTIVATED AFTER</th><th style={{ padding: "7px 8px" }}>EXPIRES AFTER</th><th style={{ padding: "7px 8px" }}>ACTION</th>
+          </tr></thead>
+          <tbody>{policies.map(policy => <tr key={policy.policy_id} style={{ borderBottom: "1px solid var(--line)" }}>
+            <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 600 }}>{policy.policy_id}</td>
+            <td style={{ padding: 8 }}>{policy.scope_type}</td>
+            <td style={{ padding: 8, fontFamily: "monospace" }}>{policy.scope_value}</td>
+            <td style={{ padding: 8 }}>{policy.activated_after_record_id}</td>
+            <td style={{ padding: 8 }}>{policy.expires_after_record_id}</td>
+            <td style={{ padding: 8 }}><span className="tag tag-red">{policy.policy_action}</span></td>
+          </tr>)}</tbody>
         </table>
-      </div>
+        <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 7 }}>Showing {policies.length} of {totalPolicies?.toLocaleString() ?? policies.length} policies.</div>
+      </div>}
 
       <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Test Pre-Filter Policy Matcher (Backend /api/policies/test)</div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="text"
-            value={testIp}
-            onChange={e => setTestIp(e.target.value)}
-            placeholder="Enter Source IP (e.g. 192.168.1.12)"
-            style={{
-              flex: 2,
-              padding: "6px 12px",
-              background: "var(--panel)",
-              border: "1px solid var(--line)",
-              borderRadius: 6,
-              color: "var(--text)",
-              fontSize: 12,
-              fontFamily: "monospace",
-            }}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>Step:</span>
-            <input
-              type="number"
-              value={testStep}
-              onChange={e => setTestStep(parseInt(e.target.value) || 0)}
-              style={{
-                width: 70,
-                padding: "6px 8px",
-                background: "var(--panel)",
-                border: "1px solid var(--line)",
-                borderRadius: 6,
-                color: "var(--text)",
-                fontSize: 12,
-              }}
-            />
-          </div>
-          <button className="primary-btn" onClick={testFilter} disabled={isTesting} style={{ fontSize: 12, padding: "6px 14px" }}>
-            {isTesting ? "Evaluating…" : "Test Pre-Filter"}
-          </button>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Test the real backend pre-filter matcher</div>
+        <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 10px" }}>Enter a policy scope value and the record position to check activation and expiry. The matcher does not create or alter policies.</p>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input type="text" value={testIdentity} onChange={event => setTestIdentity(event.target.value)} placeholder="SOURCE_IP scope value from policy.csv" style={{ flex: "1 1 220px", minWidth: 0, padding: "8px 10px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", fontSize: 11, fontFamily: "monospace" }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--muted)" }}>Record step <input type="number" min="0" value={testStep} onChange={event => setTestStep(Math.max(0, Number.parseInt(event.target.value, 10) || 0))} style={{ width: 86, padding: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)" }}/></label>
+          <button className="primary-btn" onClick={testFilter} disabled={isTesting}>{isTesting ? "Checking…" : "Test matcher"}</button>
         </div>
-        {matchResult && (
-          <div style={{ marginTop: 10, fontSize: 12, padding: 8, borderRadius: 6, background: matchResult.includes("BLOCKED") ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)", color: matchResult.includes("BLOCKED") ? "#ef4444" : "#22c55e" }}>
-            {matchResult}
-          </div>
-        )}
+        {matchResult && <div role={matchResult.error ? "alert" : "status"} style={{ marginTop: 10, fontSize: 11, padding: 10, borderRadius: 6, background: matchResult.error ? "#35221f" : matchResult.matched ? "#351f25" : "#112a27", color: matchResult.error ? "#ffb4a4" : matchResult.matched ? "#ff9ba7" : "#9de6c6" }}>
+          {matchResult.error || matchResult.message}
+        </div>}
       </div>
 
       <div className="panel-foot" style={{ marginTop: 14 }}>
-        <span><LockKeyhole size={13} /> Simulated policies only · No actual OS firewall iptables modifications</span>
-        <span>COMPLIANCE: SCOPE_TYPE = SOURCE_IP · POLICY_ACTION = BLOCK</span>
+        <span><LockKeyhole size={13} /> Simulated policies only · No host firewall modifications</span>
+        <span>POLICY SCOPE: SOURCE_IP · ACTION: BLOCK</span>
       </div>
     </section>
   );
