@@ -37,7 +37,7 @@ export function TopologyCommandCentre() {
           <div className="panel-kicker">WEBGL 3D · MULTI-AGENT TOPOLOGY COMMAND</div>
           <h3>Autonomous Agent Neural Topology</h3>
           <p>
-            Interactive 3D representation of the 5-agent detection pipeline, active mitigation gateway, and real-time flow paths.
+            Interactive 3D schematic of the five-agent offline detection and simulated-defense pipeline.
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -72,7 +72,7 @@ export function TopologyCommandCentre() {
 
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Hardware-accelerated WebGL 3D scene with 2D canvas fallback</span>
-        <span>STATUS: 5/5 AGENTS ACTIVE · REPLAY ENGINE SYNCHRONIZED</span>
+        <span>SCHEMATIC VIEW · LOCAL REPLAY DATA WHEN AVAILABLE</span>
       </div>
     </section>
   );
@@ -89,12 +89,12 @@ export function FiveAgentArchitectureView() {
       id: 1,
       name: "Agent 1: Threat Detection",
       role: "Supervised Multiclass Classifier",
-      model: "Calibrated Random Forest (100 Estimators)",
+      model: "Random Forest (artifact-defined configuration; confidence is not calibrated)",
       input: "71 preprocessed network flow metrics",
-      output: "Predicted Class & Probability Confidence (0.0 - 1.0)",
-      latency: "0.0237 ms / flow",
-      throughput: "42,190 flows / sec",
-      accuracy: "99.9956% on 114,185 holdout flows",
+      output: "Predicted class + model confidence (not calibrated)",
+      latency: "See measured benchmark report",
+      throughput: "See measured benchmark report",
+      accuracy: "See generated evaluation report",
       classes: "BENIGN, BRUTE_FORCE, DOS, DDOS, PORT_SCAN",
       description: "Extracts flow-level features and runs high-speed tree ensemble inference with canonical label encoding. Resolves unambiguous signatures within microsecond windows.",
     },
@@ -102,12 +102,12 @@ export function FiveAgentArchitectureView() {
       id: 2,
       name: "Agent 2: Anomaly Detection",
       role: "Unsupervised Statistical Outlier Isolation",
-      model: "Isolation Forest (100 isolation trees, c=0.05)",
+      model: "Isolation Forest (parameters loaded from model artifact)",
       input: "71 continuous flow distribution metrics",
-      output: "Normalized Anomaly Score [0.0, 1.0] & Outlier Flag",
-      latency: "0.0669 ms / flow",
-      throughput: "14,940 flows / sec",
-      accuracy: "0.958% benign false-positive rate",
+      output: "Anomaly score on model output scale + outlier flag",
+      latency: "See measured benchmark report",
+      throughput: "See measured benchmark report",
+      accuracy: "See generated evaluation report",
       classes: "Statistical normal vs zero-day outlier anomaly",
       description: "Evaluates recursive feature space partitioning depth. Operates strictly unsupervised without access to ground-truth labels to catch novel attacks missed by signature models.",
     },
@@ -118,9 +118,9 @@ export function FiveAgentArchitectureView() {
       model: "Rule-Based Deterministic Fusion Engine",
       input: "A1 multiclass prediction & A2 anomaly score",
       output: "Simulated Action (ALLOW/BLOCK/REVIEW) & Evidence Status",
-      latency: "< 0.005 ms / decision",
-      throughput: "> 100,000 decisions / sec",
-      accuracy: "100% deterministic decision arbitration",
+      latency: "Not separately benchmarked",
+      throughput: "Not independently measured",
+      accuracy: "Deterministic decision rules; not a predictive accuracy metric",
       classes: "ALLOW, BLOCK, REVIEW (Status: AGREE, DISAGREE, INCOMPLETE)",
       description: "Combines supervised classification and anomaly signals. Disagreements between agents are never hidden; they are routed to REVIEW with human-readable rationale.",
     },
@@ -131,9 +131,9 @@ export function FiveAgentArchitectureView() {
       model: "Sliding-Window Temporal Heuristic Correlator",
       input: "Monotonic arrival sequence, source/dest endpoints, flow timestamps",
       output: "Deterministic Campaign Group ID & Supporting Flow Evidence",
-      latency: "0.012 ms / flow update",
-      throughput: "> 50,000 flows / sec",
-      accuracy: "Detects Port Scans (>=5 ports), DDoS convergence, and SSH Brute Force",
+      latency: "See measured replay report",
+      throughput: "Not independently measured",
+      accuracy: "Pattern heuristics; evaluate against labelled validation data",
       classes: "PORT_SCAN, DDOS, BRUTE_FORCE, DOS_SURGE",
       description: "Maintains a 150-flow chronological sliding window. Correlates individual packets across time and destination ports to uncover coordinated multi-stage campaigns.",
     },
@@ -144,9 +144,9 @@ export function FiveAgentArchitectureView() {
       model: "Causal Stateful Policy Life-Cycle Engine",
       input: "Confirmed attack detections & incoming flow source endpoints",
       output: "Pre-filter BLOCK evaluations & forward temporary DefensePolicies",
-      latency: "0.008 ms / flow pre-filter check",
-      throughput: "> 80,000 checks / sec",
-      accuracy: "Zero self-blocked triggers · 100% causal forward application",
+      latency: "See measured replay report",
+      throughput: "Not independently measured",
+      accuracy: "Causality assertions are tested; see current replay validation",
       classes: "ALLOW, BLOCK (with applied_policy_id POL-XXXXX)",
       description: "Evaluates incoming flows against unexpired active block rules before analysis. When confirmed attacks pass through, forward-looking policies are generated with explicit expiration ticks.",
     },
@@ -161,7 +161,7 @@ export function FiveAgentArchitectureView() {
           <div className="panel-kicker">SYSTEM ARCHITECTURE · FIVE-AGENT COOPERATIVE IDS</div>
           <h3>Five Autonomous Cooperative Security Agents</h3>
           <p>
-            Detailed specifications, model parameters, data contracts, and verified benchmarks for Agents 1 through 5.
+            Agent roles and contracts for Agents 1–5. Runtime status and benchmark measurements are shown only when artifacts are available.
           </p>
         </div>
         <span className="panel-icon"><Layers size={18} /></span>
@@ -201,7 +201,7 @@ export function FiveAgentArchitectureView() {
             <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{current.name}</div>
             <div style={{ fontSize: 12, color: "var(--blue)", marginTop: 2 }}>{current.role}</div>
           </div>
-          <span className="tag tag-green"><Check size={12} /> OPERATIONAL & VERIFIED</span>
+          <span className="tag tag-green"><Check size={12} /> SOURCE IMPLEMENTATION</span>
         </div>
 
         <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, marginBottom: 16 }}>
