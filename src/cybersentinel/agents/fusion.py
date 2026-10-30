@@ -1,6 +1,7 @@
 """Deterministic, explainable evidence fusion for CyberSentinel."""
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from cybersentinel.contracts import FusionResult
@@ -27,10 +28,14 @@ class EvidenceFusionAgent:
             and self._get(threat, "predicted_class") in VALID_CLASSES
             and self._number(self._get(threat, "confidence")) is not None
         )
+        anomaly_score = self._get(anomaly, "anomaly_score") if anomaly is not None else None
         a_ok = (
             anomaly is not None
             and self._get(anomaly, "status", "success") == "success"
             and isinstance(self._get(anomaly, "is_anomaly"), bool)
+            and isinstance(anomaly_score, (int, float))
+            and not isinstance(anomaly_score, bool)
+            and math.isfinite(float(anomaly_score))
         )
 
         if not t_ok or not a_ok:
