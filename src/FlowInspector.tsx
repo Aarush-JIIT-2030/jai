@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Cpu, LockKeyhole, Network, RefreshCw } from "lucide-react";
+import { ArrowRight, Cpu, LockKeyhole, Network } from "lucide-react";
 
 type FlowResult = {
   final_class: string | null;
