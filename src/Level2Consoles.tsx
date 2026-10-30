@@ -67,12 +67,12 @@ export function TopologyCommandCentre() {
         </div>
       </div>
 
-      <div style={{ height: 280, position: "relative", background: "radial-gradient(circle at center, #0f172a 0%, #030712 100%)", borderRadius: 8, margin: "6px 0 14px 0" }}>
+      <div style={{ height: 480, position: "relative", background: "radial-gradient(circle at center, rgba(15, 30, 58, 0.45) 0%, rgba(3, 7, 18, 0.95) 100%)", borderRadius: 12, margin: "12px 0 16px 0", border: "1px solid rgba(56, 189, 248, 0.22)", overflow: "hidden", boxShadow: "inset 0 0 50px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.1)" }}>
         <Suspense fallback={<div className="topology-loading" role="status">Loading 3D topology…</div>}>
       <NetworkTopology3D threatLevel={threatLevel} />
     </Suspense>
         <div style={{ position: "absolute", bottom: 12, left: 14, fontSize: 11, color: "var(--muted)", pointerEvents: "none" }}>
-          <b>ACTIVE ORBITS:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
+          <b>ACTIVE NODES:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
         </div>
       </div>
 

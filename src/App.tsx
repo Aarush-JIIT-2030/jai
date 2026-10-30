@@ -7,6 +7,7 @@ import {
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
+import { ParticleBackdrop } from "./components/ParticleBackdrop";
 const Agent2Console = lazy(() => import("./FlowInspector").then(module => ({ default: module.Agent2Console })));
 const FlowInspector = lazy(() => import("./FlowInspector").then(module => ({ default: module.FlowInspector })));
 const BatchReplay = lazy(() => import("./BatchReplay").then(module => ({ default: module.BatchReplay })));
@@ -173,6 +174,7 @@ export default function App() {
   const labelCoverage = totalLabels ? Math.round(knownLabels.reduce((n, l) => n + dataset!.labels[l], 0) / totalLabels * 100) : 0;
 
   if (!session) return <div className="auth-shell">
+    <ParticleBackdrop />
     <div className="auth-art">
       <div className="brand"><div className="brand-mark"><Shield size={21} /></div><span>CYBERSENTINEL</span></div>
       <div className="auth-copy">
@@ -212,6 +214,7 @@ export default function App() {
   </div>;
 
   return <div className="app-shell">
+    <ParticleBackdrop />
     {mobileNavOpen && <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
     <aside className={"sidebar" + (mobileNavOpen ? " mobile-open" : "")}>
       <div className="brand"><div className="brand-mark"><Shield size={21} /></div><span>CYBERSENTINEL</span></div>
