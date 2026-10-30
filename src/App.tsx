@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Papa from "papaparse";
 import {
   Activity, AlertTriangle, ArrowRight, ArrowUpRight, Bell, Check,
@@ -7,9 +7,19 @@ import {
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
-import { Agent2Console, FlowInspector } from "./FlowInspector";
-import { BatchReplay } from "./BatchReplay";
-import { TopologyCommandCentre, FiveAgentArchitectureView, EvidenceFusionStudio, TemporalCorrelationConsole, AdaptiveDefenseConsole, ReplayStudio, SubmissionStudio, ModelIntelligenceView, AuditHistoryView, SystemHealthView } from "./Level2Consoles";
+const Agent2Console = lazy(() => import("./FlowInspector").then(module => ({ default: module.Agent2Console })));
+const FlowInspector = lazy(() => import("./FlowInspector").then(module => ({ default: module.FlowInspector })));
+const BatchReplay = lazy(() => import("./BatchReplay").then(module => ({ default: module.BatchReplay })));
+const TopologyCommandCentre = lazy(() => import("./Level2Consoles").then(module => ({ default: module.TopologyCommandCentre })));
+const FiveAgentArchitectureView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.FiveAgentArchitectureView })));
+const EvidenceFusionStudio = lazy(() => import("./Level2Consoles").then(module => ({ default: module.EvidenceFusionStudio })));
+const TemporalCorrelationConsole = lazy(() => import("./Level2Consoles").then(module => ({ default: module.TemporalCorrelationConsole })));
+const AdaptiveDefenseConsole = lazy(() => import("./Level2Consoles").then(module => ({ default: module.AdaptiveDefenseConsole })));
+const ReplayStudio = lazy(() => import("./Level2Consoles").then(module => ({ default: module.ReplayStudio })));
+const SubmissionStudio = lazy(() => import("./Level2Consoles").then(module => ({ default: module.SubmissionStudio })));
+const ModelIntelligenceView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.ModelIntelligenceView })));
+const AuditHistoryView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.AuditHistoryView })));
+const SystemHealthView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.SystemHealthView })));
 
 type Health = {
   status: string;
@@ -247,6 +257,7 @@ export default function App() {
         </div>
       </div>
     </aside>
+    <Suspense fallback={<div className="main-content"><div className="page-wrap"><div className="panel empty-inline" role="status" aria-live="polite">Loading security console…</div></div></div>}>
     <main className="main-content">
       <header className="topbar">
         <button type="button" className="mobile-menu-btn" aria-label={mobileNavOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(v => !v)}>{mobileNavOpen ? <X size={18}/> : <Menu size={18}/>}</button>
@@ -428,6 +439,7 @@ export default function App() {
         </footer>
       </div>
     </main>
+    </Suspense>
   </div>;
 }
 

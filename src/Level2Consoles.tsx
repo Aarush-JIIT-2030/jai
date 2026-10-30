@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import {
   Activity, Check, Database, Download, FileSpreadsheet, Fingerprint,
   Gauge, Layers, LockKeyhole, Play, RefreshCw,
   ShieldAlert, ShieldCheck
 } from "lucide-react";
-import { NetworkTopology3D } from "./components/NetworkTopology3D";
+const NetworkTopology3D = lazy(() => import("./components/NetworkTopology3D").then(module => ({ default: module.NetworkTopology3D })));
 
 type Policy = {
   policy_id: string;
@@ -68,7 +68,9 @@ export function TopologyCommandCentre() {
       </div>
 
       <div style={{ height: 280, position: "relative", background: "radial-gradient(circle at center, #0f172a 0%, #030712 100%)", borderRadius: 8, margin: "6px 0 14px 0" }}>
-        <NetworkTopology3D threatLevel={threatLevel} />
+        <Suspense fallback={<div className="topology-loading" role="status">Loading 3D topology…</div>}>
+      <NetworkTopology3D threatLevel={threatLevel} onNodeSelect={setSelectedNode} />
+    </Suspense>
         <div style={{ position: "absolute", bottom: 12, left: 14, fontSize: 11, color: "var(--muted)", pointerEvents: "none" }}>
           <b>ACTIVE ORBITS:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
         </div>
