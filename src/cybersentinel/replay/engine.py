@@ -115,30 +115,22 @@ class ReplayEngine:
         # Extract endpoints fast
         dports = df["Destination Port"].fillna(0).astype(int).tolist() if "Destination Port" in df.columns else [0] * total_rows
 
-        src_ip_col = None
-        for col in ("source_ip", "Source IP", "src_ip", "src"):
-            if col in df.columns:
-                src_ip_col = col
-                break
-
+        src_ip_col = next(
+            (column for column in ("source_ip", "Source IP", "src_ip", "src") if column in df.columns),
+            None,
+        )
         if src_ip_col:
-            src_ips = df[src_ip_col].astype(str).tolist()
+            src_ips = [
+                str(value).strip() if pd.notna(value) and str(value).strip() else ""
+                for value in df[src_ip_col].tolist()
+            ]
         else:
-            # Deterministic host identity derived from client TCP stack fingerprint
-            client_cols = [c for c in ("Init_Win_bytes_forward", "min_seg_size_forward", "Fwd Header Length") if c in df.columns]
-            if client_cols:
-                fp_to_ip: dict[tuple, str] = {}
-                src_ips = []
-                for row in df[client_cols].itertuples(index=False):
-                    if row not in fp_to_ip:
-                        idx = len(fp_to_ip) + 1
-                        fp_to_ip[row] = f"192.168.{idx // 254 + 1}.{idx % 254 + 1}"
-                    src_ips.append(fp_to_ip[row])
-            else:
-                src_ips = [
-                    f"192.168.1.{((dports[i] * 31) % 254) + 1}"
-                    for i in range(total_rows)
-                ]
+            # Use the same deterministic TCP-stack identity derivation as the
+            # standalone correlation API. No port/duration-derived pseudo-hosts.
+            src_ips = [
+                TemporalCorrelationAgent.derive_source_identity(flow)
+                for flow in df.to_dict(orient="records")
+            ]
 
         classification_rows: list[dict[str, Any]] = []
         replay_rows: list[dict[str, Any]] = []
