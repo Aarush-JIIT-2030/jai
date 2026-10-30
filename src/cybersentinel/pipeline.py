@@ -11,6 +11,9 @@ from cybersentinel.contracts import (
     ThreatDetectionResult,
 )
 from cybersentinel.agents.fusion import EvidenceFusionAgent
+from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
+from cybersentinel.agents.threat_detection import ThreatDetectionAgent
+from pathlib import Path
 
 logger = logging.getLogger("cybersentinel.pipeline")
 
@@ -22,6 +25,15 @@ class CyberSentinelPipeline:
         self.threat_agent = threat_agent
         self.anomaly_agent = anomaly_agent
         self.fusion_agent = fusion_agent or EvidenceFusionAgent()
+
+    @classmethod
+    def load_default(cls, threat_path: str | Path = "models/threat_detection/model.joblib", anomaly_path: str | Path = "models/anomaly_detection/model.joblib") -> "CyberSentinelPipeline":
+        """Load both trained artifacts; never substitute untrained placeholder agents."""
+        threat_file, anomaly_file = Path(threat_path), Path(anomaly_path)
+        missing = [str(path) for path in (threat_file, anomaly_file) if not path.is_file()]
+        if missing:
+            raise FileNotFoundError("Required model artifact(s) missing: " + ", ".join(missing))
+        return cls(ThreatDetectionAgent.load(threat_file), AnomalyDetectionAgent.load(anomaly_file), EvidenceFusionAgent())
 
     def analyze(self, flow: dict[str, Any]) -> dict[str, Any]:
         started = time.perf_counter()
