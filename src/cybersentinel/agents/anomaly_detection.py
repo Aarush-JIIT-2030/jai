@@ -1,6 +1,192 @@
-"""Independent anomaly detection agent."""
+"""Independent benign-baseline anomaly detector for network flows.
+
+Agent 2 is trained only on benign rows from the training partition. It does not
+consume Agent 1 predictions or labels during scoring. Thresholds and imputation
+statistics are learned from training data and persisted with the artifact.
+"""
+from __future__ import annotations
+
+import os
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.impute import SimpleImputer
+
+from cybersentinel.contracts import AnomalyDetectionResult
+
+
+FEATURE_EVIDENCE_MAP = {
+    "Flow Packets/s": "unusual_packet_rate",
+    "Flow Bytes/s": "abnormal_byte_rate",
+    "Flow Duration": "abnormal_flow_duration",
+    "Total Fwd Packets": "high_forward_packet_volume",
+    "Total Length of Fwd Packets": "abnormal_payload_size",
+    "Fwd Packet Length Max": "unusually_large_packet",
+    "FIN Flag Count": "abnormal_fin_flag_activity",
+    "SYN Flag Count": "unusual_syn_flag_pattern",
+    "RST Flag Count": "high_rst_teardown_rate",
+    "PSH Flag Count": "abnormal_psh_flag_rate",
+    "Destination Port": "anomalous_service_port",
+}
+ARTIFACT_FORMAT_VERSION = 1
+
+
+def _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if not isinstance(frame, pd.DataFrame):
+        frame = pd.DataFrame(frame)
+    data = frame.loc[:, ~frame.columns.duplicated()].copy()
+    excluded = {"record_id", "label", "flow id", "source ip", "destination ip", "timestamp"}
+    data = data.drop(columns=[c for c in data.columns if str(c).strip().casefold() in excluded], errors="ignore")
+    numeric = {}
+    for col in data.columns:
+        values = pd.to_numeric(data[col], errors="coerce").replace([np.inf, -np.inf], np.nan)
+        if values.notna().any():
+            numeric[str(col)] = values.astype("float64")
+    if not numeric:
+        raise ValueError("No usable numeric flow features were supplied.")
+    return pd.DataFrame(numeric, index=data.index)
+
+
 class AnomalyDetectionAgent:
-    def fit(self, benign_training_features) -> "AnomalyDetectionAgent":
-        raise NotImplementedError("Fit detector using permitted training data only.")
-    def score(self, flow: dict):
-        raise NotImplementedError("Return anomaly score and supporting feature evidence.")
+    """Isolation Forest over a benign-only training baseline."""
+
+    def __init__(self, estimator: Any = None, feature_columns: list[str] | None = None,
+                 imputer: SimpleImputer | None = None,
+                 profiles: dict[str, dict[str, float]] | None = None,
+                 threshold: float | None = None, metadata: dict[str, Any] | None = None):
+        self.estimator = estimator
+        self.feature_columns = list(feature_columns or [])
+        self.imputer = imputer
+        self.profiles = profiles or {}
+        self.threshold = threshold
+        self.metadata = metadata or {}
+
+    def fit(self, benign_training_features: pd.DataFrame) -> "AnomalyDetectionAgent":
+        x = _numeric_frame(benign_training_features)
+        # Fit feature selection and imputation on benign training data only.
+        self.feature_columns = [c for c in x.columns if x[c].nunique(dropna=True) > 1]
+        if not self.feature_columns:
+            raise ValueError("Benign training data has no varying numeric features.")
+        x = x.reindex(columns=self.feature_columns)
+        self.imputer = SimpleImputer(strategy="median")
+        matrix = self.imputer.fit_transform(x)
+        self.estimator = IsolationForest(
+            n_estimators=200,
+            max_samples=min(50000, len(matrix)),
+            contamination="auto",
+            random_state=42,
+            n_jobs=-1,
+        )
+        self.estimator.fit(matrix)
+        training_scores = self.estimator.decision_function(matrix)
+        # The 1st percentile of benign training scores defines the operating point.
+        self.threshold = float(np.percentile(training_scores, 1.0))
+        self.profiles = {}
+        for index, col in enumerate(self.feature_columns):
+            values = matrix[:, index]
+            q01, q25, q50, q75, q99 = np.percentile(values, [1, 25, 50, 75, 99])
+            self.profiles[col] = {
+                "median": float(q50),
+                "iqr": float(max(q75 - q25, 1e-9)),
+                "q01": float(q01),
+                "q99": float(q99),
+            }
+        self.metadata = {
+            "artifact_format_version": ARTIFACT_FORMAT_VERSION,
+            "algorithm": "IsolationForest",
+            "training_rows": int(len(matrix)),
+            "feature_count": len(self.feature_columns),
+            "feature_columns": self.feature_columns,
+            "threshold_method": "1st percentile of benign training decision_function scores",
+            "training_scope": "benign rows from training partition only",
+        }
+        return self
+
+    def _aligned(self, flow: dict[str, Any]) -> pd.DataFrame:
+        raw = _numeric_frame(pd.DataFrame([flow]))
+        return raw.reindex(columns=self.feature_columns)
+
+    def _evidence(self, flow: dict[str, Any]) -> list[str]:
+        deviations = []
+        for col, profile in self.profiles.items():
+            if col not in flow:
+                continue
+            try:
+                value = float(flow[col])
+            except (TypeError, ValueError):
+                continue
+            if not np.isfinite(value):
+                continue
+            if value < profile["q01"] or value > profile["q99"]:
+                strength = abs(value - profile["median"]) / profile["iqr"]
+                deviations.append((col, strength))
+        deviations.sort(key=lambda item: item[1], reverse=True)
+        result = []
+        for col, _ in deviations[:5]:
+            result.append(FEATURE_EVIDENCE_MAP.get(
+                col, "unusual_" + col.casefold().replace(" ", "_").replace("/", "_per_")
+            ))
+        return result
+
+    def score(self, flow: dict[str, Any]) -> AnomalyDetectionResult:
+        if self.estimator is None or self.imputer is None or self.threshold is None:
+            return AnomalyDetectionResult(None, None, [], status="not_ready",
+                                          message="Anomaly detector has not been trained or loaded.")
+        if not isinstance(flow, dict) or not flow:
+            return AnomalyDetectionResult(None, None, [], status="error",
+                                          message="Flow must be a non-empty object.")
+        try:
+            matrix = self.imputer.transform(self._aligned(flow))
+            score = float(self.estimator.decision_function(matrix)[0])
+            flagged = bool(score < self.threshold)
+            return AnomalyDetectionResult(
+                anomaly_score=score,
+                is_anomaly=flagged,
+                evidence=self._evidence(flow) if flagged else [],
+                status="success",
+            )
+        except Exception as exc:
+            return AnomalyDetectionResult(None, None, [], status="error",
+                                          message=f"Anomaly scoring failed: {type(exc).__name__}")
+
+    def save(self, path: str | Path) -> Path:
+        if self.estimator is None or self.imputer is None or self.threshold is None:
+            raise RuntimeError("Cannot save an untrained anomaly detector.")
+        destination = Path(path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(prefix=destination.name, suffix=".tmp", dir=str(destination.parent))
+        os.close(fd)
+        try:
+            joblib.dump({
+                "artifact_format_version": ARTIFACT_FORMAT_VERSION,
+                "estimator": self.estimator,
+                "imputer": self.imputer,
+                "feature_columns": self.feature_columns,
+                "profiles": self.profiles,
+                "threshold": self.threshold,
+                "metadata": self.metadata,
+            }, temporary, compress=3)
+            os.replace(temporary, destination)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return destination
+
+    @classmethod
+    def load(cls, path: str | Path) -> "AnomalyDetectionAgent":
+        payload = joblib.load(path)
+        if payload.get("artifact_format_version") != ARTIFACT_FORMAT_VERSION:
+            raise ValueError("Unsupported anomaly model artifact version.")
+        return cls(
+            estimator=payload["estimator"],
+            feature_columns=payload["feature_columns"],
+            imputer=payload["imputer"],
+            profiles=payload.get("profiles", {}),
+            threshold=float(payload["threshold"]),
+            metadata=payload.get("metadata", {}),
+        )
