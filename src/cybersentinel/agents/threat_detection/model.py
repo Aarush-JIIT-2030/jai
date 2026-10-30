@@ -13,7 +13,7 @@ from sklearn.preprocessing import LabelEncoder
 
 BENCHMARK_CLASSES = ("BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN")
 ARTIFACT_FORMAT_VERSION = 1
-DEFAULT_DROP_COLUMNS = {"flowid", "sourceip", "destinationip", "srcip", "dstip", "timestamp"}
+DEFAULT_DROP_COLUMNS = {"recordid", "flowid", "sourceip", "destinationip", "srcip", "dstip", "timestamp"}
 
 def _key(value: Any) -> str:
     return "".join(ch for ch in str(value).casefold() if ch.isalnum())
