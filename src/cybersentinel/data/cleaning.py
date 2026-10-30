@@ -111,22 +111,6 @@ def _raw_dataset_stats(frame: pd.DataFrame) -> dict[str, Any]:
         for c in NONNEGATIVE_LENGTH_COLUMNS
         if c in frame.columns
     }
-
-
-def inspect_frame(frame: pd.DataFrame) -> dict[str, Any]:
-    """Summarize a frame's schema and data-quality issues without modifying it."""
-    if ID_COLUMN in frame.columns and TARGET_COLUMN in frame.columns:
-        return _raw_dataset_stats(frame)
-    numeric = frame.select_dtypes(include=[np.number])
-    values = numeric.to_numpy(dtype=np.float64, copy=False)
-    return {
-        "rows": int(len(frame)),
-        "columns": int(len(frame.columns)),
-        "column_names": [str(c) for c in frame.columns],
-        "missing_by_column": frame.isna().sum().astype(int).to_dict(),
-        "infinite_numeric_values": int(np.isinf(values).sum()),
-        "duplicate_rows": int(frame.duplicated().sum()),
-    }
     numeric_values = numeric.to_numpy(dtype=np.float64, copy=False)
     return {
         "rows": int(len(frame)),
@@ -148,6 +132,22 @@ def inspect_frame(frame: pd.DataFrame) -> dict[str, Any]:
             for c in negative_header_counts
         },
         "class_counts": _class_counts(frame),
+    }
+
+
+def inspect_frame(frame: pd.DataFrame) -> dict[str, Any]:
+    """Summarize a frame's schema and data-quality issues without modifying it."""
+    if ID_COLUMN in frame.columns and TARGET_COLUMN in frame.columns:
+        return _raw_dataset_stats(frame)
+    numeric = frame.select_dtypes(include=[np.number])
+    values = numeric.to_numpy(dtype=np.float64, copy=False)
+    return {
+        "rows": int(len(frame)),
+        "columns": int(len(frame.columns)),
+        "column_names": [str(c) for c in frame.columns],
+        "missing_by_column": frame.isna().sum().astype(int).to_dict(),
+        "infinite_numeric_values": int(np.isinf(values).sum()),
+        "duplicate_rows": int(frame.duplicated().sum()),
     }
 
 
