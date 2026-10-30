@@ -88,6 +88,42 @@ def health():
     }
 
 
+@app.get("/api/system/diagnostics")
+def system_diagnostics():
+    """Expose actual local artifact presence without inventing readiness."""
+    dataset = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    history_db = BASE_DIR / "data" / "cybersentinel_history.db"
+    submission = BASE_DIR / "outputs" / "submission"
+    model_status = {
+        "agent_1_model": THREAT_MODEL.is_file(),
+        "agent_2_model": ANOMALY_MODEL.is_file(),
+        "agent_3_fusion_code": True,
+        "agent_4_correlation_code": True,
+        "agent_5_defense_code": True,
+    }
+    files = {}
+    for filename in ("classification.csv", "policy.csv", "replay.csv"):
+        path = submission / filename
+        files[filename] = {
+            "present": path.is_file(),
+            "bytes": path.stat().st_size if path.is_file() else None,
+        }
+    return {
+        "api": {"available": True, "mode": "offline-replay"},
+        "models": model_status,
+        "models_ready": get_pipeline() is not None,
+        "evaluation_dataset": {
+            "present": dataset.is_file(),
+            "bytes": dataset.stat().st_size if dataset.is_file() else None,
+            "path": "data/processed/eval_prepared.parquet",
+        },
+        "submission_artifacts": files,
+        "history_database": {"present": history_db.is_file()},
+        "source_identity": "native source IP when present; otherwise TCP-stack-derived synthetic identity; unavailable identity fails closed",
+        "firewall": {"mode": "simulated-only", "host_firewall_modified": False},
+    }
+
+
 @app.get("/api/history")
 def get_history(limit: int = 15):
     """Retrieve runs from local SQLite database."""
