@@ -335,7 +335,7 @@ def simulate_replay(payload: ReplaySimulationRequest):
     ]
 
     # Save to local SQLite
-    run_id = f"RUN-{int(time.time())}"
+    run_id = f"RUN-{time.time_ns()}"
     metrics = results["metrics"]
     record_run(
         run_id=run_id,
