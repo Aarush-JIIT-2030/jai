@@ -145,15 +145,15 @@ export default function App() {
   }
 
   const knownLabels = dataset ? Object.keys(dataset.labels).filter(l => BENCHMARK.includes(l)) : [];
-  const totalLabels = dataset ? Object.values(dataset.labels).reduce((a,b) => a+b, 0) : 0;
-  const labelCoverage = totalLabels ? Math.round(knownLabels.reduce((n,l) => n + dataset!.labels[l], 0) / totalLabels * 100) : 0;
+  const totalLabels = dataset ? Object.values(dataset.labels).reduce((a, b) => a + b, 0) : 0;
+  const labelCoverage = totalLabels ? Math.round(knownLabels.reduce((n, l) => n + dataset!.labels[l], 0) / totalLabels * 100) : 0;
 
   if (!session) return <div className="auth-shell">
     <div className="auth-art">
-      <div className="brand"><div className="brand-mark"><Shield size={21}/></div><span>CYBERSENTINEL</span></div>
+      <div className="brand"><div className="brand-mark"><Shield size={21} /></div><span>CYBERSENTINEL</span></div>
       <div className="auth-copy">
-        <div className="eyebrow"><span className="pulse-dot"/> JAI 2026 · TRACK 01</div>
-        <h1>See the threat.<br/><em>Understand the why.</em></h1>
+        <div className="eyebrow"><span className="pulse-dot" /> JAI 2026 · TRACK 01</div>
+        <h1>See the threat.<br /><em>Understand the why.</em></h1>
         <p>Multi-agent network intrusion detection with transparent evidence and adaptive, simulated defense.</p>
         <div className="auth-stats">
           <div><strong>03</strong><span>INTELLIGENCE AGENTS</span></div>
@@ -165,33 +165,32 @@ export default function App() {
     </div>
     <div className="auth-panel">
       <form className="auth-card" onSubmit={authenticate}>
-        <div className="auth-icon"><Fingerprint size={22}/></div>
+        <div className="auth-icon"><Fingerprint size={22} /></div>
         <div className="eyebrow">SECURE WORKSPACE</div>
         <h2>{authMode === "signin" ? "Welcome back" : "Create your workspace"}</h2>
         <p className="muted">Sign in with Supabase or continue in offline guest mode.</p>
-        <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@team.com" required autoComplete="email"/></label>
-        <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8} autoComplete={authMode === "signin" ? "current-password" : "new-password"}/></label>
-        {authError && <div className="auth-error"><AlertTriangle size={15}/>{authError}</div>}
+        <label>Email address<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@team.com" required autoComplete="email" /></label>
+        <label>Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8} autoComplete={authMode === "signin" ? "current-password" : "new-password"} /></label>
+        {authError && <div className="auth-error"><AlertTriangle size={15} />{authError}</div>}
         {!isSupabaseConfigured && <div className="auth-error">Supabase cloud URL is not configured. Use Guest Mode below.</div>}
         <button className="primary-btn full" disabled={authBusy || !isSupabaseConfigured}>
-          {authBusy ? "Please wait…" : authMode === "signin" ? "Sign in" : "Create account"}<ArrowRight size={16}/>
+          {authBusy ? "Please wait…" : authMode === "signin" ? "Sign in" : "Create account"}<ArrowRight size={16} />
         </button>
         <button type="button" className="secondary-btn full" style={{ marginTop: 8 }} onClick={enterGuestMode}>
           Continue in Offline Guest Mode
         </button>
         <div className="auth-switch">
-          {authMode === "signin" ? "New to CyberSentinel?" : "Already have an account?"} <button type="button" onClick={()=>{setAuthMode(authMode==="signin"?"signup":"signin");setAuthError("");}}>{authMode === "signin" ? "Create account" : "Sign in"}</button>
+          {authMode === "signin" ? "New to CyberSentinel?" : "Already have an account?"} <button type="button" onClick={() => { setAuthMode(authMode === "signin" ? "signup" : "signin"); setAuthError(""); }}>{authMode === "signin" ? "Create account" : "Sign in"}</button>
         </div>
-        <div className="secure-note"><LockKeyhole size={13}/> Offline replay & evaluation only · Zero live firewall changes</div>
+        <div className="secure-note"><LockKeyhole size={13} /> Offline replay & evaluation only · Zero live firewall changes</div>
       </form>
     </div>
   </div>;
 
   return <div className="app-shell">
-      <ParticleBackdrop />
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark"><Shield size={21}/></div><span>CYBERSENTINEL</span></div>
-      <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14}/></div>
+      <div className="brand"><div className="brand-mark"><Shield size={21} /></div><span>CYBERSENTINEL</span></div>
+      <div className="workspace"><div className="workspace-avatar">J</div><div><b>JAI HACK 2026</b><small>Security workspace</small></div><ChevronDown size={14} /></div>
       <div className="nav-label">COMMAND WORKSPACE</div>
       {[
         ["Overview", Gauge],
@@ -219,15 +218,15 @@ export default function App() {
       <button className="nav-item" onClick={()=>setNotice("Complete offline setup, reproduction benchmarks, and model artifacts are verified under release/day2-final/.")}><CircleHelp size={16}/>Release Guides<ArrowUpRight size={13} className="nav-external"/></button>
       <div className="sidebar-bottom">
         <div className="system-card">
-          <div className="system-card-head"><span className="pulse-dot"/> SYSTEM STATUS</div>
+          <div className="system-card-head"><span className="pulse-dot" /> SYSTEM STATUS</div>
           <div className="system-row"><span>Web console</span><b className="status-ok">Operational</b></div>
-          <div className="system-row"><span>Inference API</span><b className={health?.status==="ok"?"status-ok":"status-warn"}>{health?.status==="ok"?"Online":"Not ready"}</b></div>
+          <div className="system-row"><span>Inference API</span><b className={health?.status === "ok" ? "status-ok" : "status-warn"}>{health?.status === "ok" ? "Online" : "Not ready"}</b></div>
           <div className="system-row"><span>ML models</span><b className={health?.model_ready ? "status-ok" : "status-warn"}>{health?.model_ready ? "Active" : "Pending"}</b></div>
         </div>
         <div className="profile-row">
-          <div className="profile-avatar">{(session.user.email?.[0]??"U").toUpperCase()}</div>
+          <div className="profile-avatar">{(session.user.email?.[0] ?? "U").toUpperCase()}</div>
           <div className="profile-meta"><b>{session.user.email}</b><small>Analyst session</small></div>
-          <button title="Sign out" onClick={signOut} className="icon-btn"><LogOut size={16}/></button>
+          <button title="Sign out" onClick={signOut} className="icon-btn"><LogOut size={16} /></button>
         </div>
       </div>
     </aside>
@@ -235,25 +234,26 @@ export default function App() {
       <header className="topbar">
         <div className="crumb"><span>Workspace</span><span>/</span><b>{activeNav}</b></div>
         <div className="top-actions">
-          <div className="env-pill"><span className="pulse-dot"/> OFFLINE REPLAY MODE</div>
-          <button className="icon-btn" title="Refresh API status" onClick={checkHealth}><RefreshCw size={16}/></button>
-          <button className="icon-btn" title="Notifications" onClick={()=>setNotice("No new alerts. All agents operational.")}><Bell size={16}/></button>
-          <div className="top-avatar">{(session.user.email?.[0]??"U").toUpperCase()}</div>
+          <div className="env-pill"><span className="pulse-dot" /> OFFLINE REPLAY MODE</div>
+          <button className="icon-btn" title="Refresh API status" onClick={checkHealth}><RefreshCw size={16} /></button>
+          <button className="icon-btn" title="Notifications" onClick={() => setNotice("No new alerts. All agents operational.")}><Bell size={16} /></button>
+          <div className="top-avatar">{(session.user.email?.[0] ?? "U").toUpperCase()}</div>
         </div>
       </header>
       <div className="page-wrap">
         <section className="page-heading">
           <div>
-            <div className="eyebrow">THREAT INTELLIGENCE CONSOLE <span className="heading-line"/></div>
-            <h1>{activeNav==="Overview"?"Security overview":activeNav}</h1>
+            <div className="eyebrow">THREAT INTELLIGENCE CONSOLE <span className="heading-line" /></div>
+            <h1>{activeNav === "Overview" ? "Security overview" : activeNav}</h1>
             <p>Monitor network-flow datasets, inspect evidence, and orchestrate agent-based detection.</p>
           </div>
           <div className="heading-actions">
             <span className="date-chip">JAI 2026 <span>·</span> BENCHMARK R1</span>
-            <button className="primary-btn" onClick={()=>inputRef.current?.click()}><CloudUpload size={16}/> Inspect dataset</button>
+            <button className="primary-btn" onClick={() => inputRef.current?.click()}><CloudUpload size={16} /> Inspect dataset</button>
           </div>
         </section>
-        {notice && <div className="notice"><Check size={15}/>{notice}<button onClick={()=>setNotice("")}><X size={15}/></button></div>}
+        {notice && <div className="notice"><Check size={15} />{notice}<button onClick={() => setNotice("")}><X size={15} /></button></div>}
+
         {activeNav === "Overview" && <TopologyCommandCentre />}
         {activeNav === "Five-Agent Architecture" && <FiveAgentArchitectureView />}
         {activeNav === "Flow Inspector" && (
@@ -263,6 +263,7 @@ export default function App() {
             <BatchReplay modelReady={Boolean(health?.model_ready)} />
           </>
         )}
+
         {activeNav === "Evidence Fusion" && <EvidenceFusionStudio />}
         {activeNav === "Temporal Investigations" && <TemporalCorrelationConsole />}
         {activeNav === "Adaptive Defense" && <AdaptiveDefenseConsole />}
@@ -402,7 +403,7 @@ export default function App() {
 
         <footer className="footer">
           <span>CYBERSENTINEL <i>·</i> JAI 2026</span>
-          <span><span className="pulse-dot"/> OFFLINE ANALYSIS ONLY</span>
+          <span><span className="pulse-dot" /> OFFLINE ANALYSIS ONLY</span>
           <span>BUILD 1.0.0</span>
         </footer>
       </div>
@@ -410,20 +411,20 @@ export default function App() {
   </div>;
 }
 
-function Metric({icon:Icon,label,value,detail,tone}:{icon:any;label:string;value:string;detail:string;tone:string}) {
+function Metric({ icon: Icon, label, value, detail, tone }: { icon: any; label: string; value: string; detail: string; tone: string }) {
   return <div className="metric-card">
-    <div className={"metric-icon "+tone}><Icon size={18}/></div>
+    <div className={"metric-icon " + tone}><Icon size={18} /></div>
     <div className="metric-label">{label}</div>
     <div className="metric-value">{value}</div>
     <div className="metric-detail">{detail}</div>
   </div>;
 }
 
-function Agent({number,title,desc,status,icon:Icon}:{number:string;title:string;desc:string;status:string;icon:any}) {
+function Agent({ number, title, desc, status, icon: Icon }: { number: string; title: string; desc: string; status: string; icon: any }) {
   return <div className="agent-row">
     <div className="agent-number">{number}</div>
-    <div className="agent-icon"><Icon size={17}/></div>
+    <div className="agent-icon"><Icon size={17} /></div>
     <div className="agent-copy"><b>{title}</b><span>{desc}</span></div>
-    <span className={"agent-status "+(status==="Active"?"ready":"pending")}>{status}</span>
+    <span className={"agent-status " + (status === "Active" ? "ready" : "pending")}>{status}</span>
   </div>;
 }

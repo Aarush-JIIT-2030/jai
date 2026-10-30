@@ -124,10 +124,21 @@ class ReplayEngine:
         if src_ip_col:
             src_ips = df[src_ip_col].astype(str).tolist()
         else:
-            src_ips = [
-                f"192.168.1.{(dports[i] * 31 + (i % 250)) % 254 + 1}"
-                for i in range(total_rows)
-            ]
+            # Deterministic host identity derived from client TCP stack fingerprint
+            client_cols = [c for c in ("Init_Win_bytes_forward", "min_seg_size_forward", "Fwd Header Length") if c in df.columns]
+            if client_cols:
+                fp_to_ip: dict[tuple, str] = {}
+                src_ips = []
+                for row in df[client_cols].itertuples(index=False):
+                    if row not in fp_to_ip:
+                        idx = len(fp_to_ip) + 1
+                        fp_to_ip[row] = f"192.168.{idx // 254 + 1}.{idx % 254 + 1}"
+                    src_ips.append(fp_to_ip[row])
+            else:
+                src_ips = [
+                    f"192.168.1.{((dports[i] * 31) % 254) + 1}"
+                    for i in range(total_rows)
+                ]
 
         classification_rows: list[dict[str, Any]] = []
         replay_rows: list[dict[str, Any]] = []
@@ -203,7 +214,6 @@ class ReplayEngine:
                 # Check if this allowed flow represents an attack requiring a forward policy
                 is_attack = (
                     fusion.action == "BLOCK"
-                    or (t_class != "BENIGN" and t_conf >= 0.70)
                     or (correlation.correlated and correlation.attack_type in ("PORT_SCAN", "DOS", "DDOS", "BRUTE_FORCE"))
                 )
 
