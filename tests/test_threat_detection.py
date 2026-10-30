@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from cybersentinel.agents.threat_detection import ThreatDetectionAgent, ThreatDetectionModel
+from cybersentinel.agents.threat_detection.model import numeric_features
 from cybersentinel.agents.threat_detection.evaluate import evaluate_predictions
 from cybersentinel.agents.threat_detection.train import load_label_mapping
 from cybersentinel.contracts import ThreatDetectionResult
@@ -59,3 +60,14 @@ def test_metrics_report_all_classes():
     assert result["accuracy"] == 1.0 and result["macro_f1"] == 1.0
     assert list(result["per_class"]) == CLASSES
     assert len(result["confusion_matrix"]) == 5
+
+
+def test_record_id_is_excluded_from_classifier_features():
+    frame = pd.DataFrame({
+        "record_id": [1, 2, 3],
+        "Flow Duration": [100, 200, 300],
+        "Flow ID": ["a", "b", "c"],
+    })
+    features = numeric_features(frame)
+    assert "record_id" not in features.columns
+    assert "Flow Duration" in features.columns
