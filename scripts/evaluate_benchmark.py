@@ -53,7 +53,10 @@ def evaluate(eval_path: str, threat_path: str, anomaly_path: str, output: str, f
     cm = confusion_matrix(y_true, y_pred, labels=CLASSES)
 
     started = time.perf_counter()
-    anomaly_results = [anomaly.score(row) for row in features.to_dict(orient="records")]
+    if hasattr(anomaly, "score_frame"):
+        anomaly_results = anomaly.score_frame(features)
+    else:
+        anomaly_results = [anomaly.score(row) for row in features.to_dict(orient="records")]
     anomaly_seconds = time.perf_counter() - started
     anomaly_flags = np.asarray([bool(item.is_anomaly) for item in anomaly_results])
     benign_mask = np.asarray(y_true) == "BENIGN"

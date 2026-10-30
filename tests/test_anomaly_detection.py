@@ -62,3 +62,12 @@ def test_empty_training_data_is_rejected():
     import pytest
     with pytest.raises(ValueError):
         AnomalyDetectionAgent().fit(pd.DataFrame())
+
+
+def test_score_frame_vectorized():
+    agent = AnomalyDetectionAgent().fit(benign_sample())
+    df = benign_sample(rows=20)
+    results = agent.score_frame(df)
+    assert len(results) == 20
+    assert all(r.status == "success" for r in results)
+    assert all(isinstance(r.is_anomaly, bool) for r in results)

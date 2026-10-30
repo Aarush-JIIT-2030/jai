@@ -138,10 +138,10 @@ class AnomalyDetectionAgent:
     def score(self, flow: dict[str, Any]) -> AnomalyDetectionResult:
         if self.estimator is None or self.imputer is None or self.threshold is None:
             return AnomalyDetectionResult(None, None, [], status="not_ready",
-                                          message="Anomaly detector has not been trained or loaded.")
+                                           message="Anomaly detector has not been trained or loaded.")
         if not isinstance(flow, dict) or not flow:
             return AnomalyDetectionResult(None, None, [], status="error",
-                                          message="Flow must be a non-empty object.")
+                                           message="Flow must be a non-empty object.")
         try:
             matrix = self.imputer.transform(self._aligned(flow))
             score = float(self.estimator.decision_function(matrix)[0])
@@ -154,7 +154,40 @@ class AnomalyDetectionAgent:
             )
         except Exception as exc:
             return AnomalyDetectionResult(None, None, [], status="error",
-                                          message=f"Anomaly scoring failed: {type(exc).__name__}")
+                                           message=f"Anomaly scoring failed: {type(exc).__name__}")
+
+    def score_frame(self, features: pd.DataFrame) -> list[AnomalyDetectionResult]:
+        if self.estimator is None or self.imputer is None or self.threshold is None:
+            return [AnomalyDetectionResult(None, None, [], status="not_ready",
+                                           message="Anomaly detector has not been trained or loaded.")] * len(features)
+        try:
+            raw = _numeric_frame(features).reindex(columns=self.feature_columns)
+            matrix = self.imputer.transform(raw)
+            scores = self.estimator.decision_function(matrix)
+            flagged_indices = np.where(scores < self.threshold)[0]
+            flagged_set = set(flagged_indices)
+
+            # Extract evidence only for flagged flows to preserve high throughput
+            evidence_dict = {}
+            if flagged_indices.size > 0:
+                for idx in flagged_indices:
+                    flow_dict = features.iloc[int(idx)].to_dict()
+                    evidence_dict[idx] = self._evidence(flow_dict)
+
+            results = []
+            for idx, score_val in enumerate(scores):
+                s = float(score_val)
+                flagged = idx in flagged_set
+                results.append(AnomalyDetectionResult(
+                    anomaly_score=s,
+                    is_anomaly=flagged,
+                    evidence=evidence_dict.get(idx, []) if flagged else [],
+                    status="success",
+                ))
+            return results
+        except Exception as exc:
+            return [AnomalyDetectionResult(None, None, [], status="error",
+                                           message=f"Anomaly scoring failed: {type(exc).__name__}")] * len(features)
 
     def save(self, path: str | Path) -> Path:
         if self.estimator is None or self.imputer is None or self.threshold is None:
