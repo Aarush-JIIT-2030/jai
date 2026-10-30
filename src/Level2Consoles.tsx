@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Activity, Check, Database, Download, FileSpreadsheet, Fingerprint,
   Gauge, Layers, LockKeyhole, Play, RefreshCw,
-  ShieldAlert, ShieldCheck, SlidersHorizontal
+  ShieldAlert, ShieldCheck
 } from "lucide-react";
 import { NetworkTopology3D } from "./components/NetworkTopology3D";
 
