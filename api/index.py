@@ -2,10 +2,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+SOURCE_DIR = BASE_DIR / "src"
+if str(SOURCE_DIR) not in sys.path:
+    sys.path.insert(0, str(SOURCE_DIR))
 
 from cybersentinel.pipeline import CyberSentinelPipeline
 
@@ -15,7 +21,6 @@ app = FastAPI(
     description="Offline network-flow analysis with simulated policy recommendations only.",
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent
 THREAT_MODEL = BASE_DIR / "models" / "threat_detection" / "model.joblib"
 ANOMALY_MODEL = BASE_DIR / "models" / "anomaly_detection" / "model.joblib"
 _pipeline: CyberSentinelPipeline | None = None
