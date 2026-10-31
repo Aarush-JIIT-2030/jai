@@ -61,8 +61,8 @@ class SubmissionValidator:
 
                 try:
                     score = float(score_str)
-                    if not (-1.0 <= score <= 1.0):
-                        issues.append(f"Row {idx}: Anomaly score out of range: {score}")
+                    if not (0.0 <= score <= 1.0):
+                        issues.append(f"Row {idx}: Anomaly score must be within [0,1]: {score}")
                 except (ValueError, TypeError):
                     issues.append(f"Row {idx}: Non-numeric anomaly score '{score_str}'")
 
