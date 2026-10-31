@@ -61,6 +61,7 @@ def main() -> int:
     else:
         df = pd.read_csv(args.input)
 
+    limited_run = args.limit is not None and args.limit > 0 and args.limit < len(df)
     if args.limit and args.limit > 0:
         logger.info("Limiting replay to first %d records", args.limit)
         df = df.iloc[:args.limit]
@@ -106,7 +107,7 @@ def main() -> int:
 
     # 4. Independently validate full submissions against the original input.
     summary = dict(results["metrics"])
-    if args.limit is not None:
+    if limited_run:
         # A limited replay is useful for smoke testing, but can never be accepted
         # as a complete submission because it intentionally omits input records.
         validation = {"valid": False, "status": "SKIPPED_LIMITED_RUN", "errors": []}
