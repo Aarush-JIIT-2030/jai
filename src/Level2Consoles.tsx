@@ -439,7 +439,7 @@ export function AdaptiveDefenseConsole() {
   const [totalPolicies, setTotalPolicies] = useState<number | null>(null);
   const [overview, setOverview] = useState<any>(null);
   const [testIdentity, setTestIdentity] = useState("");
-  const [testStep, setTestStep] = useState(0);
+  const [testStep, setTestStep] = useState(1);
   const [matchResult, setMatchResult] = useState<any>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -595,7 +595,7 @@ export function AdaptiveDefenseConsole() {
         <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 10px" }}>Enter a policy scope value and the record position to check activation and expiry. The matcher does not create or alter policies.</p>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input type="text" value={testIdentity} onChange={event => setTestIdentity(event.target.value)} placeholder="SOURCE_IP scope value from policies.csv" style={{ flex: "1 1 220px", minWidth: 0, padding: "8px 10px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", fontSize: 11, fontFamily: "monospace" }} />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--muted)" }}>Record step <input type="number" min="0" value={testStep} onChange={event => setTestStep(Math.max(0, Number.parseInt(event.target.value, 10) || 0))} style={{ width: 86, padding: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)" }}/></label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--muted)" }}>Record step <input type="number" min="1" value={testStep} onChange={event => setTestStep(Math.max(1, Number.parseInt(event.target.value, 10) || 1))} style={{ width: 86, padding: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)" }}/></label>
           <button className="primary-btn" onClick={testFilter} disabled={isTesting}>{isTesting ? "Checking…" : "Test matcher"}</button>
         </div>
         {matchResult && <div role={matchResult.error ? "alert" : "status"} style={{ marginTop: 10, fontSize: 11, padding: 10, borderRadius: 6, background: matchResult.error ? "#35221f" : matchResult.matched ? "#351f25" : "#112a27", color: matchResult.error ? "#ffb4a4" : matchResult.matched ? "#ff9ba7" : "#9de6c6" }}>
