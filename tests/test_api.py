@@ -9,7 +9,12 @@ class ReadyPipeline:
             def predict(self, flow):
                 from cybersentinel.contracts import ThreatDetectionResult
                 return ThreatDetectionResult(predicted_class="BENIGN", confidence=0.99)
+        class ModelStub:
+            feature_columns = ["Flow Duration", "Destination Port"]
+            metadata = {"confidence_calibrated": False}
+
         class AnomalyStub:
+            feature_columns = ["Flow Duration", "Destination Port"]
             def score(self, flow):
                 from cybersentinel.contracts import AnomalyDetectionResult
                 return AnomalyDetectionResult(anomaly_score=0.01, is_anomaly=False)
@@ -19,6 +24,7 @@ class ReadyPipeline:
                 return FusionResult(final_class="BENIGN", evidence_status="AGREE", action="ALLOW", rationale=["Stub"])
 
         self.threat_agent = ThreatStub()
+        self.threat_agent.model = ModelStub()
         self.anomaly_agent = AnomalyStub()
         self.fusion_agent = FusionStub()
 
@@ -79,8 +85,12 @@ def test_batch_endpoint_returns_aggregated_actions(monkeypatch):
 def test_replay_simulate_endpoint(monkeypatch):
     monkeypatch.setattr(index, "_pipeline", ReadyPipeline())
     flows = [
-        {"record_id": 1, "source_ip": "10.0.0.1", "Destination Port": 443},
-        {"record_id": 2, "source_ip": "10.0.0.1", "Destination Port": 443},
+        {"record_id": 1, "seq": 1, "day": "2017-07-04", "time_offset": "00:00.0",
+         "source_ip": "10.0.0.1", "destination_ip": "10.0.0.2", "source_port": 50000,
+         "destination_port": 443, "protocol": 6, "Destination Port": 443, "Flow Duration": 1000},
+        {"record_id": 2, "seq": 2, "day": "2017-07-04", "time_offset": "00:01.0",
+         "source_ip": "10.0.0.1", "destination_ip": "10.0.0.2", "source_port": 50001,
+         "destination_port": 443, "protocol": 6, "Destination Port": 443, "Flow Duration": 1200},
     ]
     response = TestClient(index.app).post("/api/replay/simulate", json={"flows": flows})
     assert response.status_code == 200
