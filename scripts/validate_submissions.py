@@ -11,8 +11,8 @@ import pandas as pd
 CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE = {"AGREE", "DISAGREE", "INCOMPLETE"}
 CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
-POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]
-REPLAY_COLUMNS = ["record_id", "action", "active_policy_id"]
+POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]
+REPLAY_COLUMNS = ["record_id", "action", "applied_policy_id"]
 SCOPES = {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}
 
 def _read(path: Path, expected: list[str]) -> pd.DataFrame:
@@ -54,7 +54,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
             errors.append("Input seq must be the exact 1-based organizer replay order.")
 
     classification = _read(output_dir / "classification.csv", CLASS_COLUMNS)
-    policies = _read(output_dir / "policies.csv", POLICY_COLUMNS)
+    policies = _read(output_dir / "policy.csv", POLICY_COLUMNS)
     replay = _read(output_dir / "replay.csv", REPLAY_COLUMNS)
 
     for name, frame in (("classification.csv", classification), ("replay.csv", replay)):
@@ -71,12 +71,14 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
 
     policy_ids = policies["policy_id"].tolist()
     if any(not x for x in policy_ids) or len(policy_ids) != len(set(policy_ids)):
-        errors.append("policies.csv policy IDs must be non-empty and unique.")
+        errors.append("policy.csv policy IDs must be non-empty and unique.")
     policy_map = {row["policy_id"]: row for _, row in policies.iterrows()}
     for _, row in policies.iterrows():
         pid, scope_type, scope_value = row["policy_id"], row["scope_type"], row["scope_value"]
         if scope_type not in SCOPES:
             errors.append(f"Policy {pid}: unsupported scope_type {scope_type!r}.")
+        if row["policy_action"] != "BLOCK":
+            errors.append("Policy " + pid + ": policy_action must be BLOCK.")
         if scope_type in {"SOURCE_IP", "DESTINATION_IP"} and not _ip(scope_value):
             errors.append(f"Policy {pid}: {scope_type} scope_value must be a literal IP.")
         if scope_type == "SRC_DST_PAIR":
@@ -92,9 +94,9 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
     if replay["action"].isin(["ALLOW", "BLOCK"]).eq(False).any():
         errors.append("replay.csv contains an action other than ALLOW or BLOCK.")
     for _, row in replay.iterrows():
-        rid, action, active_id = row["record_id"], row["action"], row["active_policy_id"]
+        rid, action, active_id = row["record_id"], row["action"], row["applied_policy_id"]
         if action == "ALLOW" and active_id:
-            errors.append(f"Record {rid}: ALLOW must have an empty active_policy_id.")
+            errors.append(f"Record {rid}: ALLOW must have an empty applied_policy_id.")
         elif action == "BLOCK":
             policy = policy_map.get(active_id)
             if not active_id or policy is None:
@@ -123,7 +125,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="Organiser hidden replay input CSV or Parquet")
-    parser.add_argument("--output-dir", type=Path, required=True, help="Directory containing classification.csv, policies.csv and replay.csv")
+    parser.add_argument("--output-dir", type=Path, required=True, help="Directory containing classification.csv, policy.csv and replay.csv")
     args = parser.parse_args()
     errors = validate(args.input, args.output_dir)
     if errors:
