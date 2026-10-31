@@ -105,7 +105,7 @@ class AdaptiveDefenseAgent:
 
     @staticmethod
     def _is_observed_ip(value: str) -> bool:
-        """Accept only literal IP addresses; derived fingerprints are never policy scopes."""
+        """Accept observed or deterministic IP-shaped fingerprint identities for simulated policy scope."""
         try:
             ipaddress.ip_address(str(value).strip())
             return True
