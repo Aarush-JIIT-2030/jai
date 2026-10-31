@@ -59,7 +59,7 @@ class ReplayEngine:
         if len(threat_preds) != total_rows or len(anomaly_results) != total_rows:
             raise RuntimeError("Agent 1/2 batch output length does not match replay input.")
 
-        dports = df["Destination Port"].fillna(0).astype(int).tolist() if "Destination Port" in df.columns else [0] * total_rows
+        dports = pd.to_numeric(df["Destination Port"], errors="coerce").fillna(0).where(lambda values: values.mod(1).eq(0), 0).clip(0, 65535).astype(int).tolist() if "Destination Port" in df.columns else [0] * total_rows
         src_col = next((c for c in ("source_ip", "Source IP", "Source_IP", "src_ip", "src") if c in df.columns), None)
         flow_records = df.to_dict(orient="records")
         native_src = [str(row.get(src_col, "")).strip() if src_col and pd.notna(row.get(src_col)) else "" for row in flow_records]
