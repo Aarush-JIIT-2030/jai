@@ -27,6 +27,10 @@ def _read_report(name: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail={"code": "REPORT_INVALID", "message": f"Could not read {name}.json: {type(exc).__name__}"}) from exc
     if not isinstance(payload, dict):
         raise HTTPException(status_code=500, detail={"code": "REPORT_INVALID", "message": f"{name}.json must contain a JSON object."})
+    # The report writer stores provenance beside the result under `data`.
+    # Flatten the public response while retaining provenance for the UI.
+    if isinstance(payload.get("data"), dict):
+        return {**payload["data"], "report_name": payload.get("report_name", name), "metadata": payload.get("metadata", {})}
     return payload
 
 
