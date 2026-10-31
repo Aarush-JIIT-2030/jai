@@ -10,6 +10,17 @@ Historical scores and throughput figures describe earlier artifacts. Treat them 
 
 ## Reproduction procedure
 
+If the organisers provide a separate labelled validation file, prepare it with the exact training-fitted preprocessing state before using either calibration workflow:
+
+~~~bash
+python scripts/prepare_validation.py \
+  --input data/raw/validation/flows.parquet \
+  --preprocessor-state data/processed/preprocessing_state.json \
+  --output data/processed/labelled_validation_prepared.parquet
+~~~
+
+This reuses training medians, feature selection, and feature order. It rejects schema drift and excludes record IDs from the ML matrix. Keep the original replay metadata/input separately for endpoint correlation and policy validation.
+
 1. Obtain the organizer-provided training and labelled validation files, the exact organizer class mapping, and the hidden replay input/API contract.
 2. Run cleaning/preparation on the permitted labelled training and validation files. Fit feature selection and imputation on training data only. Keep replay metadata (organizer record IDs, endpoints and timestamps, if supplied) separate from the ML feature matrix.
 3. Train Agent 1 on training data. Use a separate labelled validation split for temperature calibration; never calibrate on hidden replay records.
