@@ -21,6 +21,12 @@ python -m cybersentinel.data.cleaning \
   --eval data/raw/eval/flows.parquet \
   --out-dir data/processed
 
+python -m cybersentinel.agents.threat_detection.train \
+  --train data/processed/training_prepared.parquet \
+  --label-column label \
+  --model-out models/threat_detection/model.joblib \
+  --report-out reports/generated/threat_detection_training.json
+
 python scripts/train_anomaly.py \
   --train data/processed/training_prepared.parquet \
   --model-out models/anomaly_detection/model.joblib

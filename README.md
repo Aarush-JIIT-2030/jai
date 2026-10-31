@@ -25,7 +25,7 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                    ▼                                     ▼
         ┌───────────────────────┐             ┌─────────────────────┐
         │  Agent 1: Threat Det  │             │ Agent 2: Anomaly Det│
-        │ (Random Forest, 400 estimators by default)│             │ (Isolation Forest)  │
+        │ (Random Forest)      │             │ (Isolation Forest)  │
         └──────────┬────────────┘             └──────────┬──────────┘
                    │                                     │
                    └──────────────────┬──────────────────┘
@@ -128,9 +128,9 @@ pip install -e ".[dev,ml]"
 python scripts/reproduce_benchmarks.py
 ```
 
-### 3. Generate Official Submission Files
+### 3. Generate Local Replay Files
 ```bash
-# Runs causal replay and generates classification.csv, policy.csv, replay.csv
+# Generates local replay CSVs when data and models are available
 python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
 ```
 
