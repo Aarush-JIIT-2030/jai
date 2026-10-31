@@ -9,7 +9,7 @@ interface NodeData {
   name: string;
   role: string;
   category: "agent" | "core" | "ingress" | "target";
-  status: "ACTIVE" | "MONITORING" | "ENFORCING" | "QUARANTINED";
+  status: string;
   latency: string;
   flows: string;
   color: number;
@@ -84,7 +84,7 @@ const NODES_METADATA: Record<string, NodeData> = {
     role: "Simulated Quarantine Policy Synthesizer",
     category: "agent",
     status: "SIMULATED ONLY",
-    latency: "Measured per replay",
+    latency: "Not independently measured",
     flows: "Temporary simulated policies",
     color: 0xf43f5e, // Rose / Red
     description: "Synthesizes temporary simulated firewall rules (POL-XXXXX) for malicious source endpoints with exact expiration TTLs. Operates strictly in memory.",
