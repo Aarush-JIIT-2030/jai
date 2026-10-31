@@ -711,47 +711,65 @@ def get_policies(limit: int = 50, offset: int = 0):
 
 @app.post("/api/policies/test")
 def test_policy_prefilter(payload: dict[str, Any]):
-    """Test real policy pre-filter matching against an IP and sequence record index."""
+    """Test a policy against organizer record positions, not numeric record-ID arithmetic."""
     source_ip = str(payload.get("source_ip", "")).strip()
-    current_step = int(payload.get("current_step", 100))
+    current_step = payload.get("current_step", 1)
+    try:
+        current_step = int(current_step)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="current_step must be a 1-based organizer seq value.")
+    if not source_ip or current_step < 1:
+        raise HTTPException(status_code=422, detail="Provide a source_ip and a positive 1-based current_step.")
 
-    if not source_ip:
-        raise HTTPException(status_code=422, detail="Provide a non-empty source_ip string.")
+    candidates = (
+        BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet",
+        BASE_DIR / "data" / "processed" / "hidden_replay_input.csv",
+    )
+    input_file = next((path for path in candidates if path.is_file()), None)
+    if input_file is None:
+        raise HTTPException(status_code=503, detail={
+            "code": "REPLAY_INPUT_NOT_AVAILABLE",
+            "message": "Install the organizer replay input to test policy activation by seq.",
+        })
+    try:
+        source = pd.read_parquet(input_file) if input_file.suffix == ".parquet" else pd.read_csv(input_file)
+        if not {"record_id", "seq"}.issubset(source.columns):
+            raise ValueError("Replay input must contain record_id and seq.")
+        positions = dict(zip(source["record_id"].astype(str), pd.to_numeric(source["seq"], errors="raise").astype(int)))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail={"code": "REPLAY_INPUT_INVALID", "type": type(exc).__name__}) from exc
 
     pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
     matched_policy = None
     if pol_file.is_file():
         try:
-            pol_df = pd.read_csv(pol_file)
+            pol_df = pd.read_csv(pol_file, dtype=str, keep_default_na=False)
             matching = pol_df[
+                (pol_df["scope_type"] == "SOURCE_IP") &
                 (pol_df["scope_value"] == source_ip) &
-                (pol_df["activated_after_record_id"] < current_step) &
-                (pol_df["expires_after_record_id"] >= current_step)
+                (pol_df["activated_after_record_id"].map(positions) < current_step) &
+                (pol_df["expires_after_record_id"].map(positions) >= current_step)
             ]
             if not matching.empty:
-                matched_policy = matching.iloc[0].to_dict()
-        except Exception:
-            pass
+                matched_policy = matching.sort_values("policy_id").iloc[0].to_dict()
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail={"code": "POLICY_FILE_INVALID", "type": type(exc).__name__}) from exc
 
     if matched_policy:
         return {
-            "matched": True,
-            "action": "BLOCK",
-            "policy_id": matched_policy["policy_id"],
+            "matched": True, "action": "BLOCK", "policy_id": matched_policy["policy_id"],
             "scope_value": matched_policy["scope_value"],
             "activated_after": matched_policy["activated_after_record_id"],
             "expires_after": matched_policy["expires_after_record_id"],
             "status": "ACTIVE_POLICY_MATCH",
-            "message": f"Pre-filter rule {matched_policy['policy_id']} drops flow from {source_ip} (active from record {matched_policy['activated_after_record_id']} to {matched_policy['expires_after_record_id']}).",
+            "message": f"Pre-filter rule {matched_policy['policy_id']} matches source IP {source_ip} at seq {current_step}.",
         }
-
     return {
-        "matched": False,
-        "action": "ALLOW",
-        "policy_id": "",
+        "matched": False, "action": "ALLOW", "policy_id": "",
         "status": "NO_MATCHING_POLICY",
-        "message": f"No active policy matches source IP {source_ip} at sequence step {current_step}. Flow is allowed through to 5-agent detection pipeline.",
+        "message": f"No active policy matches source IP {source_ip} at seq {current_step}.",
     }
+
 
 
 @app.get("/api/correlation/groups")
