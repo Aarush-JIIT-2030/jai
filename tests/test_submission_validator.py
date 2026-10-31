@@ -153,7 +153,7 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
     ], columns=["record_id", "predicted_class", "anomaly score", "evidence status"]).to_csv(sub_dir / "classification.csv", index=False)
     pd.DataFrame([
         ["POL-00001", "rec-1", "SOURCE_IP", "192.0.2.10", "rec-2", "BLOCK"],
-    ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]).to_csv(sub_dir / "policy.csv", index=False)
+    ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]).to_csv(sub_dir / "policy.csv", index=False)
     pd.DataFrame([
         ["rec-1", "ALLOW", ""],
         ["rec-2", "BLOCK", "POL-00001"],
@@ -182,7 +182,7 @@ def test_independent_official_csv_validator_rejects_fingerprint_derived_source_s
     ], columns=["record_id", "predicted_class", "anomaly score", "evidence status"]).to_csv(tmp_path / "classification.csv", index=False)
     pd.DataFrame([
         ["POL-00001", 201, "SOURCE_IP", "10.1.2.3", 202, "BLOCK"],
-    ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]).to_csv(tmp_path / "policy.csv", index=False)
+    ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]).to_csv(tmp_path / "policy.csv", index=False)
     pd.DataFrame([
         [201, "ALLOW", ""], [202, "BLOCK", "POL-00001"],
     ], columns=["record_id", "action", "active_policy_id"]).to_csv(tmp_path / "replay.csv", index=False)
