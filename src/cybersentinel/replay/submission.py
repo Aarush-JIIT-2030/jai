@@ -2,7 +2,7 @@
 
 Produces and verifies the three required competition files:
 1. classification.csv
-2. policies.csv
+2. policy.csv
 3. replay.csv
 """
 from __future__ import annotations
@@ -40,7 +40,7 @@ class SubmissionValidator:
 
         with file_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            required_headers = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
+            required_headers = ["record_id", "predicted_class", "anomaly score", "evidence status"]
             if reader.fieldnames != required_headers:
                 issues.append(f"Header mismatch. Expected {required_headers}, found {reader.fieldnames}")
 
@@ -48,8 +48,8 @@ class SubmissionValidator:
                 row_count += 1
                 rec_id = row.get("record_id")
                 pred = row.get("predicted_class")
-                score_str = row.get("anomaly_score") if "anomaly_score" in row else row.get("anomaly_score")
-                ev_status = row.get("evidence_status") if "evidence_status" in row else row.get("evidence_status")
+                score_str = row.get("anomaly score")
+                ev_status = row.get("evidence status")
 
                 if rec_id in seen_records:
                     issues.append(f"Row {idx}: Duplicate record_id '{rec_id}'")
@@ -92,7 +92,7 @@ class SubmissionValidator:
             reader = csv.DictReader(f)
             required_cols = [
                 "policy_id", "activated_after_record_id", "scope_type",
-                "scope_value", "expires_after_record_id"
+                "scope_value", "expires_after_record_id", "policy_action"
             ]
             if reader.fieldnames != required_cols:
                 issues.append(f"Header mismatch. Expected {required_cols}, found {reader.fieldnames}")
@@ -101,7 +101,12 @@ class SubmissionValidator:
                 row_count += 1
                 pol_id = row.get("policy_id")
                 scope_type = row.get("scope_type")
+                policy_action = row.get("policy_action")
 
+                if not pol_id:
+                    issues.append(f"Row {idx}: policy_id must be non-empty.")
+                if policy_action != "BLOCK":
+                    issues.append(f"Row {idx}: policy_action must be BLOCK.")
                 if pol_id in policies:
                     issues.append(f"Row {idx}: Duplicate policy_id '{pol_id}'")
                 policies[pol_id] = row
@@ -168,7 +173,7 @@ class SubmissionValidator:
                 if action == "ALLOW":
                     allow_count += 1
                     if applied_pol != "":
-                        issues.append(f"Row {idx}: ALLOW action must use active_policy_id=NONE, got '{applied_pol}'")
+                        issues.append(f"Row {idx}: ALLOW action must have an empty active_policy_id, got '{applied_pol}'")
                 elif action == "BLOCK":
                     block_count += 1
                     if not applied_pol:
@@ -198,7 +203,7 @@ class SubmissionValidator:
     ) -> dict[str, Any]:
         """Validate exact templates, endpoint scope, causal windows and policy tie-breaks."""
         class_res = cls.validate_classification(output_dir / "classification.csv", expected_records)
-        policy_res = cls.validate_policy(output_dir / "policies.csv")
+        policy_res = cls.validate_policy(output_dir / "policy.csv")
         replay_res = cls.validate_replay(output_dir / "replay.csv", expected_records, policy_res.get("policies", {}))
         expected = [str(value) for value in expected_records]
         positions = {record_id: index for index, record_id in enumerate(expected)}
@@ -283,7 +288,7 @@ class SubmissionValidator:
                 if action == "ALLOW":
                     if active_id != "":
                         replay_res["valid"] = False
-                        replay_res["errors"].append(f"Record {rid}: ALLOW must use active_policy_id=NONE.")
+                        replay_res["errors"].append(f"Record {rid}: ALLOW must have an empty active_policy_id.")
                         replay_res["total_errors"] += 1
                     if source_frame is not None and matches:
                         replay_res["valid"] = False
