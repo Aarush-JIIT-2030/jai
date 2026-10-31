@@ -597,7 +597,7 @@ export function Agent2Console({ ready }: { ready: boolean }) {
           ) : (
             <div className="empty-inline">No out-of-range feature evidence was returned for this flow.</div>
           )}
-          <small className="muted">The anomaly score is interpreted against Agent 2's learned decision threshold; it is not a calibrated probability.</small>
+          <small className="muted">The 0–1 anomaly index is higher for more anomalous traffic; it is a bounded score, not a probability. Agent 2 applies its learned threshold to the underlying Isolation Forest decision function.</small>
         </div>
       )}
     </section>
