@@ -92,45 +92,46 @@ class ReplayEngine:
         if hasattr(self.threat_agent, "predict_many"):
             threat_preds = self.threat_agent.predict_many(df)
         else:
-            threat_preds = []
-            for _, r in df.iterrows():
-                res = self.threat_agent.predict(r.to_dict())
-                threat_preds.append({
-                    "predicted_class": _extract_field(res, "predicted_class", "BENIGN"),
-                    "confidence": _extract_field(res, "confidence", 0.99),
-                })
+            threat_preds = [self.threat_agent.predict(r.to_dict()) for _, r in df.iterrows()]
 
         if hasattr(self.anomaly_agent, "score_frame"):
             anomaly_results = self.anomaly_agent.score_frame(df)
-            anomaly_scores = [r.anomaly_score if r.anomaly_score is not None else 0.0 for r in anomaly_results]
-            is_anomalies = [bool(r.is_anomaly) for r in anomaly_results]
         else:
-            anomaly_scores = []
-            is_anomalies = []
-            for _, r in df.iterrows():
-                res = self.anomaly_agent.score(r.to_dict())
-                anomaly_scores.append(_extract_field(res, "anomaly_score", 0.0))
-                is_anomalies.append(_extract_field(res, "is_anomaly", False))
+            anomaly_results = [self.anomaly_agent.score(r.to_dict()) for _, r in df.iterrows()]
+
+        # Preserve missing/error states. Never manufacture BENIGN/0.99 or normal/0.0
+        # predictions: fusion must see invalid outputs and return REVIEW.
+        if len(threat_preds) != total_rows or len(anomaly_results) != total_rows:
+            raise RuntimeError("Agent 1/2 batch output length does not match replay input.")
+
 
         # Extract endpoints fast
         dports = df["Destination Port"].fillna(0).astype(int).tolist() if "Destination Port" in df.columns else [0] * total_rows
 
         src_ip_col = next(
-            (column for column in ("source_ip", "Source IP", "src_ip", "src") if column in df.columns),
+            (column for column in ("source_ip", "Source IP", "Source_IP", "src_ip", "src") if column in df.columns),
             None,
         )
-        if src_ip_col:
-            src_ips = [
-                str(value).strip() if pd.notna(value) and str(value).strip() else ""
-                for value in df[src_ip_col].tolist()
-            ]
-        else:
-            # Use the same deterministic TCP-stack identity derivation as the
-            # standalone correlation API. No port/duration-derived pseudo-hosts.
-            src_ips = [
-                TemporalCorrelationAgent.derive_source_identity(flow)
-                for flow in df.to_dict(orient="records")
-            ]
+        flow_records = df.to_dict(orient="records")
+        # Only observed source IPs may become SOURCE_IP defense scopes.
+        # Fingerprint-derived identities remain correlation-only and can never block.
+        native_src_ips = [
+            str(flow.get(src_ip_col, "")).strip()
+            if src_ip_col and pd.notna(flow.get(src_ip_col)) else ""
+            for flow in flow_records
+        ]
+        correlation_src_keys = [
+            native_src_ips[i] or TemporalCorrelationAgent.derive_source_identity(flow)
+            for i, flow in enumerate(flow_records)
+        ]
+        dst_ip_col = next(
+            (column for column in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP") if column in df.columns),
+            None,
+        )
+        timestamp_col = next(
+            (column for column in ("Timestamp", "timestamp", "Flow Start", "flow_start", "start_time") if column in df.columns),
+            None,
+        )
 
         classification_rows: list[dict[str, Any]] = []
         replay_rows: list[dict[str, Any]] = []
@@ -144,34 +145,42 @@ class ReplayEngine:
         # 2. Sequential Causal Policy & Defense Loop
         for step in range(total_rows):
             record_id = record_ids[step]
-            src_ip = src_ips[step]
+            native_src_ip = native_src_ips[step]
+            correlation_src = correlation_src_keys[step]
             dport = dports[step]
             ground_truth = labels[step]
 
             t_pred = threat_preds[step]
-            t_class = t_pred.get("predicted_class", "BENIGN")
-            t_conf = t_pred.get("confidence", 0.0)
-            a_score = float(anomaly_scores[step])
-            a_flag = bool(is_anomalies[step])
+            t_class = _extract_field(t_pred, "predicted_class")
+            t_conf = _extract_field(t_pred, "confidence")
+            t_status = _extract_field(t_pred, "status", "success")
+            a_result = anomaly_results[step]
+            a_score = _extract_field(a_result, "anomaly_score")
+            a_flag = _extract_field(a_result, "is_anomaly")
+            a_status = _extract_field(a_result, "status", "success")
 
-            threat_obj = ThreatDetectionResult(predicted_class=t_class, confidence=t_conf)
-            anomaly_obj = AnomalyDetectionResult(anomaly_score=a_score, is_anomaly=a_flag)
+            threat_obj = ThreatDetectionResult(
+                predicted_class=t_class, confidence=t_conf, status=t_status
+            )
+            anomaly_obj = AnomalyDetectionResult(
+                anomaly_score=a_score, is_anomaly=a_flag,
+                evidence=_extract_field(a_result, "evidence", []) or [],
+                status=a_status,
+            )
             fusion = self.fusion_agent.fuse(threat_obj, anomaly_obj)
 
             # Record classification prediction for classification.csv (applies to ALL records)
             classification_rows.append({
                 "record_id": record_id,
-                "predicted_class": fusion.final_class or t_class or "BENIGN",
-                "anomaly score": round(a_score, 5),
-                "anomaly_score": round(a_score, 5),
+                "predicted_class": fusion.final_class or (t_class if t_class else ""),
+                "anomaly score": round(float(a_score), 5) if isinstance(a_score, (int, float)) else "",
                 "evidence status": fusion.evidence_status,
-                "evidence_status": fusion.evidence_status,
             })
 
             # Check pre-filter against active policies
             pre_filter = self.defense_agent.evaluate_pre_filter(
                 record_id=record_id,
-                source_ip=src_ip,
+                source_ip=native_src_ip,
                 current_step=step,
             )
 
@@ -195,9 +204,13 @@ class ReplayEngine:
 
                 # Correlate flow in temporal sliding window
                 flow_summary = {
-                    "source_ip": src_ip,
+                    "source_ip": correlation_src,
                     "Destination Port": dport,
                 }
+                if dst_ip_col and pd.notna(flow_records[step].get(dst_ip_col)):
+                    flow_summary["destination_ip"] = str(flow_records[step][dst_ip_col]).strip()
+                if timestamp_col and pd.notna(flow_records[step].get(timestamp_col)):
+                    flow_summary["Timestamp"] = flow_records[step][timestamp_col]
                 correlation = self.correlation_agent.correlate(
                     record_id=record_id,
                     flow=flow_summary,
@@ -214,7 +227,7 @@ class ReplayEngine:
                 detected_type = correlation.attack_type or t_class or "ATTACK"
                 self.defense_agent.handle_post_analysis(
                     record_id=record_id,
-                    source_ip=src_ip,
+                    source_ip=native_src_ip,
                     current_step=step,
                     attack_detected=is_attack,
                     attack_type=detected_type,
@@ -233,17 +246,21 @@ class ReplayEngine:
         elapsed = time.perf_counter() - start_time
         all_policies = self.defense_agent.all_policies
 
-        policy_rows = [
-            {
+        # Defense internals track expiry by zero-based replay position. The
+        # organizer CSV contract requires the corresponding organizer record ID.
+        policy_rows = []
+        for p in all_policies:
+            expiry_step = int(p.expires_after_record_id)
+            expiry_position = min(max(expiry_step, 0), max(total_rows - 1, 0))
+            expiry_record_id = record_ids[expiry_position] if total_rows else p.expires_after_record_id
+            policy_rows.append({
                 "policy_id": p.policy_id,
                 "activated_after_record_id": p.activated_after_record_id,
                 "scope_type": p.scope_type,
                 "scope_value": p.scope_value,
-                "expires_after_record_id": p.expires_after_record_id,
+                "expires_after_record_id": expiry_record_id,
                 "policy_action": p.policy_action,
-            }
-            for p in all_policies
-        ]
+            })
 
         attack_count = sum(label != "BENIGN" for label in labels) if has_label else None
         benign_count = sum(label == "BENIGN" for label in labels) if has_label else None
@@ -279,7 +296,7 @@ class ReplayEngine:
     def export_csv(rows: list[dict[str, Any]], fieldnames: list[str]) -> str:
         """Serialize rows to CSV string with specified fieldnames."""
         output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n", extrasaction="ignore")
+        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
         return output.getvalue()

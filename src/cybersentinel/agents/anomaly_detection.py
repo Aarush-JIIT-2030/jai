@@ -105,15 +105,77 @@ class AnomalyDetectionAgent:
             "feature_count": len(self.feature_columns),
             "feature_columns": self.feature_columns,
             "threshold_method": "1st percentile of benign training decision_function scores",
+            "score_definition": "raw sklearn IsolationForest.decision_function; larger is more normal, lower is more anomalous",
+            "score_is_probability": False,
             "training_scope": "benign rows from training partition only",
         }
         return self
+
+    def calibrate_threshold(
+        self,
+        validation_features: pd.DataFrame,
+        validation_labels,
+        max_benign_fpr: float = 0.02,
+    ) -> dict[str, float]:
+        """Select an anomaly threshold on a separate labelled validation partition.
+
+        Labels are used only to tune/evaluate this threshold; they are never used
+        by score()/score_frame() or by replay decisions for an individual record.
+        """
+        if self.estimator is None or self.imputer is None:
+            raise RuntimeError("Fit or load the anomaly detector before threshold calibration.")
+        if not 0.0 <= max_benign_fpr <= 1.0:
+            raise ValueError("max_benign_fpr must be between 0 and 1.")
+        labels = pd.Series(validation_labels).astype("string").str.strip().str.upper()
+        if len(labels) != len(validation_features):
+            raise ValueError("Validation features and labels must have equal lengths.")
+        if labels.isna().any() or (labels == "").any():
+            raise ValueError("Validation labels contain missing or empty values.")
+        truth = (labels != "BENIGN").to_numpy(dtype=bool)
+        benign_count = int((~truth).sum())
+        attack_count = int(truth.sum())
+        if benign_count == 0 or attack_count == 0:
+            raise ValueError("Threshold calibration requires both BENIGN and attack validation rows.")
+
+        raw = _numeric_frame(validation_features).reindex(columns=self.feature_columns)
+        scores = np.asarray(self.estimator.decision_function(self.imputer.transform(raw)), dtype=float)
+        if len(scores) != len(truth) or not np.isfinite(scores).all():
+            raise ValueError("Validation scores are missing or non-finite.")
+
+        candidates = np.unique(np.concatenate((scores, [np.nextafter(float(scores.max()), np.inf)])))
+        best = None
+        for candidate in candidates:
+            flagged = scores < float(candidate)
+            false_positive_rate = float((flagged & ~truth).sum() / benign_count)
+            recall = float((flagged & truth).sum() / attack_count)
+            if false_positive_rate <= max_benign_fpr:
+                rank = (recall, -false_positive_rate, float(candidate))
+                if best is None or rank > best[0]:
+                    best = (rank, float(candidate), false_positive_rate, recall)
+        if best is None:
+            raise RuntimeError("No validation threshold satisfies the configured benign false-positive limit.")
+
+        _, self.threshold, fpr, recall = best
+        self.metadata.update({
+            "threshold_method": "validation-selected maximum attack recall subject to benign FPR constraint",
+            "threshold_validation_rows": int(len(labels)),
+            "threshold_validation_benign_rows": benign_count,
+            "threshold_validation_attack_rows": attack_count,
+            "threshold_max_benign_fpr": float(max_benign_fpr),
+            "threshold_validation_benign_fpr": fpr,
+            "threshold_validation_attack_recall": recall,
+            "threshold_selection_uses_labels": True,
+            "labels_used_during_scoring": False,
+        })
+        return {"threshold": float(self.threshold), "benign_false_positive_rate": fpr,
+                "attack_recall": recall, "validation_rows": float(len(labels))}
 
     def _aligned(self, flow: dict[str, Any]) -> pd.DataFrame:
         raw = _numeric_frame(pd.DataFrame([flow]))
         return raw.reindex(columns=self.feature_columns)
 
-    def _evidence(self, flow: dict[str, Any]) -> list[str]:
+    def _evidence(self, flow: dict[str, Any]) -> list[dict[str, Any]]:
+        """Return inspectable deviations; these are indicators, not proof of attack."""
         deviations = []
         for col, profile in self.profiles.items():
             if col not in flow:
@@ -126,14 +188,23 @@ class AnomalyDetectionAgent:
                 continue
             if value < profile["q01"] or value > profile["q99"]:
                 strength = abs(value - profile["median"]) / profile["iqr"]
-                deviations.append((col, strength))
-        deviations.sort(key=lambda item: item[1], reverse=True)
-        result = []
-        for col, _ in deviations[:5]:
-            result.append(FEATURE_EVIDENCE_MAP.get(
-                col, "unusual_" + col.casefold().replace(" ", "_").replace("/", "_per_")
-            ))
-        return result
+                deviations.append((col, value, strength, profile))
+        deviations.sort(key=lambda item: item[2], reverse=True)
+        return [
+            {
+                "feature": col,
+                "evidence_code": FEATURE_EVIDENCE_MAP.get(
+                    col, "unusual_" + col.casefold().replace(" ", "_").replace("/", "_per_")
+                ),
+                "observed_value": float(value),
+                "baseline_q01": float(profile["q01"]),
+                "baseline_median": float(profile["median"]),
+                "baseline_q99": float(profile["q99"]),
+                "deviation_strength_iqr": float(strength),
+                "interpretation": "statistical deviation from benign training baseline; not proof of malicious activity",
+            }
+            for col, value, strength, profile in deviations[:5]
+        ]
 
     def score(self, flow: dict[str, Any]) -> AnomalyDetectionResult:
         if self.estimator is None or self.imputer is None or self.threshold is None:
