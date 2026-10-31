@@ -48,7 +48,7 @@ def _timestamp_series(frame: pd.DataFrame) -> pd.Series | None:
         return None
     dates = pd.to_datetime(frame["day"], utc=True, errors="coerce")
     parts = frame["time_offset"].astype(str).str.extract(
-        r"^(?P<minutes>\\d+):(?P<seconds>\\d{1,2}(?:\\.\\d+)?)$"
+        r"^(?P<minutes>\d+):(?P<seconds>\d{1,2}(?:\.\d+)?)$"
     )
     seconds = (
         pd.to_numeric(parts["minutes"], errors="coerce") * 60
