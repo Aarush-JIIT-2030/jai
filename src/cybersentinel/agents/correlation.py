@@ -122,7 +122,7 @@ class TemporalCorrelationAgent:
             return CorrelationResult(
                 correlated=False,
                 status="not_ready",
-                message="No native source IP or complete TCP-stack fingerprint is available for endpoint correlation.",
+                message="No valid literal source IP is available for endpoint correlation.",
             )
 
         # Prefer an elapsed-time window when timestamps are present; retain a hard
