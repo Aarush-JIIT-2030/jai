@@ -167,7 +167,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
 
         if action == "ALLOW":
             if active_policy_id != ALLOW_SENTINEL:
-                errors.append(f"Record {record_id}: ALLOW must have an empty active_policy_id.")
+                errors.append(f"Record {record_id}: ALLOW must use active_policy_id=NONE.")
             if matches:
                 errors.append(f"Record {record_id}: ALLOW is invalid because active policy {expected_policy} matches this flow.")
         elif action == "BLOCK":
