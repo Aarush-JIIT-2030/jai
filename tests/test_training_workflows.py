@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from pathlib import Path
 
 from cybersentinel.agents.threat_detection.train import train_from_csv
 from scripts.train_anomaly import train_anomaly
