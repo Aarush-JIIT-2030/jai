@@ -254,7 +254,7 @@ export function FiveAgentArchitectureView() {
 export function EvidenceFusionStudio() {
   const [threatClass, setThreatClass] = useState("PORT_SCAN");
   const [confidence, setConfidence] = useState(0.88);
-  const [anomalyScore, setAnomalyScore] = useState(-0.18);
+  const [anomalyScore, setAnomalyScore] = useState(0.75);
   const [isAnomaly, setIsAnomaly] = useState(true);
   const [result, setResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -308,9 +308,9 @@ export function EvidenceFusionStudio() {
           </div>
           <input aria-label="A1 confidence" type="range" min="0" max="1" step="0.01" value={confidence} onChange={e => setConfidence(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
-            <span style={{ color: "var(--muted)" }}>A2 anomaly score (raw model scale)</span><b>{anomalyScore.toFixed(3)}</b>
+            <span style={{ color: "var(--muted)" }}>A2 anomaly index (0–1; higher = more anomalous)</span><b>{anomalyScore.toFixed(3)}</b>
           </div>
-          <input aria-label="A2 anomaly score" type="range" min="-0.5" max="0.5" step="0.005" value={anomalyScore} onChange={e => setAnomalyScore(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
+          <input aria-label="A2 anomaly score" type="range" min="0" max="1" step="0.01" value={anomalyScore} onChange={e => setAnomalyScore(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
           <label style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--muted)", fontSize: 11 }}>
             <input type="checkbox" checked={isAnomaly} onChange={e => setIsAnomaly(e.target.checked)} />
             A2 independently flagged this flow as anomalous
