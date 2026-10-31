@@ -56,12 +56,12 @@ flowchart TD
 
 4. **Agent 4 (Temporal Correlation Agent):**
    - Maintains a stateful 150-flow sliding window across arrival order.
-   - Correlates isolated probes into multi-stage campaigns using observed endpoints and bounded time windows. DDoS and brute-force heuristics require matching A1 attack-class evidence; ordinary web fan-in or repeated benign SSH flows alone do not trigger those campaigns.
+   - Correlates isolated probes into multi-stage campaigns using literal observed endpoints where present. If native source IP is absent, the current fallback derives an IP-shaped synthetic identity from `Init_Win_bytes_forward`, `min_seg_size_forward`, and `Fwd Header Length`; it is not an observed address and can collide. Destination IP is never synthesized. DDoS and brute-force heuristics require matching A1 attack-class evidence; ordinary web fan-in or repeated benign SSH flows alone do not trigger those campaigns.
    - Extracts target endpoints, member records, and threat group IDs.
 
 5. **Agent 5 (Adaptive Defense Agent):**
    - Evaluates active policies before newly allowed flows are analyzed.
-   - Generates temporary `SOURCE_IP` quarantine policies with explicit activation and expiration boundaries (`expires_after_record_id`).
+   - Generates temporary `SOURCE_IP` quarantine policies with explicit activation and expiration boundaries (`expires_after_record_id`). The scope is an observed IP when available, otherwise the disclosed synthetic identity; the default 150-position lifetime is fixed.
    - Strictly enforces that the triggering flow is never self-blocked.
    - Never applies live firewall changes; all policies are simulated within the replay framework.
 
