@@ -11,6 +11,7 @@ import sys
 import pandas as pd
 
 from cybersentinel.replay import ReplayEngine
+from validate_submissions import validate as validate_submission_bundle
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("generate_submissions")
@@ -103,12 +104,34 @@ def main() -> int:
     (args.output_dir / "replay.csv").write_text(replay_csv, encoding="utf-8")
     logger.info("Wrote %s", args.output_dir / "replay.csv")
 
-    # 4. summary.json
+    # 4. Independently validate full submissions against the original input.
+    summary = dict(results["metrics"])
+    if args.limit is not None:
+        # A limited replay is useful for smoke testing, but can never be accepted
+        # as a complete submission because it intentionally omits input records.
+        validation = {"valid": False, "status": "SKIPPED_LIMITED_RUN", "errors": []}
+        logger.warning("Submission validation skipped: --limit produced an intentionally incomplete replay.")
+    else:
+        errors = validate_submission_bundle(args.input, args.output_dir)
+        validation = {"valid": not errors, "status": "PASSED" if not errors else "FAILED", "errors": errors}
+        if errors:
+            logger.error("Submission validation failed with %d issue(s).", len(errors))
+            for error in errors[:30]:
+                logger.error("- %s", error)
+    validation_file = args.output_dir / "validation_report.json"
+    validation_file.write_text(json.dumps(validation, indent=2), encoding="utf-8")
+    logger.info("Wrote %s", validation_file)
+    summary["submission_validation"] = validation
+
+    # 5. summary.json
     summary_file = args.output_dir / "summary.json"
-    summary_file.write_text(json.dumps(results["metrics"], indent=2), encoding="utf-8")
+    summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     logger.info("Wrote %s", summary_file)
 
-    logger.info("Replay completed successfully! Summary metrics: %s", results["metrics"])
+    if not validation["valid"]:
+        logger.error("Replay generated files, but the output is not submission-ready.")
+        return 2
+    logger.info("Replay and independent submission validation completed. Summary metrics: %s", summary)
     return 0
 
 
