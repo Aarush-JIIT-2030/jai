@@ -20,8 +20,8 @@ _SOURCE_KEYS = ("source_ip", "Source IP", "Source_IP", "src_ip", "src")
 _DESTINATION_KEYS = ("destination_ip", "Destination IP", "Destination_IP", "dst_ip", "dst")
 _TIMESTAMP_KEYS = ("Timestamp", "timestamp", "Flow Start", "flow_start", "start_time")
 _METADATA_NAMES = {
-    "recordid", "seq", "day", "timeoffset", "sourceip", "destinationip",
-    "sourceport", "destinationport", "protocol", "timestamp", "flowid",
+    "record_id", "seq", "day", "time_offset", "source_ip", "destination_ip",
+    "source_port", "destination_port", "protocol", "timestamp", "flow_id",
 }
 _LABEL_NAMES = {"label", "class", "groundtruth", "groundtruthlabel", "attacklabel"}
 
@@ -123,7 +123,7 @@ def validate_replay_input(
         errors.append("Replay timestamps must all parse and be non-decreasing in organizer seq order.")
 
     metadata = set(_METADATA_NAMES)
-    feature_columns = [name for name in frame.columns if _normalise(name) not in metadata and _normalise(name) not in _LABEL_NAMES]
+    feature_columns = [name for name in frame.columns if str(name).strip().casefold() not in metadata and _normalise(name) not in _LABEL_NAMES]
     numeric_features: dict[str, pd.Series] = {}
     for name in feature_columns:
         values = pd.to_numeric(frame[name], errors="coerce")
