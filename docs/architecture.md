@@ -6,19 +6,19 @@ CyberSentinel is an offline, five-agent network intrusion detection and adaptive
 
 ```mermaid
 flowchart TD
-    A[Chronological Offline Flow Stream] --> D1[Agent 1: Five-class classifier]
-    A --> D2[Agent 2: BENIGN-only anomaly detector]
-    D1 --> PF{Agent 5: Active policy check for this row}
+    A[Chronological offline flow row] --> D1[Agent 1: five-class prediction]
+    A --> D2[Agent 2: anomaly score]
+    D1 --> PF{Agent 5: check earlier active policy}
     D2 --> PF
-    PF -->|Existing policy matches| B[Record BLOCK + applied policy ID]
-    PF -->|No active policy| F3[Agent 3: Evidence fusion]
-    B --> C1[(classification.csv still records row evidence)]
-    F3 --> C1
-    F3 --> C4[Agent 4: Temporal correlation]
-    C4 --> R5[Agent 5: Create forward-only temporary policy]
-    R5 --> P[(policy.csv)]
-    B --> R[(replay.csv)]
-    F3 --> R
+    PF --> F3[Agent 3: evidence fusion for every row]
+    F3 --> CLASS[(classification.csv: every row)]
+    PF -->|Policy matches| B[Replay action BLOCK + policy ID]
+    PF -->|No policy match| C4[Agent 4: correlate allowed row]
+    C4 --> R5[Agent 5: create forward-only policy if warranted]
+    R5 --> POLICY[(policy.csv)]
+    B --> REPLAY[(replay.csv)]
+    C4 --> ALLOW[Replay action ALLOW]
+    ALLOW --> REPLAY
     R5 -.->|Only later rows can match| PF
 ```
 
