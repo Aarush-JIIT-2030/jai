@@ -57,7 +57,6 @@ class ReplayEngine:
         start_time = time.perf_counter()
         logger.info("Starting causal replay; each record is gated before its own model inference.")
         dports = pd.to_numeric(df["Destination Port"], errors="coerce").fillna(0).where(lambda values: values.mod(1).eq(0), 0).clip(0, 65535).astype(int).tolist() if "Destination Port" in df.columns else [0] * total_rows
-        src_col = next((c for c in ("source_ip", "Source IP", "Source_IP", "src_ip", "src") if c in df.columns), None)
         flow_records = df.to_dict(orient="records")
         corr_src = [TemporalCorrelationAgent.derive_source_identity(row) for row in flow_records]
         dst_col = next((c for c in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP") if c in df.columns), None)
