@@ -63,7 +63,7 @@ python scripts/evaluate_benchmark.py \
   --output reports/generated/official-evaluation.json
 
 python scripts/generate_submissions.py \
-  --input data/processed/hidden_replay_input.parquet \
+  --input data/processed/hidden_replay_input.csv \
   --output-dir outputs/submission
 
 python scripts/validate_submissions.py \
