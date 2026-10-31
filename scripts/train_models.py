@@ -212,7 +212,8 @@ def train_models(
         "reports": {"a1": str(a1_report), "a2": str(a2_report)},
         "evaluation_data_used_for_training_or_calibration": False,
         "hidden_data_used_for_training_or_calibration": False,
-        "disclosure": "The held-out evaluation partition and unlabelled hidden replay input are never used for fitting, calibration, or threshold selection.",
+        "calibration_metrics_are_tuning_only": calibration_frame is not None,
+        "disclosure": "Calibration/threshold-selection metrics are tuning diagnostics, not an unbiased final estimate. The held-out evaluation partition and unlabelled hidden replay input are never used for fitting, calibration, or threshold selection.",
     }
     manifest_path = report_dir / "training_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
