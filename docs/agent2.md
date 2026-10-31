@@ -6,7 +6,7 @@
 - **Baseline Training Data:** 240,000 `BENIGN` rows from the training partition only.
 - **Independence:** Never ingests or depends on Agent 1 predictions or ground truth labels during inference.
 - **Threshold Calibration:** Operating threshold is calibrated to the 1st percentile of benign training decision function scores ($\theta \approx 0.0332$).
-- **Evidence Extraction:** For flows scoring below threshold, individual features deviating beyond $Q_{01}$ or $Q_{99}$ relative to benign training interquartile ranges are mapped to human-readable evidence tags (e.g., `unusual_packet_rate`, `abnormal_flow_duration`).
+- **Evidence Extraction:** For flows whose raw decision-function score falls below the threshold, individual features deviating beyond $Q_{01}$ or $Q_{99}$ relative to benign training interquartile ranges are mapped to human-readable evidence tags (e.g., `unusual_packet_rate`, `abnormal_flow_duration`).
 
 ## Training Command
 
