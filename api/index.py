@@ -689,8 +689,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         raise HTTPException(status_code=503, detail=f"Flow inspection data could not be loaded: {type(exc).__name__}") from exc
 
     has_class_cols = (
-        {"record_id", "predicted_class", "anomaly_score", "evidence_status"}.issubset(classifications.columns) or
-        {"record_id", "predicted_class", "anomaly_score", "evidence_status"}.issubset(classifications.columns)
+        {"record_id", "predicted_class", "anomaly score", "evidence status"}.issubset(classifications.columns)
     )
     required_replay = {"record_id", "action", "active_policy_id"}
     if not has_class_cols or not required_replay.issubset(replay.columns):
@@ -713,16 +712,16 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         predicted_class = str(prediction.get("predicted_class", ""))
         if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
             continue
-        applied = decision.get("active_policy_id") or ("NONE" if decision.get("action") == "ALLOW" else "")
-        raw_score = prediction.get("anomaly_score") if "anomaly_score" in prediction else prediction.get("anomaly_score")
-        raw_evidence = prediction.get("evidence_status") if "evidence_status" in prediction else prediction.get("evidence_status", "UNCERTAIN")
+        applied = decision.get("active_policy_id") or ""
+        raw_score = prediction.get("anomaly score")
+        raw_evidence = prediction.get("evidence status", "UNCERTAIN")
         rows.append({
             "record_id": record_id,
             "predicted_class": predicted_class,
             "anomaly_score": numeric_from_value(raw_score),
             "evidence_status": str(raw_evidence),
             "action": str(decision.get("action", "")),
-            "active_policy_id": "NONE" if pd.isna(applied) or not str(applied).strip() else str(applied),
+            "active_policy_id": "" if pd.isna(applied) or not str(applied).strip() else str(applied),
             "destination_port": int(numeric_from_value(flow.get("Destination Port"))) if numeric_from_value(flow.get("Destination Port")) is not None else None,
             "flow_duration": numeric_from_value(flow.get("Flow Duration", 0)),
             "total_fwd_packets": numeric_from_value(flow.get("Total Fwd Packets", 0)),
