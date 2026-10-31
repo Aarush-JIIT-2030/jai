@@ -52,9 +52,12 @@ export function FlowInspector({ modelReady }: { modelReady: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow }),
       });
-      const payload = await response.json();
+      const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Analysis request failed."));
+        throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Analysis request failed (HTTP " + response.status + ")."));
+      }
+      if (!payload || typeof payload !== "object" || !("action" in payload) || !("evidence_status" in payload)) {
+        throw new Error("The analysis API returned an unexpected response. Check that the backend is up to date.");
       }
       setResult(payload as FlowResult);
     } catch (reason) {
@@ -122,7 +125,7 @@ export function FlowInspector({ modelReady }: { modelReady: boolean }) {
 
       <div style={{ fontSize: 11, color: "var(--muted)", margin: "14px 0" }}>Paste one observed flow record as JSON. No sample incidents or synthetic attack presets are preloaded.</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 16, marginBottom: 16 }}>
+      <div className="flow-analysis-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 0.9fr)", gap: 16, marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
             <span>OBSERVED FLOW RECORD · JSON:</span>

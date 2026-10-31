@@ -1511,3 +1511,20 @@ td {
 
 .spin-icon { animation: cs-spin .9s linear infinite; }
 @keyframes cs-spin { to { transform: rotate(360deg); } }
+
+
+/* Responsive flow analysis: keep the editor and evidence readable on tablets/phones. */
+@media(max-width: 900px) {
+  .flow-analysis-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+@media(max-width: 760px) {
+  .flow-analysis-grid { gap: 12px !important; }
+  .flow-analysis-grid textarea { min-height: 180px !important; }
+  .panel-head { align-items: flex-start; }
+  .panel-head > div { min-width: 0; }
+  .table-wrap, .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-wrap table, .table-scroll table { min-width: 620px; }
+  .panel-foot { flex-wrap: wrap; gap: 10px; }
+  .panel-foot > button { max-width: 100%; }
+}

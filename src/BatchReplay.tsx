@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { apiFetch } from "./lib/api";
 import Papa from "papaparse";
 import { Activity, FileSpreadsheet, Play, UploadCloud } from "lucide-react";
@@ -19,6 +19,7 @@ type BatchResponse = {
 };
 
 export function BatchReplay({ modelReady }: { modelReady: boolean }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [busy, setBusy] = useState(false);
@@ -46,9 +47,9 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
       dynamicTyping: true,
       skipEmptyLines: "greedy",
       complete: result => {
-        const data = result.data.filter(row => row && Object.keys(row).length > 0);
-        if (!data.length) {
-          setError("The CSV contains no usable data rows.");
+        const data = result.data.filter(row => row && Object.values(row).some(value => value !== null && value !== undefined && String(value).trim() !== ""));
+        if (!result.meta.fields?.length || !data.length) {
+          setError("The CSV must contain a header row and at least one non-empty data row.");
           return;
         }
         if (result.errors.length) {
@@ -67,6 +68,7 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
     setError("");
     setSummary(null);
     setProgress(0);
+    let processedRows = 0;
     const aggregate: BatchResponse = {
       total_analyzed: 0,
       actions: { ALLOW: 0, BLOCK: 0, REVIEW: 0 },
@@ -83,30 +85,36 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ flows: chunk }),
         });
-        const payload = await response.json();
+        const payload = await response.json().catch(() => null);
         if (!response.ok) {
-          throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Batch replay failed."));
+          throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Batch replay failed (HTTP " + response.status + ")."));
         }
-        aggregate.total_analyzed += Number(payload.total_analyzed || 0);
-        const persistence = payload.supabase_persistence;
-        if (!persistence?.stored) {
-          aggregate.supabase_persistence = { stored: false, reason: persistence?.reason || "not_confirmed" };
-        } else if (aggregate.supabase_persistence?.stored) {
-          aggregate.supabase_persistence.rows = Number(aggregate.supabase_persistence.rows || 0) + Number(persistence.rows || 0);
+        if (!payload || typeof payload !== "object" || !Array.isArray(payload.results) || !payload.actions || typeof payload.actions !== "object") {
+          throw new Error("The replay API returned an unexpected response. No further batches were sent.");
         }
+        const analyzed = Number(payload.total_analyzed);
+        if (!Number.isFinite(analyzed) || analyzed < 0) {
+          throw new Error("The replay API returned an invalid analyzed-record count.");
+        }
+        aggregate.total_analyzed += analyzed;
         for (const action of ["ALLOW", "BLOCK", "REVIEW"] as const) {
-          aggregate.actions[action] += Number(payload.actions?.[action] || 0);
+          const count = Number(payload.actions[action] ?? 0);
+          if (!Number.isFinite(count) || count < 0) throw new Error("The replay API returned an invalid " + action + " count.");
+          aggregate.actions[action] += count;
         }
-        for (const row of (payload.results || []) as ReplayRow[]) {
+        for (const row of payload.results as ReplayRow[]) {
+          if (!row || typeof row !== "object") continue;
           const className = row.final_class ?? "UNCONFIRMED";
           aggregate.class_counts[className] = (aggregate.class_counts[className] || 0) + 1;
           if (aggregate.results.length < 20) aggregate.results.push(row);
         }
-        setProgress(Math.min(rows.length, offset + chunk.length));
+        processedRows = Math.min(rows.length, offset + chunk.length);
+        setProgress(processedRows);
         setSummary({ ...aggregate, results: [...aggregate.results], class_counts: { ...aggregate.class_counts } });
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Batch replay stopped unexpectedly.");
+      const detail = reason instanceof Error ? reason.message : "Batch replay stopped unexpectedly.";
+      setError(processedRows > 0 ? detail + " Partial results cover " + processedRows.toLocaleString() + " of " + rows.length.toLocaleString() + " rows." : detail);
     } finally {
       setBusy(false);
     }
@@ -122,7 +130,10 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
     </div>
     <label className="upload-zone" style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
       <UploadCloud size={20}/><span><b>{fileName || "Choose a flow CSV"}</b><small>{rows.length ? rows.length.toLocaleString() + " rows parsed" : "CSV only · up to 100 MB"}</small></span>
-      <input type="file" accept=".csv,text/csv" onChange={event => selectFile(event.target.files?.[0])} hidden />
+      <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={event => {
+        selectFile(event.target.files?.[0]);
+        event.currentTarget.value = "";
+      }} hidden />
     </label>
     <div className="panel-foot">
       <span><Activity size={13}/> {progress.toLocaleString()} / {rows.length.toLocaleString()} rows processed</span>
