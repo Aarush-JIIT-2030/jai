@@ -10,9 +10,10 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.metrics import log_loss
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 
 from cybersentinel.agents.threat_detection.model import BENCHMARK_CLASSES, ThreatDetectionModel, numeric_features
+from cybersentinel.evaluation.generalization import canonicalize_feature_vector
 
 
 def _canonical_probabilities(model: ThreatDetectionModel, frame: pd.DataFrame) -> np.ndarray:
@@ -67,11 +68,17 @@ def evaluate_probability_calibration(
     if not 0.05 <= cal_fraction <= 0.5:
         raise ValueError("cal_fraction must be between 0.05 and 0.5.")
     labels = train_df["label"].astype(str).str.strip().str.upper()
-    fit_idx, cal_idx = train_test_split(
-        np.arange(len(train_df)), test_size=cal_fraction, random_state=random_state, stratify=labels
-    )
-    fit_df, cal_df = train_df.iloc[fit_idx], train_df.iloc[cal_idx]
     features = [c for c in train_df.columns if c != "label"]
+    numeric_train = numeric_features(train_df[features])
+    groups = np.asarray([canonicalize_feature_vector(row) for row in numeric_train.to_numpy(dtype=np.float64)])
+    n_splits = max(2, min(10, int(round(1.0 / cal_fraction))))
+    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    fit_idx, cal_idx = next(splitter.split(numeric_train, labels, groups))
+    fit_df, cal_df = train_df.iloc[fit_idx], train_df.iloc[cal_idx]
+    fit_classes = set(fit_df["label"].astype(str).str.strip().str.upper())
+    calibration_classes = set(cal_df["label"].astype(str).str.strip().str.upper())
+    if not set(BENCHMARK_CLASSES).issubset(fit_classes) or not set(BENCHMARK_CLASSES).issubset(calibration_classes):
+        raise ValueError("Group-isolated calibration split must contain all five classes in both fit and calibration partitions; provide more training examples or adjust cal_fraction.")
     model = ThreatDetectionModel(n_estimators=n_estimators, random_state=random_state)
     model.fit(fit_df[features], fit_df["label"])
     model.calibration_temperature = 1.0
@@ -101,7 +108,7 @@ def evaluate_probability_calibration(
         "evaluation_samples": len(eval_df),
         "training_samples": len(fit_df),
         "calibration_samples": len(cal_df),
-        "calibration_provenance": "stratified holdout from supplied training partition only",
+        "calibration_provenance": "stratified group-isolated holdout from supplied training partition only; identical numeric feature vectors stay in one partition",
         "method": "scalar temperature scaling",
         "temperature": calibration_result["temperature"],
         "uncalibrated": uncalibrated,
