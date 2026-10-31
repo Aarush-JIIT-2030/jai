@@ -15,6 +15,7 @@ type BatchResponse = {
   actions: Record<"ALLOW" | "BLOCK" | "REVIEW", number>;
   results: ReplayRow[];
   class_counts: Record<string, number>;
+  supabase_persistence?: { stored: boolean; rows?: number; reason?: string };
 };
 
 export function BatchReplay({ modelReady }: { modelReady: boolean }) {
@@ -71,6 +72,7 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
       actions: { ALLOW: 0, BLOCK: 0, REVIEW: 0 },
       results: [],
       class_counts: {},
+      supabase_persistence: { stored: true, rows: 0 },
     };
     try {
       const chunkSize = 1000;
@@ -86,6 +88,12 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
           throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Batch replay failed."));
         }
         aggregate.total_analyzed += Number(payload.total_analyzed || 0);
+        const persistence = payload.supabase_persistence;
+        if (!persistence?.stored) {
+          aggregate.supabase_persistence = { stored: false, reason: persistence?.reason || "not_confirmed" };
+        } else if (aggregate.supabase_persistence?.stored) {
+          aggregate.supabase_persistence.rows = Number(aggregate.supabase_persistence.rows || 0) + Number(persistence.rows || 0);
+        }
         for (const action of ["ALLOW", "BLOCK", "REVIEW"] as const) {
           aggregate.actions[action] += Number(payload.actions?.[action] || 0);
         }
@@ -137,7 +145,8 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
       <div className="table-scroll"><table><thead><tr><th>#</th><th>Final class</th><th>Action</th><th>Evidence</th></tr></thead>
         <tbody>{summary.results.slice(0, 20).map((row, index) => <tr key={index}><td>{index + 1}</td><td>{row.final_class ?? "Unconfirmed"}</td><td>{row.action}</td><td>{row.evidence_status}</td></tr>)}</tbody>
       </table></div>
-      <small>Showing the first 20 of {summary.total_analyzed.toLocaleString()} processed rows. Results are not persisted unless a separate history workflow is configured.</small>
+      <div className="empty-inline" style={{ marginTop: 12 }}>Supabase audit: {summary.supabase_persistence?.stored ? `${Number(summary.supabase_persistence.rows || 0).toLocaleString()} derived flow events saved to your private account.` : `Cloud persistence was not confirmed (${summary.supabase_persistence?.reason || "not reported"}).`}</div>
+      <small>Showing the first 20 of {summary.total_analyzed.toLocaleString()} processed rows. Raw CSV data stays in this browser session; only derived analysis metadata is stored in Supabase.</small>
     </div>}
   </section>;
 }
