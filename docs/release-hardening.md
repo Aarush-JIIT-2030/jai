@@ -10,7 +10,7 @@
 - Agent 4 prefers literal observed source and destination IP addresses. Destination IP is never synthesized. If source IP is absent, the current fallback derives an IP-shaped synthetic source identity from the finite TCP-stack fingerprint tuple (`Init_Win_bytes_forward`, `min_seg_size_forward`, `Fwd Header Length`); identical tuples map together and the truncated 24-bit hash can collide. This identity is not an observed address.
 - Agent 5 accepts syntactically valid IPv4/IPv6 source identities for simulated scope. A valid IP string can be synthetic; do not present scope validation as proof of packet-observed provenance.
 - Invalid destination values are ignored, invalid destination ports are normalized to 0, and incomplete fingerprints leave the source identity unresolved (no source policy can be created).
-- Missing/invalid model evidence is not replaced with benign or normal defaults; fusion returns INCOMPLETE/REVIEW.
+- Missing/invalid model evidence is not replaced with benign or normal defaults; fusion returns UNCERTAIN/REVIEW.
 
 ## Validation
 
