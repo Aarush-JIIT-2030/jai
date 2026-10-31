@@ -172,7 +172,7 @@ If the dataset or models are missing, the API returns an explicit unavailable re
 
 ### SOURCE_IP identity limitation
 
-The prepared feature dataset may not contain native Layer 3 source IP fields. In that case the system derives a synthetic, stable identity from TCP-stack fingerprint fields. This is not an observed IP address and can collide for clients with identical fingerprints. If the required fingerprint fields are missing, policy creation fails closed rather than inventing a host identity. See `release/benchmarks/source-ip-scope-audit.md`.
+The prepared feature dataset may not contain native Layer 3 source IP fields. Fingerprint-derived identities are not observed endpoints and are therefore not used for temporal endpoint correlation or SOURCE_IP defense policies. If the native source IP is missing or invalid, endpoint correlation and policy creation fail closed. This can reduce correlation/policy coverage on feature-only data, but avoids inventing host identities or falsely blocking unrelated clients. See `release/benchmarks/source-ip-scope-audit.md`.
 
 ## 7. Third-Party, Reference & AI Disclosures
 
