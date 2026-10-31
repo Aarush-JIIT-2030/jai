@@ -64,19 +64,25 @@ class TemporalCorrelationAgent:
         """Extract observed endpoints; only source identity may be derived."""
         src_ip = TemporalCorrelationAgent.derive_source_identity(flow)
 
-        dst_ip = None
+        dst_ip = ""
         for key in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP"):
             value = flow.get(key)
-            if value is not None and str(value).strip():
-                dst_ip = str(value).strip()
+            if value is None or not str(value).strip():
+                continue
+            try:
+                dst_ip = str(ipaddress.ip_address(str(value).strip()))
                 break
+            except ValueError:
+                # Unparseable destination metadata is not an endpoint identity.
+                continue
         # Destination is intentionally left unknown when the dataset omits it.
         dport_value = flow.get("Destination Port", 0)
         try:
-            dport = int(dport_value)
-        except (TypeError, ValueError):
+            numeric_port = float(dport_value)
+            dport = int(numeric_port) if numeric_port.is_integer() and 0 <= numeric_port <= 65535 else 0
+        except (TypeError, ValueError, OverflowError):
             dport = 0
-        return src_ip, dst_ip or "", dport
+        return src_ip, dst_ip, dport
 
     @staticmethod
     def _parse_timestamp(flow: dict[str, Any]) -> datetime | None:
