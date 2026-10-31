@@ -164,7 +164,12 @@ def evaluate_temporal_correlation(
 
     # Top-level convenience keys
     primary_results["total_campaigns_detected"] = primary_results["campaigns_detected_count"]
-    primary_results["mean_detection_delay_flows"] = delays_summary.get("overall_mean_delay_flows", 0.0)
+    primary_results["campaigns_by_type"] = {
+        attack_type: len({item.get("group_id") for item in items if item.get("group_id")})
+        for attack_type, items in campaigns_detected.items()
+    }
+    all_delays = [delay for values in detection_delays.values() for delay in values]
+    primary_results["mean_detection_delay_flows"] = float(round(float(np.mean(all_delays)), 2)) if all_delays else None
 
     return {
         "evaluation_summary": primary_results,
