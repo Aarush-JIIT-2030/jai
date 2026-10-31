@@ -26,6 +26,13 @@ HIDDEN_REQUIRED = {
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
 
 def atomic_write(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,8 +115,8 @@ def prepare(training_pack: Path, hidden_pack: Path, data_dir: Path) -> dict:
 
     report = {
         "source_archives": {
-            "training_pack": training_pack.name,
-            "hidden_pack": hidden_pack.name,
+            "training_pack": {"name": training_pack.name, "sha256": file_sha256(training_pack)},
+            "hidden_pack": {"name": hidden_pack.name, "sha256": file_sha256(hidden_pack)},
         },
         "training": {
             "path": str(next(path for path in paths if path.parts[-3:] == ("raw", "training", "flows.parquet")).relative_to(data_dir)),
