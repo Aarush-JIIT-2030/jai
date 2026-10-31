@@ -27,7 +27,7 @@ The replay is chronological and causal. A policy is created after its trigger an
 ## 5. Exact organizer submission semantics
 
 - `classification.csv` and `replay.csv` each contain exactly one row per hidden record in original `seq` order.
-- `policies.csv` has the exact five-column template and can contain zero or more rows.
+- `policy.csv` has the exact six-column template (including `policy_action=BLOCK`) and can contain zero or more rows.
 - `ALLOW` must leave `active_policy_id` empty and must not have any matching active policy.
 - `BLOCK` must reference the lexicographically smallest matching active `policy_id`.
 - A policy activates on the record after `activated_after_record_id` and remains active through `expires_after_record_id`, inclusive.
