@@ -57,6 +57,8 @@ flowchart TD
 
 ## 3. Submission Files Generator
 
+The hidden input must be processed in organiser `seq` order. It carries observed `source_ip`, `destination_ip`, `day`, and `time_offset` metadata; the replay engine preserves the input order and converts the minute-second offsets into timestamps for Agent 4.
+
 Run the 5-agent chronological replay engine to produce the three official competition CSV files:
 
 ```bash
@@ -85,7 +87,7 @@ python scripts/generate_submissions.py \
    * Never uses future records or ground-truth labels during decision making.
    * Policies only apply to *later* incoming records, strictly adhering to real-world causality.
 2. **Pre-Filtering Computational Advantage:**
-   * An active policy match skips model inference for that flow. This is a simulated replay behavior, not a measured end-to-end latency claim. When native source IP is absent, the policy identity is derived from flow features and must not be described as a real IP; see the [scope audit](../release/benchmarks/source-ip-scope-audit.md).
+   * An active policy match skips model inference for that flow. This is a simulated replay behavior, not a measured end-to-end latency claim. When native source IP is absent or invalid, endpoint correlation and policy creation fail closed; feature fingerprints are never presented as observed IPs. See the [scope audit](../release/benchmarks/source-ip-scope-audit.md).
 3. **Defense-in-Depth Trade-Off:**
    * Report only metrics reproduced on the current code and authorized data. Include macro-F1 and per-class results, state the evaluation split and its repeated-feature overlap, and describe ALLOW/BLOCK/REVIEW as simulated actions. Older release reports contain historical figures, not current results.
 
