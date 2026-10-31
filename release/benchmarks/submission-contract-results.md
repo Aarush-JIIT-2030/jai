@@ -21,16 +21,16 @@ Requirements:
 - Do not submit actual/ground-truth labels.
 - Anomaly score and evidence status must reflect the implemented Agent 2 / Agent 3 outputs.
 
-## 2. policies.csv
+## 2. policy.csv
 
 Exact required columns, in order:
 
-`policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
+`policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
 
 Requirements:
 
 - Use organiser-provided record IDs.
-- `scope_type` must be one of `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`, and `scope_value` must contain the matching literal observed endpoint(s). A policy row represents a simulated BLOCK rule; the action is recorded in `replay.csv`.
+- `scope_type` must be one of `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`, and `scope_value` must contain the matching literal observed endpoint(s). A policy row includes `policy_action=BLOCK`; the applied action and policy reference are recorded in `replay.csv`.
 - A policy is activated only after its triggering record.
 - Expiry must follow the implementation's documented record-boundary convention.
 - Only literal observed endpoint metadata is eligible for a policy scope. Missing or invalid endpoint values fail closed; feature-derived fingerprints are never treated as IP addresses.
@@ -39,14 +39,14 @@ Requirements:
 
 The briefing's explicit per-record clarification requires:
 
-`record_id,action,active_policy_id`
+`record_id,action,applied_policy_id`
 
 Requirements:
 
 - Every evaluation record exactly once.
 - `action` must be `ALLOW` or `BLOCK`.
 - `BLOCK` must reference a valid policy that was activated earlier and is still active for that record.
-- `ALLOW` must have an empty `active_policy_id`.
+- `ALLOW` must have an empty `applied_policy_id`.
 - A policy cannot block the record that triggered its creation.
 
 ## 4. Required validation
