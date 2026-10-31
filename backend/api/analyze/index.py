@@ -1,7 +1,7 @@
 """Dedicated Vercel function route for /api/analyze."""
 from typing import Any
 from fastapi import FastAPI
-from api.index import analyze
+from backend.api.index import analyze
 
 app = FastAPI()
 
