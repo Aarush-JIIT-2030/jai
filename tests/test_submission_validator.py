@@ -20,14 +20,14 @@ def test_submission_validator_valid_bundle(tmp_path):
     with (sub_dir / "policy.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"])
-        writer.writerow(["POL-00001", "rec-2", "SOURCE_IP", "10.0.0.99", "150", "BLOCK"])
+        writer.writerow(["POL-00001", "rec-1", "SOURCE_IP", "10.0.0.99", "rec-2", "BLOCK"])
 
     # 3. replay.csv
     with (sub_dir / "replay.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["record_id", "action", "applied_policy_id"])
         writer.writerow(["rec-1", "ALLOW", ""])
-        writer.writerow(["rec-2", "ALLOW", ""])
+        writer.writerow(["rec-2", "BLOCK", "POL-00001"])
 
     report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2"])
     assert report["all_valid"] is True
