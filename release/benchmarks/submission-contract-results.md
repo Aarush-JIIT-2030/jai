@@ -71,4 +71,4 @@ A local validator result is not proof that the organiser API accepted the files.
 
 An earlier version of this dossier described a different schema (`flow_id`, `predicted_label`, `confidence`, `is_anomaly`; and alternate policy/replay columns). Those columns do **not** match the Day 2 briefing and must not be used for the official submission.
 
-The current generator in `src/cybersentinel/replay/engine.py` writes the four-column classification schema, five-column policies schema, and three-column replay schema above. Re-run `python scripts/generate_submissions.py` and the current validator after any replay/model changes.
+The current generator in `src/cybersentinel/replay/engine.py` writes the four-column classification schema, six-column policy schema, and three-column replay schema above. Re-run `python scripts/generate_submissions.py` and the current validator after any replay/model changes.
