@@ -63,7 +63,7 @@ class TemporalCorrelationAgent:
                 return str(ipaddress.ip_address(str(value).strip()))
             except ValueError:
                 # Invalid endpoint metadata is not trusted; try the fingerprint fallback.
-                break
+                continue
 
         fingerprint_keys = (
             "Init_Win_bytes_forward",
