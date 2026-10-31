@@ -19,7 +19,7 @@ logger = logging.getLogger("cybersentinel.replay.submission")
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
 
 BENCHMARK_CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
-EVIDENCE_STATUSES = {"AGREE", "DISAGREE", "INCOMPLETE"}
+EVIDENCE_STATUSES = {"AGREE", "CONFLICT", "UNCERTAIN"}
 ACTIONS = {"ALLOW", "BLOCK"}
 
 
