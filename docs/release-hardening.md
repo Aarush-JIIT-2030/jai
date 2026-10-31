@@ -9,7 +9,7 @@
 ## Model artifact workflow
 - `scripts/train_models.py` trains A1 from all five canonical training classes and A2 from BENIGN training rows only.
 - Both artifacts are reloaded after training; feature schema, class set, training provenance and SHA-256 hashes are recorded.
-- A separate labelled validation file is optional and must be organizer-authorized. Without it, A1 confidence remains uncalibrated and A2 uses its training-only benign threshold.
+- By default, a deterministic stratified 15% holdout is carved from the authorized training partition for A1 temperature calibration and A2 threshold selection. An organizer-provided separate labelled validation file can be supplied instead. The held-out evaluation partition and hidden records are never used for fitting or calibration.
 - The labelled evaluation partition is reserved for final evaluation and is not used for fitting or calibration.
 
 ## Replay and CSV contract
