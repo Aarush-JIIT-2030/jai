@@ -1,6 +1,6 @@
 """Dedicated Vercel function route for /api/health."""
 from fastapi import FastAPI
-from api.index import health
+from backend.api.index import health
 
 app = FastAPI()
 
