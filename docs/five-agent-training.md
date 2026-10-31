@@ -27,7 +27,7 @@ The saved artifacts are written locally to `models/threat_detection/model.joblib
 
 ## Optional anomaly threshold selection
 
-Use label-based A2 threshold selection only if organizers explicitly permit it and supply a separate labelled validation partition. Pass that file with `--validation` and opt in with `--calibrate-anomaly-threshold`. Do not use the held-out evaluation partition or hidden replay input to select a threshold. The default workflow does not use attack labels to set A2's threshold.
+A separate organizer-permitted labelled validation file can be passed with `--validation`; the combined workflow then uses it for A1 confidence calibration instead of the internal training holdout. This alone does not tune A2's threshold. Add `--calibrate-anomaly-threshold` only if organizers explicitly permit label-based A2 threshold selection. Do not use the held-out evaluation partition or hidden replay input for calibration or model selection.
 
 The separate `scripts/train_anomaly.py` entry point supports lower-level A2 training and can calibrate its threshold when a validation file is provided. Treat that option as model selection: use it only with an explicitly permitted, separate labelled validation set, never the official held-out evaluation data.
 
