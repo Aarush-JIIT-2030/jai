@@ -228,14 +228,11 @@ class SubmissionValidator:
                 policy_res["valid"] = False
                 policy_res["errors"].append("Source frame row count does not match expected organizer input IDs.")
                 policy_res["total_errors"] = policy_res.get("total_errors", 0) + 1
-            source_ip_columns = ("source_ip", "Source IP", "Source_IP", "src_ip", "src")
-            source_ip_column = next((column for column in source_ip_columns if column in source_frame.columns), None)
-            if source_ip_column is None and policy_map:
-                policy_res["valid"] = False
-                policy_res["errors"].append("Input has no native source IP column; SOURCE_IP policies cannot be verified against observed records.")
-                policy_res["total_errors"] = policy_res.get("total_errors", 0) + 1
-            elif source_ip_column is not None and replay_path.is_file():
-                import ipaddress
+            endpoint_columns = {
+                "SOURCE_IP": ("source_ip", "Source IP", "Source_IP", "src_ip", "src"),
+                "DESTINATION_IP": ("destination_ip", "Destination IP", "Destination_IP", "dst_ip", "dst"),
+            }
+            if policy_map and replay_path.is_file():
                 with replay_path.open("r", encoding="utf-8", newline="") as handle:
                     for row in csv.DictReader(handle):
                         if row.get("action") != "BLOCK":
@@ -245,16 +242,28 @@ class SubmissionValidator:
                         policy = policy_map.get(policy_id)
                         if policy is None or rid not in positions:
                             continue
-                        observed = source_frame.iloc[positions[rid]].get(source_ip_column)
-                        try:
-                            observed_ip = str(ipaddress.ip_address(str(observed).strip()))
-                            policy_ip = str(ipaddress.ip_address(str(policy.get("scope_value", "")).strip()))
-                        except (ValueError, TypeError):
-                            observed_ip = ""
-                            policy_ip = ""
-                        if not observed_ip or observed_ip != policy_ip:
+                        scope_type = str(policy.get("scope_type", ""))
+                        source_row = source_frame.iloc[positions[rid]]
+                        def observed_ip(kind: str) -> str:
+                            for column in endpoint_columns[kind]:
+                                if column in source_frame.columns:
+                                    try:
+                                        return str(ipaddress.ip_address(str(source_row.get(column)).strip()))
+                                    except (ValueError, TypeError):
+                                        continue
+                            return ""
+                        if scope_type == "SOURCE_IP":
+                            observed_scope = observed_ip("SOURCE_IP")
+                        elif scope_type == "DESTINATION_IP":
+                            observed_scope = observed_ip("DESTINATION_IP")
+                        elif scope_type == "SRC_DST_PAIR":
+                            src, dst = observed_ip("SOURCE_IP"), observed_ip("DESTINATION_IP")
+                            observed_scope = f"{src}|{dst}" if src and dst else ""
+                        else:
+                            observed_scope = ""
+                        if not observed_scope or observed_scope != str(policy.get("scope_value", "")).strip():
                             replay_res["valid"] = False
-                            replay_res["errors"].append(f"Record {rid}: BLOCK policy {policy_id} does not match the input's observed source IP.")
+                            replay_res["errors"].append(f"Record {rid}: BLOCK policy {policy_id} does not match the input's observed {scope_type} scope.")
                             replay_res["total_errors"] = replay_res.get("total_errors", 0) + 1
         for policy_id, policy in policy_map.items():
             activation = str(policy.get("activated_after_record_id", ""))
