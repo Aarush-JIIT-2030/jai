@@ -17,7 +17,7 @@ The dataset audit found 8,161 distinct feature vectors shared by training and ev
 ## 3. Scores are not automatically probabilities
 
 - **Agent 1:** the maximum `predict_proba` output is uncalibrated unless the optional scalar temperature-calibration workflow was run on a separate, labelled, held-out validation file. Do not call it a calibrated probability otherwise.
-- **Agent 2:** Isolation Forest's decision-function-derived anomaly score is a raw score, not a probability of attack. Its threshold can optionally be selected on separate labelled validation data under a configured benign false-positive ceiling.
+- **Agent 2:** the exported value is a bounded 0–1 anomaly index (higher means more anomalous), not a probability of attack. The operating threshold is applied to the underlying Isolation Forest decision function; it can optionally be selected on separate labelled validation data under a configured benign false-positive ceiling.
 
 Report the exact model artifact and calibration provenance used for the run.
 
