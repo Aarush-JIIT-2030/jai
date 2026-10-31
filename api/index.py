@@ -658,7 +658,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
 
 @app.get("/api/policies")
 def get_policies(limit: int = 50, offset: int = 0):
-    """Retrieve policies generated during replay from outputs/submission/policies.csv."""
+    """Retrieve policies generated during replay from outputs/submission/policy.csv."""
     pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
     if not pol_file.is_file():
         return {"policies": [], "total": 0}
