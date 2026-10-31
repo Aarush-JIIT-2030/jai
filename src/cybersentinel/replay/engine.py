@@ -105,7 +105,7 @@ class ReplayEngine:
             })
 
             if pre_filter is not None:
-                action, applied_id = "BLOCK", pre_filter.active_policy_id or ""
+                action, applied_id = "BLOCK", pre_filter.applied_policy_id or ""
                 blocked += 1
                 if ground_truth and ground_truth != "BENIGN":
                     contained += 1
@@ -157,24 +157,11 @@ class ReplayEngine:
                 "expires_after_record_id": record_ids[expiry_step],
                                                             })
         observed_source_flags = [TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records]
-        synthetic_identity_count = sum(
-            1 for observed, identity in zip(observed_source_flags, corr_src)
-            if not observed and bool(identity)
-        )
-        unresolved_identity_count = sum(1 for identity in corr_src if not identity)
         observed_identity_count = sum(observed_source_flags)
-        if observed_identity_count and synthetic_identity_count:
-            identity_mode = "MIXED_OBSERVED_AND_SYNTHETIC"
-        elif synthetic_identity_count and unresolved_identity_count:
-            identity_mode = "SYNTHETIC_AND_UNRESOLVED"
-        elif synthetic_identity_count:
-            identity_mode = "SYNTHETIC_FINGERPRINT"
-        elif observed_identity_count and unresolved_identity_count:
-            identity_mode = "OBSERVED_AND_UNRESOLVED"
-        elif observed_identity_count:
-            identity_mode = "OBSERVED_ONLY"
-        else:
-            identity_mode = "UNAVAILABLE"
+        unresolved_identity_count = total_rows - observed_identity_count
+        identity_mode = "OBSERVED_ONLY" if unresolved_identity_count == 0 else (
+            "OBSERVED_AND_UNRESOLVED" if observed_identity_count else "UNAVAILABLE"
+        )
         attack_count = sum(label != "BENIGN" for label in labels) if has_label else None
         benign_count = sum(label == "BENIGN" for label in labels) if has_label else None
         metrics = {
@@ -190,7 +177,7 @@ class ReplayEngine:
             "elapsed_seconds": round(elapsed, 2),
             "throughput_fps": round(total_rows / max(0.001, elapsed), 1),
             "missing_native_source_ip_rows": total_rows - observed_identity_count,
-            "synthetic_source_identity_rows": synthetic_identity_count,
+            "synthetic_source_identity_rows": 0,
             "unresolved_source_identity_rows": unresolved_identity_count,
             "source_identity_mode": identity_mode,
         }
