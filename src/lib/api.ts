@@ -6,7 +6,7 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
   }
-  const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\\/+$/, "");
+    const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/+$/, "");
   if (import.meta.env.PROD && !apiBase) {
     throw new Error("Backend URL is not configured. Set VITE_API_BASE_URL to the deployed CyberSentinel API URL in Vercel.");
   }
