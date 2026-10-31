@@ -436,6 +436,31 @@ def run_official_replay():
             elapsed_seconds=metrics["elapsed_seconds"],
             status="COMPLETED" if validation.get("all_valid") else "VALIDATION_FAILED",
         )
+        summary = {
+            "run_id": run_id,
+            "source": "installed_unlabelled_hidden_replay_input",
+            "records_processed": int(metrics["total_records"]),
+            "artifacts": {
+                "classification_rows": len(results["classification_rows"]),
+                "replay_rows": len(results["replay_rows"]),
+                "policy_rows": len(results["policy_rows"]),
+            },
+            "operational_metrics": {
+                "blocked_records": int(metrics["blocked_records"]),
+                "allowed_records": int(metrics["allowed_records"]),
+                "policies_created": int(metrics["policies_created"]),
+                "elapsed_seconds": float(metrics["elapsed_seconds"]),
+                "throughput_records_per_second": float(metrics["throughput_fps"]),
+            },
+            "ground_truth_metrics": None,
+            "validation": {
+                "all_valid": bool(validation.get("all_valid")),
+                "status": validation.get("status"),
+                "organizer_acceptance": "NOT_VERIFIED",
+            },
+            "disclosure": "The hidden input is unlabelled. Attack/benign performance metrics and organizer acceptance cannot be inferred from this local replay.",
+        }
+        (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         return {
             "run_id": run_id,
             "metrics": metrics,
