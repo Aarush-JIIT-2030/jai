@@ -1,6 +1,6 @@
 """Dedicated Vercel function route for /api/analyze/batch."""
 from fastapi import FastAPI
-from api.index import BatchAnalyzeRequest, analyze_batch
+from backend.api.index import BatchAnalyzeRequest, analyze_batch
 
 app = FastAPI()
 
