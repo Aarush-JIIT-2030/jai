@@ -584,7 +584,7 @@ export function AdaptiveDefenseConsole() {
             <td style={{ padding: 8, fontFamily: "monospace" }}>{policy.scope_value}</td>
             <td style={{ padding: 8 }}>{policy.activated_after_record_id}</td>
             <td style={{ padding: 8 }}>{policy.expires_after_record_id}</td>
-            <td style={{ padding: 8 }}><span className="tag tag-red">{'BLOCK'}</span></td>
+            <td style={{ padding: 8 }}><span className="tag tag-red">{"BLOCK"}</span></td>
           </tr>)}</tbody>
         </table>
         <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 7 }}>Showing {policies.length} of {totalPolicies?.toLocaleString() ?? policies.length} policies.</div>
