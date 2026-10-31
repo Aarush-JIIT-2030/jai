@@ -126,7 +126,7 @@ export function FiveAgentArchitectureView() {
       latency: "Not separately benchmarked",
       throughput: "Not independently measured",
       accuracy: "Deterministic decision rules; not a predictive accuracy metric",
-      classes: "ALLOW, BLOCK, REVIEW (Status: AGREE, DISAGREE, INCOMPLETE)",
+      classes: "ALLOW, BLOCK, REVIEW (Status: AGREE, CONFLICT, UNCERTAIN)",
       description: "Combines supervised classification and anomaly signals. Disagreements between agents are never hidden; they are routed to REVIEW with human-readable rationale.",
     },
     {
