@@ -82,7 +82,7 @@ export function ParticleBackdrop() {
     let animationFrameId = 0;
     let radarAngle = 0;
 
-    const render = (now: number) => {
+    const render = () => {
       ctx.clearRect(0, 0, width, height);
 
       // 1. Subtle tactical radar sweep line across the background
