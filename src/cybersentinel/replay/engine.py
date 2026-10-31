@@ -55,18 +55,10 @@ class ReplayEngine:
         has_label = "label" in df.columns
         labels = df["label"].astype(str).str.strip().str.upper().tolist() if has_label else [""] * total_rows
         start_time = time.perf_counter()
-        logger.info("Computing predictions for Agent 1 and Agent 2...")
-        threat_preds = (self.threat_agent.predict_many(df) if hasattr(self.threat_agent, "predict_many")
-                        else [self.threat_agent.predict(r.to_dict()) for _, r in df.iterrows()])
-        anomaly_results = (self.anomaly_agent.score_frame(df) if hasattr(self.anomaly_agent, "score_frame")
-                           else [self.anomaly_agent.score(r.to_dict()) for _, r in df.iterrows()])
-        if len(threat_preds) != total_rows or len(anomaly_results) != total_rows:
-            raise RuntimeError("Agent 1/2 batch output length does not match replay input.")
-
+        logger.info("Starting causal replay; each record is gated before its own model inference.")
         dports = pd.to_numeric(df["Destination Port"], errors="coerce").fillna(0).where(lambda values: values.mod(1).eq(0), 0).clip(0, 65535).astype(int).tolist() if "Destination Port" in df.columns else [0] * total_rows
         src_col = next((c for c in ("source_ip", "Source IP", "Source_IP", "src_ip", "src") if c in df.columns), None)
         flow_records = df.to_dict(orient="records")
-        native_src = [str(row.get(src_col, "")).strip() if src_col and pd.notna(row.get(src_col)) else "" for row in flow_records]
         corr_src = [TemporalCorrelationAgent.derive_source_identity(row) for row in flow_records]
         dst_col = next((c for c in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP") if c in df.columns), None)
         time_col = next((c for c in ("Timestamp", "timestamp", "Flow Start", "flow_start", "start_time") if c in df.columns), None)
@@ -83,13 +75,19 @@ class ReplayEngine:
         classification_rows, replay_rows = [], []
         blocked = allowed = contained = benign_preserved = false_blocks = 0
         for step in range(total_rows):
-            record_id, src_ip, correlation_ip = record_ids[step], corr_src[step], corr_src[step]
+            record_id = record_ids[step]
+            src_ip = corr_src[step]
+            correlation_ip = src_ip
             ground_truth = labels[step]
-            threat, anomaly = threat_preds[step], anomaly_results[step]
+            # Existing policies are checked before inference for this record.
+            # Even pre-filtered records still receive A1/A2 classification below.
+            pre_filter = self.defense_agent.evaluate_pre_filter(record_id, src_ip, step)
+            flow = flow_records[step]
+            threat = self.threat_agent.predict(flow)
+            anomaly = self.anomaly_agent.score(flow)
             t_class = _extract_field(threat, "predicted_class")
             t_conf = _extract_field(threat, "confidence")
             a_score = _extract_field(anomaly, "anomaly_score")
-            pre_filter = self.defense_agent.evaluate_pre_filter(record_id, src_ip, step)
             threat_obj = ThreatDetectionResult(t_class, t_conf, status=_extract_field(threat, "status", "success"))
             anomaly_obj = AnomalyDetectionResult(
                 a_score, _extract_field(anomaly, "is_anomaly"),
@@ -155,7 +153,6 @@ class ReplayEngine:
                 "activated_after_record_id": policy.activated_after_record_id,
                 "scope_type": policy.scope_type, "scope_value": policy.scope_value,
                 "expires_after_record_id": record_ids[expiry_step],
-                "policy_action": policy.policy_action,
                 "policy_action": policy.policy_action,
                                                             })
         observed_source_flags = [TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records]
