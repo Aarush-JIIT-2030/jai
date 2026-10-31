@@ -12,7 +12,7 @@ flowchart TD
 
     subgraph A5_Pre["Agent 5: Pre-Filter Phase"]
         PF{Active Policy<br/>Match Source IP?}
-        BLK[Immediate Simulated BLOCK<br/>active_policy_id = POL-XXXXX<br/>No model inference for matched flow]
+        BLK[Immediate Simulated BLOCK<br/>active_policy_id = POL-XXXXX<br/>Classification and fusion evidence still retained; skip correlation and policy updates]
     end
 
     subgraph Detection["Tri-Agent Core (Analyzed Flows)"]
@@ -86,8 +86,8 @@ python scripts/generate_submissions.py \
 1. **Strict Causal Replay Discipline:**
    * Never uses future records or ground-truth labels during decision making.
    * Policies only apply to *later* incoming records, strictly adhering to real-world causality.
-2. **Pre-Filtering Computational Advantage:**
-   * An active policy match skips model inference for that flow. This is a simulated replay behavior, not a measured end-to-end latency claim. When native source IP is absent or invalid, endpoint correlation and policy creation fail closed; feature fingerprints are never presented as observed IPs. See the [scope audit](../release/benchmarks/source-ip-scope-audit.md).
+2. **Pre-Filter Action Gate:**
+   * A1/A2 classification and A3 evidence-fusion outputs are still computed for every row because `classification.csv` requires one prediction per record, including records later blocked. The active-policy check determines the replay action before Agent 4 correlation and Agent 5 policy updates; blocked rows do not enter those later state updates. This is simulated replay behavior, not a measured inference-speed optimization. When native source IP is absent or invalid, endpoint correlation and policy creation fail closed; feature fingerprints are never presented as observed IPs. See the [scope audit](../release/benchmarks/source-ip-scope-audit.md).
 3. **Defense-in-Depth Trade-Off:**
    * Report only metrics reproduced on the current code and authorized data. Include macro-F1 and per-class results, state the evaluation split and its repeated-feature overlap, and describe ALLOW/BLOCK/REVIEW as simulated actions. Older release reports contain historical figures, not current results.
 
