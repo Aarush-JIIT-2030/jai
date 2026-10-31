@@ -180,7 +180,6 @@ The prepared feature dataset may not contain native Layer 3 source IP fields. In
 * **Project license:** No project-level `LICENSE` file is currently present. The maintainers should choose and add one before presenting this repository as reusable open-source software; no license is inferred here.
 * **Dataset:** CICIDS2017 flow data and the challenge’s class mapping are governed by their respective providers and organizer terms. No challenge data is committed.
 * **AI assistance:** The team reports using Antigravity and ChatGPT for code review, debugging, test design, documentation, and UI implementation assistance. Team members remain responsible for understanding and presenting the submitted code.
-* **UI/UX reference:** The team reports reviewing the user-supplied `CICRCombined-main` archive for design patterns only. The team reports that no source files or components were copied; verify the exact archive’s license before any code reuse.
 
 
 Historical release and QA documents are indexed in [`release/README.md`](release/README.md); their old pass statuses are not current verification.
