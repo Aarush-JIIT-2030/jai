@@ -173,9 +173,9 @@ uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload
 ### Backend endpoints added for the final SOC workflow
 
 - `GET /api/system/diagnostics` — reports actual local model, dataset, SQLite and submission artifact presence.
-- `GET /api/overview` — computes evaluation KPIs from the installed labelled evaluation dataset and generated CSVs; labels are used only for offline metrics.
+- `GET /api/overview` — reports operational counts from unlabelled hidden replay outputs; ground-truth performance metrics remain unavailable.
 - `POST /api/fusion/simulate` — invokes the production Python Agent 3 fusion contract.
-- `POST /api/replay/run-official` — runs the installed evaluation parquet chronologically and writes the three official CSVs.
+- `POST /api/replay/run-official` — runs the installed unlabelled hidden replay input chronologically and writes the three official CSVs.
 - `GET /api/correlation/groups` — returns groups from the latest completed replay in the current API process, or an empty list when none exist.
 
 If the dataset or models are missing, the API returns an explicit unavailable response. It does not substitute synthetic benchmark values or sample incidents.
