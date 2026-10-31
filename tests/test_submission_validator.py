@@ -188,3 +188,27 @@ def test_independent_official_csv_validator_rejects_fingerprint_derived_source_s
     ], columns=["record_id", "action", "active_policy_id"]).to_csv(tmp_path / "replay.csv", index=False)
     errors = validate_official_csvs(input_path, tmp_path)
     assert any("scope_value must exactly match the observed SOURCE_IP" in error for error in errors)
+
+
+
+def test_independent_validator_enforces_lexicographically_smallest_matching_policy(tmp_path):
+    input_path = _write_official_bundle(tmp_path)
+    policies = pd.read_csv(tmp_path / "policies.csv")
+    duplicate_scope = policies.iloc[0].copy()
+    duplicate_scope["policy_id"] = "POL-00002"
+    policies = pd.concat([policies, duplicate_scope.to_frame().T], ignore_index=True)
+    policies.to_csv(tmp_path / "policies.csv", index=False)
+    replay = pd.read_csv(tmp_path / "replay.csv", dtype=str, keep_default_na=False)
+    replay.loc[1, "active_policy_id"] = "POL-00002"
+    replay.to_csv(tmp_path / "replay.csv", index=False)
+    errors = validate_official_csvs(input_path, tmp_path)
+    assert any("lexicographically smallest matching policy_id POL-00001" in error for error in errors)
+
+
+def test_independent_validator_rejects_allow_when_an_active_policy_matches(tmp_path):
+    input_path = _write_official_bundle(tmp_path)
+    replay = pd.read_csv(tmp_path / "replay.csv", dtype=str, keep_default_na=False)
+    replay.loc[1, ["action", "active_policy_id"]] = ["ALLOW", "NONE"]
+    replay.to_csv(tmp_path / "replay.csv", index=False)
+    errors = validate_official_csvs(input_path, tmp_path)
+    assert any("ALLOW is invalid because active policy POL-00001 matches this flow" in error for error in errors)
