@@ -98,7 +98,7 @@ def test_replay_does_not_fabricate_benign_when_agents_fail():
     engine = ReplayEngine(BrokenThreatAgent(), BrokenAnomalyAgent())
     result = engine.run_replay(pd.DataFrame([{"record_id": 1, "source_ip": "192.0.2.1"}]))
     assert result["classification_rows"][0]["predicted_class"] == ""
-    assert result["classification_rows"][0]["evidence_status"] == "INCOMPLETE"
+    assert result["classification_rows"][0]["evidence_status"] == "UNCERTAIN"
     assert result["replay_rows"][0]["action"] == "ALLOW"
     assert result["policy_rows"] == []
 
