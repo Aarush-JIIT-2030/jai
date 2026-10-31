@@ -75,25 +75,19 @@ flowchart LR
 
 ### 3. Model and evaluation lifecycle
 
-```mermaid
-flowchart TD
-    DS["Authorized labelled training data"] --> QC["Data audit + train-only preprocessing"]
-    QC --> A1T["Train A1 · five-class classifier"]
-    QC --> A2T["Fit A2 · BENIGN-only Isolation Forest"]
-    A1T --> ART["Local model artifacts + provenance"]
-    A2T --> ART
-    EV["Separate labelled evaluation partition"] --> RUN["Full-system evaluation runner"]
-    ART --> RUN
-    RUN --> REP["Nine JSON reports + plots"]
-    REP --> API["Evaluation API"]
-    API --> UI["Model Intelligence dashboard"]
-    H["Hidden unlabelled replay input"] --> REPLAY["Chronological replay + submission generation"]
-    ART --> REPLAY
-    REPLAY --> CSV["classification.csv · policies.csv · replay.csv"]
-    CSV --> VAL["Independent submission validation"]
-```
+The model lifecycle is deliberately split into training, evaluation, and hidden-data replay so that evaluation evidence is reproducible and replay decisions do not depend on unavailable labels.
 
-Evaluation reports and submission files are generated locally; they are not implied to exist in a clean checkout. Hidden replay labels are not used for decisions.
+1. **Prepare the training data.** Start with authorized, labelled training records. Audit the input schema and labels, then fit preprocessing steps on the training partition only. Reuse the fitted preprocessing contract for later inference; do not fit transformations on evaluation or hidden replay data.
+2. **Train the learned agents locally.**
+   - **A1 — supervised detector:** train the five-class classifier using the labelled training partition.
+   - **A2 — benign-baseline detector:** fit the Isolation Forest using BENIGN training records only.
+3. **Keep artifacts and provenance together.** Save the trained model artifacts and preprocessing/configuration metadata locally. The runtime agents load these artifacts; training is not silently repeated during replay.
+4. **Evaluate on a separate labelled partition.** Run the full-system evaluation runner against the separate evaluation partition using the saved artifacts. The evaluation suite produces nine JSON reports and plots covering the configured metrics and analyses.
+5. **Expose evaluation results.** The backend evaluation API serves the generated reports to the Model Intelligence dashboard. The dashboard presents evaluation evidence; it does not train models or manufacture metrics.
+6. **Run hidden replay independently.** Supply hidden, unlabelled flow records to the chronological replay process. Replay uses the saved artifacts and causal event ordering to generate `classification.csv`, `policies.csv`, and `replay.csv`.
+7. **Validate generated submissions.** Run the independent submission validator against the generated files before treating them as deliverables.
+
+Evaluation reports and submission files are generated locally; they are not implied to exist in a clean checkout. Hidden replay labels are not used for decisions. Keep the training, evaluation, and hidden replay partitions separate, and do not use hidden replay outcomes to tune or select models.
 
 ### 4. How to use this repository
 
