@@ -157,6 +157,25 @@ class ReplayEngine:
                 "expires_after_record_id": record_ids[expiry_step],
                 "policy_action": policy.policy_action,
                                             })
+        observed_source_flags = [TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records]
+        synthetic_identity_count = sum(
+            1 for observed, identity in zip(observed_source_flags, corr_src)
+            if not observed and bool(identity)
+        )
+        unresolved_identity_count = sum(1 for identity in corr_src if not identity)
+        observed_identity_count = sum(observed_source_flags)
+        if observed_identity_count and synthetic_identity_count:
+            identity_mode = "MIXED_OBSERVED_AND_SYNTHETIC"
+        elif synthetic_identity_count and unresolved_identity_count:
+            identity_mode = "SYNTHETIC_AND_UNRESOLVED"
+        elif synthetic_identity_count:
+            identity_mode = "SYNTHETIC_FINGERPRINT"
+        elif observed_identity_count and unresolved_identity_count:
+            identity_mode = "OBSERVED_AND_UNRESOLVED"
+        elif observed_identity_count:
+            identity_mode = "OBSERVED_ONLY"
+        else:
+            identity_mode = "UNAVAILABLE"
         attack_count = sum(label != "BENIGN" for label in labels) if has_label else None
         benign_count = sum(label == "BENIGN" for label in labels) if has_label else None
         metrics = {
@@ -171,9 +190,10 @@ class ReplayEngine:
             "false_block_rate": round(false_blocks / max(1, benign_count) * 100, 2) if benign_count is not None else None,
             "elapsed_seconds": round(elapsed, 2),
             "throughput_fps": round(total_rows / max(0.001, elapsed), 1),
-            "missing_native_source_ip_rows": sum(1 for row in flow_records if not TemporalCorrelationAgent.has_observed_source_ip(row)),
-            "synthetic_source_identity_rows": sum(1 for row in flow_records if not TemporalCorrelationAgent.has_observed_source_ip(row)),
-            "source_identity_mode": ("MIXED_OBSERVED_AND_SYNTHETIC" if any(TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records) and any(not TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records) else ("SYNTHETIC_FINGERPRINT" if flow_records and not any(TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records) else "OBSERVED_ONLY")),
+            "missing_native_source_ip_rows": total_rows - observed_identity_count,
+            "synthetic_source_identity_rows": synthetic_identity_count,
+            "unresolved_source_identity_rows": unresolved_identity_count,
+            "source_identity_mode": identity_mode,
         }
         return {"classification_rows": classification_rows, "policy_rows": policy_rows,
                 "replay_rows": replay_rows, "metrics": metrics}
