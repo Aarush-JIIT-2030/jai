@@ -109,7 +109,7 @@ class SubmissionValidator:
                 policies[pol_id] = row
 
                 if scope_type not in {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}:
-                    issues.append(f"Row {idx}: Scope type must be SOURCE_IP, got '{scope_type}'")
+                    issues.append(f"Row {idx}: Unsupported scope_type '{scope_type}'")
 
                 if action != "BLOCK":
                     issues.append(f"Row {idx}: Policy action must be BLOCK, got '{action}'")
