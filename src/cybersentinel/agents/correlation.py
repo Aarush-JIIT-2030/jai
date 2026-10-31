@@ -87,6 +87,19 @@ class TemporalCorrelationAgent:
         return f"10.{digest[0]}.{digest[1]}.{digest[2]}"
 
     @staticmethod
+    def has_observed_source_ip(flow: dict[str, Any]) -> bool:
+        """Return whether the flow contains a parseable, native source IP field."""
+        for key in ("source_ip", "Source IP", "Source_IP", "src_ip", "src"):
+            value = flow.get(key)
+            if value is None or not str(value).strip():
+                continue
+            try:
+                ipaddress.ip_address(str(value).strip())
+                return True
+            except ValueError:
+                continue
+        return False
+    @staticmethod
     def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:
         """Extract observed endpoints; only source identity may be derived."""
         src_ip = TemporalCorrelationAgent.derive_source_identity(flow)
