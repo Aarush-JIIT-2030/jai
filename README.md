@@ -19,7 +19,7 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                   │    Network Flow Packet Stream (CICIDS) │
                   └───────────────────┬────────────────────┘
                                       │
-                 [Agent 5 Pre-Filter: Active Block Check]
+                   [A1/A2 classification pass for every row]
                                       │
                    ┌──────────────────┴──────────────────┐
                    ▼                                     ▼
@@ -44,7 +44,7 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                                       ▼
                          ┌─────────────────────────┐
                          │Agent 5: Adaptive Defense│
-                         │(Forward Policy POL-XXXX)│
+                         │Policy gate + forward rule│
                          └─────────────────────────┘
 ```
 
