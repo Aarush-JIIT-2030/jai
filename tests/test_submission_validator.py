@@ -164,3 +164,29 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
 
     assert report["all_valid"] is False
     assert any("does not match the input's observed SOURCE_IP scope" in error for error in report["replay"]["errors"])
+
+def test_independent_official_csv_validator_accepts_fingerprint_derived_source_scope(tmp_path):
+    from cybersentinel.agents.correlation import TemporalCorrelationAgent
+
+    fingerprint = {
+        "Init_Win_bytes_forward": 64240,
+        "min_seg_size_forward": 20,
+        "Fwd Header Length": 40,
+    }
+    identity = TemporalCorrelationAgent.derive_source_identity(fingerprint)
+    input_frame = pd.DataFrame([
+        {"record_id": 201, **fingerprint},
+        {"record_id": 202, **fingerprint},
+    ])
+    input_path = tmp_path / "fingerprint-input.csv"
+    input_frame.to_csv(input_path, index=False)
+    pd.DataFrame([
+        [201, "DOS", 0.1, "AGREE"], [202, "DOS", 0.2, "AGREE"],
+    ], columns=["record_id", "predicted_class", "anomaly_score", "evidence_status"]).to_csv(tmp_path / "classification.csv", index=False)
+    pd.DataFrame([
+        ["POL-00001", 201, "SOURCE_IP", identity, 202, "BLOCK"],
+    ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]).to_csv(tmp_path / "policy.csv", index=False)
+    pd.DataFrame([
+        [201, "ALLOW", ""], [202, "BLOCK", "POL-00001"],
+    ], columns=["record_id", "action", "applied_policy_id"]).to_csv(tmp_path / "replay.csv", index=False)
+    assert validate_official_csvs(input_path, tmp_path) == []
