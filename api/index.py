@@ -110,7 +110,7 @@ def system_diagnostics():
         "agent_5_defense_code": True,
     }
     files = {}
-    for filename in ("classification.csv", "policies.csv", "replay.csv"):
+    for filename in ("classification.csv", "policy.csv", "replay.csv"):
         path = submission / filename
         files[filename] = {
             "present": path.is_file(),
@@ -392,12 +392,12 @@ def run_official_replay():
         output_dir.mkdir(parents=True, exist_ok=True)
         files = {
             "classification.csv": engine.export_csv(
-                results["classification_rows"],
-                ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
+                [{**row, "anomaly score": row["anomaly_score"], "evidence status": row["evidence_status"]} for row in results["classification_rows"]],
+                ["record_id", "predicted_class", "anomaly score", "evidence status"],
             ),
-            "policies.csv": engine.export_csv(
+            "policy.csv": engine.export_csv(
                 results["policy_rows"],
-                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"],
+                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
             ),
             "replay.csv": engine.export_csv(
                 results["replay_rows"],
@@ -450,7 +450,7 @@ def run_official_replay():
             "validation": validation,
             "files": {name: {"path": f"outputs/submission/{name}", "rows": len(results[key])}
                       for name, key in (("classification.csv", "classification_rows"),
-                                        ("policies.csv", "policy_rows"),
+                                        ("policy.csv", "policy_rows"),
                                         ("replay.csv", "replay_rows"))},
             "correlation_groups": len(_LAST_CORRELATION_GROUPS),
             "source": "installed_unlabelled_hidden_replay_input",
@@ -575,7 +575,7 @@ def get_overview():
     """Return operational replay counts without inventing hidden-set ground-truth metrics."""
     sub_dir = BASE_DIR / "outputs" / "submission"
     replay_file = sub_dir / "replay.csv"
-    policies_file = sub_dir / "policies.csv"
+    policies_file = sub_dir / "policy.csv"
     classification_file = sub_dir / "classification.csv"
     missing = [str(path.name) for path in (replay_file, policies_file, classification_file) if not path.is_file()]
     if missing:
@@ -643,7 +643,7 @@ def get_benchmarks():
 @app.get("/api/submissions/download/{filename}")
 def download_submission_file(filename: str):
     """Download an official submission CSV or report."""
-    allowed = {"classification.csv", "policies.csv", "replay.csv", "summary.json", "validation_report.json"}
+    allowed = {"classification.csv", "policy.csv", "replay.csv", "summary.json", "validation_report.json"}
     if filename not in allowed:
         raise HTTPException(status_code=400, detail=f"Invalid file requested: {filename}")
 
@@ -733,8 +733,8 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
 
 @app.get("/api/policies")
 def get_policies(limit: int = 50, offset: int = 0):
-    """Retrieve policies generated during replay from outputs/submission/policies.csv."""
-    pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
+    """Retrieve policies generated during replay from outputs/submission/policy.csv."""
+    pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
     if not pol_file.is_file():
         return {"policies": [], "total": 0}
     try:
@@ -776,7 +776,7 @@ def test_policy_prefilter(payload: dict[str, Any]):
     except Exception as exc:
         raise HTTPException(status_code=503, detail={"code": "REPLAY_INPUT_INVALID", "type": type(exc).__name__}) from exc
 
-    pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
+    pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
     matched_policy = None
     if pol_file.is_file():
         try:
