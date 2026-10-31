@@ -262,7 +262,7 @@ class SubmissionValidator:
                             observed_scope = ""
                         if not observed_scope or observed_scope != str(policy.get("scope_value", "")).strip():
                             replay_res["valid"] = False
-                            replay_res["errors"].append(f"Record {rid}: BLOCK policy {policy_id} does not match the input's observed {scope_type} scope.")
+                            replay_res["errors"].append(f"Record {rid}: BLOCK policy {policy_id} does not match the input-derived {scope_type} identity.")
                             replay_res["total_errors"] = replay_res.get("total_errors", 0) + 1
         for policy_id, policy in policy_map.items():
             activation = str(policy.get("activated_after_record_id", ""))
