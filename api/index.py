@@ -86,9 +86,9 @@ def health():
         "agents": {
             "agent_1_threat_detection": pipeline is not None and threat_present,
             "agent_2_anomaly_detection": pipeline is not None and anomaly_present,
-            "agent_3_evidence_fusion": True,
-            "agent_4_temporal_correlation": True,
-            "agent_5_adaptive_defense": True,
+            "agent_3_evidence_fusion": pipeline is not None,
+            "agent_4_temporal_correlation": pipeline is not None,
+            "agent_5_adaptive_defense": pipeline is not None,
         },
         "readiness": "ready" if pipeline is not None else "not_ready",
         "message": "Both model artifacts loaded; offline inference is ready." if pipeline else "API process is available, but verified model artifacts are missing or failed validation.",
@@ -713,7 +713,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         predicted_class = str(prediction.get("predicted_class", ""))
         if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
             continue
-        applied = decision.get("active_policy_id", "")
+        applied = decision.get("active_policy_id") or ("NONE" if decision.get("action") == "ALLOW" else "")
         raw_score = prediction.get("anomaly_score") if "anomaly_score" in prediction else prediction.get("anomaly_score")
         raw_evidence = prediction.get("evidence_status") if "evidence_status" in prediction else prediction.get("evidence_status", "UNCERTAIN")
         rows.append({
