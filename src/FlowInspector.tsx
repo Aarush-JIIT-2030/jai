@@ -305,13 +305,13 @@ export function AgentReadiness({ health }: { health: { model_ready: boolean; age
 type AnomalyResult = {
   anomaly_score: number | null;
   is_anomaly: boolean | null;
-  evidence: string[];
+  evidence: (string | Record<string, unknown>)[];
   status: string;
   message?: string | null;
 };
 
 export function Agent2Console({ ready }: { ready: boolean }) {
-  const [flowJson, setFlowJson] = useState("{}");
+  const [flowJson, setFlowJson] = useState("");
   const [result, setResult] = useState<AnomalyResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -387,13 +387,13 @@ export function Agent2Console({ ready }: { ready: boolean }) {
       {result && (
         <div className="dataset-loaded" style={{ marginTop: 18 }}>
           <div className="dataset-facts">
-            <div><small>ANOMALY RESULT</small><b>{result.is_anomaly ? "Anomaly Flagged" : "Baseline-like"}</b></div>
-            <div><small>RAW SCORE</small><b>{result.anomaly_score == null ? "—" : result.anomaly_score.toFixed(5)}</b></div>
+            <div><small>ANOMALY RESULT</small><b>{result.is_anomaly == null ? "Unknown" : result.is_anomaly ? "Anomaly Flagged" : "Baseline-like"}</b></div>
+            <div><small>ANOMALY INDEX · NOT A PROBABILITY</small><b>{result.anomaly_score == null ? "—" : result.anomaly_score.toFixed(5)}</b></div>
             <div><small>STATUS</small><b>{result.status}</b></div>
           </div>
           <b>Feature evidence</b>
           {result.evidence.length ? (
-            <ul>{result.evidence.map((item, index) => <li key={index}>{item.replaceAll("_", " ")}</li>)}</ul>
+            <ul>{result.evidence.map((item, index) => <li key={index}>{typeof item === "string" ? item.replaceAll("_", " ") : JSON.stringify(item)}</li>)}</ul>
           ) : (
             <div className="empty-inline">No out-of-range feature evidence was returned for this flow.</div>
           )}
