@@ -809,7 +809,7 @@ export function SubmissionStudio() {
 
   const fileCards = [
     { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly_score,evidence_status" },
-    { filename: "policies.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action" },
+    { filename: "policies.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id" },
     { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record with policy references.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
   ];
 
