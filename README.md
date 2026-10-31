@@ -460,7 +460,6 @@ Do not present the hosted deployment as a production-ready live SOC service unle
 - **Model artifact safety:** model artifacts use joblib/pickle serialization. Load only artifacts from trusted provenance.
 - **Project license:** MIT License; see [`LICENSE`](LICENSE). Third-party dependency and dataset terms continue to apply.
 - **AI assistance:** the team reports using Antigravity and ChatGPT for code review, debugging, test design, documentation, and UI implementation assistance. Team members remain responsible for understanding and presenting the submitted code.
-- **UI/UX reference:** the team reports reviewing the user-supplied `CICRCombined-main` archive for design patterns only; related project: [amancodes8/CICRCombined](https://github.com/amancodes8/CICRCombined). The team reports that source files/components were not copied.
-- **Architecture reference:** [Vaibhav-Patidar/cybersentinel](https://github.com/Vaibhav-Patidar/cybersentinel) was reviewed for high-level pipeline/evidence presentation ideas; the team reports that source files were not copied.
+
 
 Historical release and QA notes are indexed in [`release/README.md`](release/README.md). Their old pass statuses are historical snapshots, not current verification for this commit.
