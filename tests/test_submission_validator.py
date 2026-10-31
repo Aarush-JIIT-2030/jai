@@ -51,7 +51,7 @@ def test_submission_validator_catches_invalid_class(tmp_path):
     with (sub_dir / "replay.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["record_id", "action", "active_policy_id"])
-        writer.writerow(["rec-1", "ALLOW", "NONE"])
+        writer.writerow(["rec-1", "ALLOW", ""])
 
     report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1"])
     assert report["all_valid"] is False
@@ -74,7 +74,7 @@ def test_submission_validator_accepts_underscore_headers(tmp_path):
     with (sub_dir / "replay.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["record_id", "action", "active_policy_id"])
-        writer.writerow(["rec-1", "ALLOW", "NONE"])
+        writer.writerow(["rec-1", "ALLOW", ""])
 
     report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1"])
     assert report["all_valid"] is True
@@ -118,7 +118,7 @@ def _write_official_bundle(tmp_path):
         ["POL-00001", 101, "SOURCE_IP", "192.0.2.1", 103],
     ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]).to_csv(tmp_path / "policies.csv", index=False)
     pd.DataFrame([
-        [101, "ALLOW", "NONE"], [102, "BLOCK", "POL-00001"], [103, "ALLOW", "NONE"],
+        [101, "ALLOW", ""], [102, "BLOCK", "POL-00001"], [103, "ALLOW", ""],
     ], columns=["record_id", "action", "active_policy_id"]).to_csv(tmp_path / "replay.csv", index=False)
     return tmp_path / "input.csv"
 
@@ -155,7 +155,7 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
         ["POL-00001", "rec-1", "SOURCE_IP", "192.0.2.10", "rec-2"],
     ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]).to_csv(sub_dir / "policies.csv", index=False)
     pd.DataFrame([
-        ["rec-1", "ALLOW", "NONE"],
+        ["rec-1", "ALLOW", ""],
         ["rec-2", "BLOCK", "POL-00001"],
     ], columns=["record_id", "action", "active_policy_id"]).to_csv(sub_dir / "replay.csv", index=False)
     source = pd.DataFrame({"record_id": ["rec-1", "rec-2"], "source_ip": ["192.0.2.10", "192.0.2.11"]})
@@ -184,7 +184,7 @@ def test_independent_official_csv_validator_rejects_fingerprint_derived_source_s
         ["POL-00001", 201, "SOURCE_IP", "10.1.2.3", 202],
     ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]).to_csv(tmp_path / "policies.csv", index=False)
     pd.DataFrame([
-        [201, "ALLOW", "NONE"], [202, "BLOCK", "POL-00001"],
+        [201, "ALLOW", ""], [202, "BLOCK", "POL-00001"],
     ], columns=["record_id", "action", "active_policy_id"]).to_csv(tmp_path / "replay.csv", index=False)
     errors = validate_official_csvs(input_path, tmp_path)
     assert any("scope_value must exactly match the observed SOURCE_IP" in error for error in errors)
@@ -208,7 +208,7 @@ def test_independent_validator_enforces_lexicographically_smallest_matching_poli
 def test_independent_validator_rejects_allow_when_an_active_policy_matches(tmp_path):
     input_path = _write_official_bundle(tmp_path)
     replay = pd.read_csv(tmp_path / "replay.csv", dtype=str, keep_default_na=False)
-    replay.loc[1, ["action", "active_policy_id"]] = ["ALLOW", "NONE"]
+    replay.loc[1, ["action", "active_policy_id"]] = ["ALLOW", ""]
     replay.to_csv(tmp_path / "replay.csv", index=False)
     errors = validate_official_csvs(input_path, tmp_path)
     assert any("ALLOW is invalid because active policy POL-00001 matches this flow" in error for error in errors)
