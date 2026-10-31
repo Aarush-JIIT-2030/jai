@@ -94,9 +94,9 @@ export function FiveAgentArchitectureView() {
       id: 1,
       name: "Agent 1: Threat Detection",
       role: "Supervised Multiclass Classifier",
-      model: "Random Forest (artifact-defined configuration; confidence is not calibrated)",
+      model: "Random Forest (artifact-defined; calibration provenance is artifact-dependent)",
       input: "71 preprocessed network flow metrics",
-      output: "Predicted class + model confidence (not calibrated)",
+      output: "Predicted class + model confidence; calibration depends on the saved artifact",
       latency: "See measured benchmark report",
       throughput: "See measured benchmark report",
       accuracy: "See generated evaluation report",
@@ -109,7 +109,7 @@ export function FiveAgentArchitectureView() {
       role: "Unsupervised Statistical Outlier Isolation",
       model: "Isolation Forest (parameters loaded from model artifact)",
       input: "71 continuous flow distribution metrics",
-      output: "Anomaly score on model output scale + outlier flag",
+      output: "Bounded 0–1 anomaly index (not a probability) + outlier flag",
       latency: "See measured benchmark report",
       throughput: "See measured benchmark report",
       accuracy: "See generated evaluation report",
@@ -140,7 +140,7 @@ export function FiveAgentArchitectureView() {
       throughput: "Not independently measured",
       accuracy: "Pattern heuristics; evaluate against labelled validation data",
       classes: "PORT_SCAN, DDOS, BRUTE_FORCE, DOS_SURGE",
-      description: "Maintains a 150-flow chronological sliding window. Correlates individual packets across time and destination ports to uncover coordinated multi-stage campaigns.",
+      description: "Maintains a fixed 150-flow cap and configured 300-second age window when timestamps exist. Prefers observed endpoints; missing source IP can fall back to a collision-prone synthetic TCP fingerprint identity. Destination IP is never synthesized.",
     },
     {
       id: 5,
@@ -153,7 +153,7 @@ export function FiveAgentArchitectureView() {
       throughput: "Not independently measured",
       accuracy: "Causality assertions are tested; see current replay validation",
       classes: "ALLOW, BLOCK (with active_policy_id POL-XXXXX)",
-      description: "Evaluates incoming flows against unexpired active block rules before analysis. When confirmed attacks pass through, forward-looking policies are generated with explicit expiration ticks.",
+      description: "Checks earlier active policies before downstream correlation. Confirmed attacks can create a forward-only simulated SOURCE_IP block with a fixed default 150-position lifetime; it never blocks its own trigger row.",
     },
   ];
 
@@ -898,7 +898,7 @@ export function ModelIntelligenceView() {
         <div>
           <div className="panel-kicker">MODEL EVALUATION · GENERATED BENCHMARK REPORT</div>
           <h3>Model Intelligence & Diagnostics</h3>
-          <p>Displays metrics only when a benchmark report is available. Confidence is model-derived and not probability-calibrated.</p>
+          <p>Displays metrics only when a benchmark report is available. A1 confidence calibration depends on the loaded artifact; A2 exports a bounded anomaly index, not an attack probability.</p>
         </div>
         <span className="panel-icon"><Gauge size={18} /></span>
       </div>
@@ -951,7 +951,7 @@ export function ModelIntelligenceView() {
       </>}
       <div className="panel-foot" style={{ marginTop: 14 }}>
         <span><LockKeyhole size={13} /> No fallback metrics or confusion matrix are fabricated</span>
-        <span>MODEL CONFIDENCE IS NOT CALIBRATED</span>
+        <span>CONFIDENCE CALIBRATION IS ARTIFACT-DEPENDENT</span>
       </div>
     </section>
   );
@@ -1116,6 +1116,17 @@ export function SystemHealthView({ health }: { health: any }) {
         <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)", marginBottom: 5 }}>SOURCE IDENTITY DISCLOSURE</div>
           <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>{diagnostics.source_identity}</p>
+        </div>
+
+        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)", marginBottom: 7 }}>KNOWN LIMITATIONS · JUDGE DISCLOSURE</div>
+          <ul style={{ margin: 0, paddingLeft: 17, fontSize: 10, color: "var(--muted)", lineHeight: 1.65 }}>
+            <li>When native Layer-3 source IP is absent, the source identity is synthesized from three TCP-stack fingerprint fields. It is not observed; identical fingerprints share an identity and the 24-bit hash can collide, potentially causing false blocks.</li>
+            <li>8.58% of the audited evaluation rows share exact feature vectors with training data; repeated-flow results can therefore be optimistic.</li>
+            <li>A1 confidence is calibrated only when a separate held-out temperature-calibration run is recorded in the model artifact. A2's 0–1 anomaly index is not a probability.</li>
+            <li>The 150-flow correlation cap, 300-second timestamp window, and 150-position default policy lifetime are fixed parameters, not adaptive learned values.</li>
+            <li>Evaluation is CICIDS2017-only and offline. Cross-dataset generalization and live-network operation are untested; all defense actions are simulated.</li>
+          </ul>
         </div>
       </>}
 
