@@ -119,7 +119,7 @@ def system_diagnostics():
         "evaluation_dataset": {
             "present": dataset.is_file(),
             "bytes": dataset.stat().st_size if dataset.is_file() else None,
-            "path": "data/processed/eval_prepared.parquet",
+            "path": "data/processed/hidden_replay_input.csv",
         },
         "submission_artifacts": files,
         "history_database": {"present": history_db.is_file()},
@@ -250,7 +250,7 @@ def analyze(payload: dict[str, Any]):
     }
     analysis["adaptive_defense"] = {
         "action": defense.action,
-        "active_policy_id": defense.active_policy_id,
+        "active_policy_id": defense.applied_policy_id,
         "new_policy": {
             "policy_id": defense.new_policy_created.policy_id,
             "scope_type": defense.new_policy_created.scope_type,
@@ -633,7 +633,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
             continue
         applied = decision.get("active_policy_id", "")
         raw_score = prediction.get("anomaly_score") if "anomaly_score" in prediction else prediction.get("anomaly_score")
-        raw_evidence = prediction.get("evidence_status") if "evidence_status" in prediction else prediction.get("evidence_status", "INCOMPLETE")
+        raw_evidence = prediction.get("evidence_status") if "evidence_status" in prediction else prediction.get("evidence_status", "UNCERTAIN")
         rows.append({
             "record_id": record_id,
             "predicted_class": predicted_class,
