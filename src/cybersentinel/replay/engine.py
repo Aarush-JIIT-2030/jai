@@ -163,7 +163,7 @@ class ReplayEngine:
     @staticmethod
     def export_csv(rows: list[dict[str, Any]], fieldnames: list[str]) -> str:
         output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\\n")
+        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
         return output.getvalue()
