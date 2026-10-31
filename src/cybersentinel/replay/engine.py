@@ -73,7 +73,9 @@ class ReplayEngine:
         derived_timestamps = None
         if time_col is None and {"day", "time_offset"}.issubset(df.columns):
             dates = pd.to_datetime(df["day"], errors="coerce", utc=True)
-            offsets = pd.to_timedelta(df["time_offset"].astype(str), errors="coerce")
+            parts = df["time_offset"].astype(str).str.extract(r"^(?P<minutes>\\d+):(?P<seconds>\\d{1,2}(?:\\.\\d+)?)$")
+            elapsed_seconds = (pd.to_numeric(parts["minutes"], errors="coerce") * 60 + pd.to_numeric(parts["seconds"], errors="coerce"))
+            offsets = pd.to_timedelta(elapsed_seconds, unit="s")
             derived_timestamps = dates + offsets
 
         classification_rows, replay_rows = [], []
