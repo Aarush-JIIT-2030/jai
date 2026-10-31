@@ -7,7 +7,7 @@
 - Policy lifetime is tracked internally by replay position and exported as the organizer record ID at the expiry position.
 - Policy lookup occurs before the fusion decision for each row.
 - Classification is emitted for every row independently of the replay action.
-- Agent 4 uses only literal observed source IPs and observed destination IPs. A TCP fingerprint is not an endpoint and is never converted into an address.
+- Agent 4 uses only literal observed source and destination IP addresses. Invalid destination values are ignored, invalid destination ports are normalized to 0, and TCP fingerprints are never converted into endpoints.
 - Agent 5 accepts only literal IPv4/IPv6 source addresses for SOURCE_IP scope.
 - Missing/invalid model evidence is not replaced with benign or normal defaults; fusion returns INCOMPLETE/REVIEW.
 
