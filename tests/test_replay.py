@@ -55,7 +55,7 @@ def test_replay_causal_workflow(tmp_path):
     # Flow 101: First attack flow -> ALLOW into analyzer, activates policy
     assert results["replay_rows"][0]["record_id"] == 101
     assert results["replay_rows"][0]["action"] == "ALLOW"
-    assert results["replay_rows"][0]["active_policy_id"] == ""
+    assert results["replay_rows"][0]["active_policy_id"] == "NONE"
 
     # Flow 102: Second attack flow from same source -> BLOCKED by active policy!
     assert results["replay_rows"][1]["record_id"] == 102
@@ -69,15 +69,15 @@ def test_replay_causal_workflow(tmp_path):
     # Verify CSV files export
     sub_files = engine.generate_submission_files(df, output_dir=tmp_path)
     assert sub_files["classification"].is_file()
-    assert sub_files["policy"].is_file()
+    assert sub_files["policies"].is_file()
     assert sub_files["replay"].is_file()
 
     # Check header conformity
     class_header = sub_files["classification"].read_text().splitlines()[0]
-    assert class_header == "record_id,predicted_class,anomaly score,evidence status"
+    assert class_header == "record_id,predicted_class,anomaly_score,evidence_status"
 
     policy_header = sub_files["policies"].read_text().splitlines()[0]
-    assert policy_header == "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action"
+    assert policy_header == "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id"
 
     replay_header = sub_files["replay"].read_text().splitlines()[0]
     assert replay_header == "record_id,action,active_policy_id"
@@ -118,7 +118,7 @@ def test_replay_never_creates_policy_from_fingerprint_metadata():
     assert TemporalCorrelationAgent.derive_source_identity(fingerprint) == ""
     assert result["policy_rows"] == []
     assert [row["action"] for row in result["replay_rows"]] == ["ALLOW", "ALLOW"]
-    assert [row["active_policy_id"] for row in result["replay_rows"]] == ["", ""]
+    assert [row["active_policy_id"] for row in result["replay_rows"]] == ["NONE", "NONE"]
 
 
 def test_replay_uses_day_and_minute_second_offsets_for_temporal_correlation():
