@@ -67,7 +67,7 @@ class ReplayEngine:
         src_col = next((c for c in ("source_ip", "Source IP", "Source_IP", "src_ip", "src") if c in df.columns), None)
         flow_records = df.to_dict(orient="records")
         native_src = [str(row.get(src_col, "")).strip() if src_col and pd.notna(row.get(src_col)) else "" for row in flow_records]
-        corr_src = [native_src[i] or TemporalCorrelationAgent.derive_source_identity(row) for i, row in enumerate(flow_records)]
+        corr_src = [TemporalCorrelationAgent.derive_source_identity(row) for row in flow_records]
         dst_col = next((c for c in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP") if c in df.columns), None)
         time_col = next((c for c in ("Timestamp", "timestamp", "Flow Start", "flow_start", "start_time") if c in df.columns), None)
         derived_timestamps = None
@@ -83,7 +83,7 @@ class ReplayEngine:
         classification_rows, replay_rows = [], []
         blocked = allowed = contained = benign_preserved = false_blocks = 0
         for step in range(total_rows):
-            record_id, src_ip, correlation_ip = record_ids[step], native_src[step], corr_src[step]
+            record_id, src_ip, correlation_ip = record_ids[step], corr_src[step], corr_src[step]
             ground_truth = labels[step]
             threat, anomaly = threat_preds[step], anomaly_results[step]
             t_class = _extract_field(threat, "predicted_class")
@@ -170,6 +170,7 @@ class ReplayEngine:
             "false_block_rate": round(false_blocks / max(1, benign_count) * 100, 2) if benign_count is not None else None,
             "elapsed_seconds": round(elapsed, 2),
             "throughput_fps": round(total_rows / max(0.001, elapsed), 1),
+            "synthetic_source_identity_rows": sum(1 for raw in native_src if not raw),
         }
         return {"classification_rows": classification_rows, "policy_rows": policy_rows,
                 "replay_rows": replay_rows, "metrics": metrics}
