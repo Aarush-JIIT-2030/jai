@@ -29,6 +29,90 @@ CyberSentinel is an offline, five-agent network-flow intrusion detection and sim
 
 ## System at a glance
 
+## Visual system map
+
+> **Start here:** the diagrams below show how data becomes model evidence, how evidence becomes a simulated defense decision, and how the project is trained, evaluated, and run. The detailed contracts and commands follow each flow.
+
+### 1. End-to-end product flow
+
+```mermaid
+flowchart TD
+    U["Authorized flow data"] --> P["Prepare and validate data"]
+    P --> T["Train A1 + A2 locally"]
+    T --> M["Versioned model artifacts"]
+    U --> R["Chronological replay input"]
+    M --> I["Five-agent inference pipeline"]
+    R --> I
+    I --> C["Classification evidence"]
+    I --> D["Simulated policy decisions"]
+    C --> S["classification.csv"]
+    D --> Q["policies.csv + replay.csv"]
+    S --> V["Independent submission validator"]
+    Q --> V
+    V --> O["Validated local submission bundle"]
+```
+
+### 2. Five-agent decision pipeline
+
+```mermaid
+flowchart LR
+    F["One flow record"] --> A1["A1 · Supervised classifier"]
+    F --> A2["A2 · Benign-baseline anomaly detector"]
+    A1 --> A3["A3 · Evidence fusion"]
+    A2 --> A3
+    A3 --> G{"Matching policy already active?"}
+    G -->|Yes| B["BLOCK · simulated"]
+    G -->|No| A4["A4 · Chronological correlation"]
+    A4 --> T{"Campaign trigger?"}
+    T -->|No| L["ALLOW · simulated"]
+    T -->|Yes| A5["A5 · Create forward-looking policy"]
+    A5 --> L
+    B --> X["Record evidence, action and policy reference"]
+    L --> X
+```
+
+**Important ordering rule:** only a policy created by an earlier record can block the current record. A trigger record cannot block itself; a newly created policy applies to later records within its activation/expiry window.
+
+### 3. Model and evaluation lifecycle
+
+```mermaid
+flowchart TD
+    DS["Authorized labelled training data"] --> QC["Data audit + train-only preprocessing"]
+    QC --> A1T["Train A1 · five-class classifier"]
+    QC --> A2T["Fit A2 · BENIGN-only Isolation Forest"]
+    A1T --> ART["Local model artifacts + provenance"]
+    A2T --> ART
+    EV["Separate labelled evaluation partition"] --> RUN["Full-system evaluation runner"]
+    ART --> RUN
+    RUN --> REP["Nine JSON reports + plots"]
+    REP --> API["Evaluation API"]
+    API --> UI["Model Intelligence dashboard"]
+    H["Hidden unlabelled replay input"] --> REPLAY["Chronological replay + submission generation"]
+    ART --> REPLAY
+    REPLAY --> CSV["classification.csv · policies.csv · replay.csv"]
+    CSV --> VAL["Independent submission validation"]
+```
+
+Evaluation reports and submission files are generated locally; they are not implied to exist in a clean checkout. Hidden replay labels are not used for decisions.
+
+### 4. How to use this repository
+
+```mermaid
+flowchart TD
+    START(["Clone repository"]) --> INSTALL["Install Python + Node dependencies"]
+    INSTALL --> DATA["Prepare authorized challenge data"]
+    DATA --> TRAIN["Train A1 and A2"]
+    TRAIN --> CHOICE{"What do you want to do?"}
+    CHOICE -->|"Inspect model quality"| EVAL["Run full evaluation suite"]
+    EVAL --> DASH["Open Model Intelligence in analyst UI"]
+    CHOICE -->|"Create challenge outputs"| SUB["Generate chronological submissions"]
+    SUB --> CHECK["Run independent validator"]
+    CHOICE -->|"Explore the application"| DEV["Start FastAPI + Vite"]
+    DASH --> DONE(["Inspect actual artifacts and provenance"])
+    CHECK --> DONE
+    DEV --> DONE
+```
+
 | Area | Implementation |
 |---|---|
 | Supervised classification | Agent 1: versioned Random Forest by default; optional XGBoost backend |
