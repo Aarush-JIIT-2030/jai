@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import sys
 import time
 from typing import Any
@@ -23,6 +24,7 @@ from cybersentinel.agents.correlation import TemporalCorrelationAgent
 from cybersentinel.agents.adaptive_defense import AdaptiveDefenseAgent
 from cybersentinel.replay import ReplayEngine
 from cybersentinel.replay.submission import SubmissionValidator
+from cybersentinel.replay.input_validation import validate_replay_input
 from cybersentinel.storage.history_db import list_runs, record_run
 import pandas as pd
 
@@ -39,6 +41,7 @@ _anomaly_agent: AnomalyDetectionAgent | None = None
 _correlation_agent = TemporalCorrelationAgent()
 _defense_agent = AdaptiveDefenseAgent()
 _LAST_CORRELATION_GROUPS: list[dict[str, Any]] = []
+SERVERLESS_RUNTIME = os.environ.get("VERCEL") == "1"
 
 
 class BatchAnalyzeRequest(BaseModel):
@@ -78,20 +81,22 @@ def health():
         "mode": "offline-replay",
         "model_ready": pipeline is not None,
         "agents": {
-            "agent_1_threat_detection": threat_present,
-            "agent_2_anomaly_detection": anomaly_present,
-            "agent_3_evidence_fusion": True,
-            "agent_4_temporal_correlation": True,
-            "agent_5_adaptive_defense": True,
+            "agent_1_threat_detection": pipeline is not None and threat_present,
+            "agent_2_anomaly_detection": pipeline is not None and anomaly_present,
+            "agent_3_evidence_fusion": pipeline is not None,
+            "agent_4_temporal_correlation": pipeline is not None,
+            "agent_5_adaptive_defense": pipeline is not None,
         },
-        "message": "All 5 multi-agent components operational." if pipeline else "Model artifacts are missing or failed validation.",
+        "readiness": "ready" if pipeline is not None else "not_ready",
+        "message": "Both model artifacts loaded; offline inference is ready." if pipeline else "API process is available, but verified model artifacts are missing or failed validation.",
     }
 
 
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
     """Expose actual local artifact presence without inventing readiness."""
-    dataset = BASE_DIR / "data" / "processed" / "hidden_replay_input.csv"
+    dataset_candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    dataset = next((path for path in dataset_candidates if path.is_file()), dataset_candidates[-1])
     history_db = BASE_DIR / "data" / "cybersentinel_history.db"
     submission = BASE_DIR / "outputs" / "submission"
     model_status = {
@@ -108,8 +113,15 @@ def system_diagnostics():
             "present": path.is_file(),
             "bytes": path.stat().st_size if path.is_file() else None,
         }
+    input_validation = None
+    if dataset.is_file():
+        try:
+            input_frame = pd.read_parquet(dataset) if dataset.suffix == ".parquet" else pd.read_csv(dataset)
+            input_validation = validate_replay_input(input_frame)
+        except Exception as exc:
+            input_validation = {"valid": False, "errors": [f"Input validation could not run: {type(exc).__name__}"]}
     return {
-        "api": {"available": True, "mode": "offline-replay"},
+        "api": {"available": True, "mode": "offline-replay", "runtime": "serverless-preview" if SERVERLESS_RUNTIME else "local"},
         "models": model_status,
         "model_sizes": {
             "agent_1_bytes": THREAT_MODEL.stat().st_size if THREAT_MODEL.is_file() else None,
@@ -119,10 +131,11 @@ def system_diagnostics():
         "hidden_replay_input": {
             "present": dataset.is_file(),
             "bytes": dataset.stat().st_size if dataset.is_file() else None,
-            "path": "data/processed/hidden_replay_input.csv",
+            "path": str(dataset.relative_to(BASE_DIR)) if dataset.is_file() else "data/processed/hidden_replay_input.csv",
+            "validation": input_validation,
         },
         "submission_artifacts": files,
-        "history_database": {"present": history_db.is_file()},
+        "history_database": {"present": history_db.is_file(), "persistent": not SERVERLESS_RUNTIME, "mode": "ephemeral" if SERVERLESS_RUNTIME else "local_sqlite"},
         "source_identity": "literal observed source IP only; missing or invalid endpoint values remain unknown and never become synthetic identities",
         "firewall": {"mode": "simulated-only", "host_firewall_modified": False},
     }
@@ -131,6 +144,8 @@ def system_diagnostics():
 @app.get("/api/history")
 def get_history(limit: int = 15):
     """Retrieve runs from local SQLite database."""
+    if SERVERLESS_RUNTIME:
+        return {"runs": [], "source": "not_persistent_serverless", "message": "Run history is local-only and is not persisted by serverless preview deployments."}
     try:
         runs = list_runs(limit=limit)
         normalized = [
@@ -152,9 +167,9 @@ def models_status():
             "agents": {
                 "threat_detection": {"artifact_present": THREAT_MODEL.is_file()},
                 "anomaly_detection": {"artifact_present": ANOMALY_MODEL.is_file()},
-                "evidence_fusion": {"ready": True},
-                "temporal_correlation": {"ready": True},
-                "adaptive_defense": {"ready": True},
+                "evidence_fusion": {"code_available": True, "runtime_ready": False},
+                "temporal_correlation": {"code_available": True, "runtime_ready": False},
+                "adaptive_defense": {"code_available": True, "runtime_ready": False},
             },
         }
     return {
@@ -164,14 +179,19 @@ def models_status():
             "threat_detection": {
                 "backend": pipeline.threat_agent.model.metadata.get("backend"),
                 "feature_count": len(pipeline.threat_agent.model.feature_columns),
+                "feature_columns": list(pipeline.threat_agent.model.feature_columns),
                 "training_rows": pipeline.threat_agent.model.metadata.get("training_rows"),
+                "confidence_calibrated": bool(pipeline.threat_agent.model.metadata.get("confidence_calibrated", False)),
+                "calibration_temperature": pipeline.threat_agent.model.calibration_temperature,
                 "classes": list(pipeline.threat_agent.model.label_encoder.classes_),
             },
             "anomaly_detection": {
                 "algorithm": "IsolationForest",
                 "feature_count": len(pipeline.anomaly_agent.feature_columns),
+                "feature_columns": list(pipeline.anomaly_agent.feature_columns),
                 "training_rows": pipeline.anomaly_agent.metadata.get("training_rows"),
                 "threshold": pipeline.anomaly_agent.threshold,
+                "score_is_probability": False,
             },
             "evidence_fusion": {"simulated_actions": ["ALLOW", "BLOCK", "REVIEW"]},
             "temporal_correlation": {"window_size": _correlation_agent.window_size},
@@ -219,45 +239,14 @@ def analyze(payload: dict[str, Any]):
     if not isinstance(flow, dict) or not flow:
         raise HTTPException(status_code=422, detail="Provide a non-empty flow object.")
 
-    # Run Tri-Agent pipeline
+    # This endpoint is deliberately stateless: A4/A5 require chronological
+    # sequence state and are run only by /api/replay/simulate or /api/replay/run-official.
     analysis = pipeline.analyze(flow)
-
-    # Correlate with Agent 4
-    correlation = _correlation_agent.correlate(
-        record_id=flow.get("record_id", "live-flow"),
-        flow=flow,
-        threat_class=analysis.get("final_class"),
-        confidence=analysis.get("confidence"),
-    )
-
-    # Evaluate with Agent 5
-    src_ip, _, _ = TemporalCorrelationAgent.extract_endpoints(flow)
-    is_attack = analysis.get("action") == "BLOCK" or (correlation.correlated and correlation.attack_type != "BENIGN")
-    defense = _defense_agent.handle_post_analysis(
-        record_id=flow.get("record_id", "live-flow"),
-        source_ip=src_ip,
-        current_step=len(_correlation_agent.history),
-        attack_detected=is_attack,
-        attack_type=correlation.attack_type or analysis.get("final_class"),
-        confidence=analysis.get("confidence"),
-    )
-
-    analysis["temporal_correlation"] = {
-        "correlated": correlation.correlated,
-        "group_id": correlation.group_id,
-        "attack_type": correlation.attack_type,
-        "evidence": correlation.evidence,
-    }
-    analysis["adaptive_defense"] = {
-        "action": defense.action,
-        "active_policy_id": defense.applied_policy_id,
-        "new_policy": {
-            "policy_id": defense.new_policy_created.policy_id,
-            "scope_type": defense.new_policy_created.scope_type,
-            "scope_value": defense.new_policy_created.scope_value,
-            "expires_after_record_id": defense.new_policy_created.expires_after_record_id,
-        } if defense.new_policy_created else None,
-        "rationale": defense.rationale,
+    analysis["execution_mode"] = "single_record_model_inference"
+    analysis["stateful_agents"] = "not_run; use chronological replay for A4/A5"
+    analysis["model_provenance"] = {
+        "a1_confidence_calibrated": bool(pipeline.threat_agent.model.metadata.get("confidence_calibrated", False)),
+        "a2_score_is_probability": False,
     }
     return analysis
 
@@ -314,6 +303,12 @@ def simulate_replay(payload: ReplaySimulationRequest):
         fusion_agent=pipeline.fusion_agent,
     )
     df = pd.DataFrame(payload.flows)
+    input_report = validate_replay_input(df, {
+        "Agent 1": engine.threat_agent.model.feature_columns,
+        "Agent 2": engine.anomaly_agent.feature_columns,
+    })
+    if not input_report["valid"]:
+        raise HTTPException(status_code=422, detail={"code": "REPLAY_INPUT_INVALID", "report": input_report})
     results = engine.run_replay(df)
 
     # Retain only groups produced by this replay run.
@@ -362,6 +357,8 @@ def simulate_replay(payload: ReplaySimulationRequest):
 @app.post("/api/replay/run-official")
 def run_official_replay():
     """Run the installed official evaluation stream and write the three submission CSVs."""
+    if SERVERLESS_RUNTIME:
+        raise HTTPException(status_code=503, detail={"code": "LOCAL_RUNTIME_REQUIRED", "message": "Replay execution and local SQLite history require the local Python runtime; serverless previews are read-only."})
     pipeline = get_pipeline()
     if pipeline is None:
         raise HTTPException(
@@ -381,6 +378,12 @@ def run_official_replay():
             anomaly_agent=pipeline.anomaly_agent,
             fusion_agent=pipeline.fusion_agent,
         )
+        input_report = validate_replay_input(frame, {
+            "Agent 1": engine.threat_agent.model.feature_columns,
+            "Agent 2": engine.anomaly_agent.feature_columns,
+        })
+        if not input_report["valid"]:
+            raise HTTPException(status_code=422, detail={"code": "REPLAY_INPUT_INVALID", "report": input_report})
         results = engine.run_replay(frame)
         output_dir = BASE_DIR / "outputs" / "submission"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -617,9 +620,9 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
     class_map = classifications.set_index("record_id").to_dict(orient="index")
     replay_map = replay.set_index("record_id").to_dict(orient="index")
 
-    def numeric_from_value(value: Any) -> float:
+    def numeric_from_value(value: Any) -> float | None:
         parsed = pd.to_numeric(value, errors="coerce")
-        return float(parsed) if pd.notna(parsed) else 0.0
+        return float(parsed) if pd.notna(parsed) else None
 
     rows = []
     for index, flow in df.iterrows():
@@ -641,7 +644,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
             "evidence_status": str(raw_evidence),
             "action": str(decision.get("action", "")),
             "active_policy_id": "" if pd.isna(applied) or not str(applied).strip() else str(applied),
-            "destination_port": int(numeric_from_value(flow.get("Destination Port", 0))),
+            "destination_port": int(numeric_from_value(flow.get("Destination Port"))) if numeric_from_value(flow.get("Destination Port")) is not None else None,
             "flow_duration": numeric_from_value(flow.get("Flow Duration", 0)),
             "total_fwd_packets": numeric_from_value(flow.get("Total Fwd Packets", 0)),
             "packet_length_mean": numeric_from_value(flow.get("Packet Length Mean", 0)),
