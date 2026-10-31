@@ -98,7 +98,7 @@ def health():
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
     """Expose actual local artifact presence without inventing readiness."""
-    dataset_candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    dataset_candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.csv", BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet")
     dataset = next((path for path in dataset_candidates if path.is_file()), dataset_candidates[-1])
     history_db = BASE_DIR / "data" / "cybersentinel_history.db"
     submission = BASE_DIR / "outputs" / "submission"
@@ -375,7 +375,7 @@ def run_official_replay():
             status_code=503,
             detail={"code": "MODEL_NOT_READY", "message": "Install and verify both model artifacts before running replay."},
         )
-    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.csv", BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet")
     eval_file = next((path for path in candidates if path.is_file()), None)
     if eval_file is None:
         raise HTTPException(status_code=404, detail={"code": "HIDDEN_REPLAY_INPUT_NOT_FOUND", "message": "Install the unlabelled organizer input as hidden_replay_input.parquet or .csv."})
@@ -564,7 +564,7 @@ def validate_submissions():
     # The source dataset is the authority for coverage and ordering. Never infer
     # expected IDs from classification.csv, because a truncated file could then
     # incorrectly validate against its own contents.
-    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.csv", BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet")
     eval_file = next((path for path in candidates if path.is_file()), None)
     if eval_file is None:
         return {"valid": False, "status": "INPUT_DATASET_NOT_AVAILABLE", "message": "Cannot verify submission coverage without the original unlabelled hidden replay input."}
@@ -679,7 +679,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         raise HTTPException(status_code=422, detail="limit must be 1..200 and offset must be non-negative.")
 
     sub_dir = BASE_DIR / "outputs" / "submission"
-    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.csv", BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet")
     eval_file = next((path for path in candidates if path.is_file()), None)
     class_file = sub_dir / "classification.csv"
     replay_file = sub_dir / "replay.csv"
