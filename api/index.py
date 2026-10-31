@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 import io
 import json
+import base64
 import os
 import sys
 import tempfile
@@ -81,7 +82,7 @@ def get_pipeline() -> CyberSentinelPipeline | None:
 def health():
     pipeline = get_pipeline()
     threat_present = THREAT_MODEL.is_file()
-    anomaly_present = ANOMALY_MODEL.is_file()
+    anomaly_agent = get_anomaly_agent()
     return {
         "status": "ok",
         "service": "CyberSentinel API",
@@ -90,13 +91,17 @@ def health():
         "model_ready": pipeline is not None,
         "agents": {
             "agent_1_threat_detection": pipeline is not None and threat_present,
-            "agent_2_anomaly_detection": pipeline is not None and anomaly_present,
+            "agent_2_anomaly_detection": anomaly_agent is not None,
             "agent_3_evidence_fusion": pipeline is not None,
             "agent_4_temporal_correlation": pipeline is not None,
             "agent_5_adaptive_defense": pipeline is not None,
         },
         "readiness": "ready" if pipeline is not None else "not_ready",
-        "message": "Both model artifacts loaded; offline inference is ready." if pipeline else "API process is available, but verified model artifacts are missing or failed validation.",
+        "message": "Both model artifacts loaded; offline inference is ready." if pipeline else (
+            "Agent 2 is independently ready; the combined pipeline still requires both model artifacts."
+            if anomaly_agent is not None else
+            "API process is available, but one or more model artifacts are missing or failed validation."
+        ),
     }
 
 
@@ -174,7 +179,12 @@ def models_status():
             "models_ready": False,
             "agents": {
                 "threat_detection": {"artifact_present": THREAT_MODEL.is_file()},
-                "anomaly_detection": {"artifact_present": ANOMALY_MODEL.is_file()},
+                "anomaly_detection": {
+                    "artifact_present": ANOMALY_MODEL.is_file(),
+                    "runtime_ready": get_anomaly_agent() is not None,
+                    "feature_count": len(get_anomaly_agent().feature_columns) if get_anomaly_agent() else 0,
+                    "score_is_probability": False,
+                },
                 "evidence_fusion": {"code_available": True, "runtime_ready": False},
                 "temporal_correlation": {"code_available": True, "runtime_ready": False},
                 "adaptive_defense": {"code_available": True, "runtime_ready": False},
@@ -209,13 +219,33 @@ def models_status():
     }
 
 
+def _supabase_service_key() -> str | None:
+    dedicated = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SECRET_KEY")
+    if dedicated:
+        return dedicated.strip()
+    # Existing deployments may already have a server-only SUPABASE_KEY. Accept
+    # it only when it is a recognized secret key or a JWT with role=service_role.
+    candidate = os.environ.get("SUPABASE_KEY", "").strip()
+    if candidate.startswith("sb_secret_"):
+        return candidate
+    try:
+        encoded = candidate.split(".")[1]
+        encoded += "=" * (-len(encoded) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(encoded.encode("ascii")))
+        if claims.get("role") == "service_role":
+            return candidate
+    except Exception:
+        pass
+    return None
+
+
 def _supabase_persistence_configured() -> bool:
-    return bool(os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SECRET_KEY"))
+    return _supabase_service_key() is not None
 
 
 def _persist_agent2_event(result: AnomalyDetectionResult, source: str = "agent2_independent") -> dict[str, Any]:
     """Persist score metadata only; never upload the raw network-flow record."""
-    secret = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SECRET_KEY")
+    secret = _supabase_service_key()
     if not secret:
         return {"stored": False, "reason": "server_secret_not_configured"}
     base_url = os.environ.get("SUPABASE_URL", "https://egwguyexqixmqytydesc.supabase.co").rstrip("/")
@@ -255,27 +285,33 @@ def _persist_agent2_event(result: AnomalyDetectionResult, source: str = "agent2_
         return {"stored": False, "reason": f"supabase_error_{type(exc).__name__}"}
 
 
+def get_anomaly_agent() -> AnomalyDetectionAgent | None:
+    """Load Agent 2 independently of the supervised Agent 1 artifact."""
+    global _anomaly_agent
+    if _anomaly_agent is not None:
+        return _anomaly_agent
+    if not ANOMALY_MODEL.is_file():
+        return None
+    try:
+        _anomaly_agent = AnomalyDetectionAgent.load(ANOMALY_MODEL)
+    except Exception:
+        _anomaly_agent = None
+    return _anomaly_agent
+
+
 @app.post("/api/agents/anomaly/score")
 def score_anomaly(payload: dict[str, Any]):
     """Run Agent 2 independently without requiring Agent 1 or evidence fusion."""
-    global _anomaly_agent
-    if _anomaly_agent is None:
-        if not ANOMALY_MODEL.is_file():
-            raise HTTPException(
-                status_code=503,
-                detail={"code": "AGENT_2_NOT_READY", "message": "Agent 2 model artifact is not installed."},
-            )
-        try:
-            _anomaly_agent = AnomalyDetectionAgent.load(ANOMALY_MODEL)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail={"code": "AGENT_2_NOT_READY", "message": f"Agent 2 model could not be loaded: {type(exc).__name__}"},
-            )
+    agent = get_anomaly_agent()
+    if agent is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "AGENT_2_NOT_READY", "message": "Agent 2 model artifact is missing or failed validation."},
+        )
     flow = payload.get("flow", payload)
     if not isinstance(flow, dict) or not flow:
         raise HTTPException(status_code=422, detail="Provide a non-empty flow object.")
-    result = _anomaly_agent.score(flow)
+    result = agent.score(flow)
     if result.status != "success":
         raise HTTPException(status_code=422, detail={"code": "AGENT_2_SCORING_ERROR", "message": result.message or "Anomaly scoring failed."})
     response = result.to_dict()
