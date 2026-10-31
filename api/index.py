@@ -3,13 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import io
-import json
 import os
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
 import zipfile
 from typing import Any
 
@@ -183,7 +180,6 @@ def models_status():
     return {
         "status": "ready",
         "models_ready": True,
-        "supabase_persistence_configured": _supabase_persistence_configured(),
         "agents": {
             "threat_detection": {
                 "backend": pipeline.threat_agent.model.metadata.get("backend"),
@@ -209,52 +205,6 @@ def models_status():
     }
 
 
-def _supabase_persistence_configured() -> bool:
-    return bool(os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SECRET_KEY"))
-
-
-def _persist_agent2_event(result: AnomalyDetectionResult, source: str = "agent2_independent") -> dict[str, Any]:
-    """Persist score metadata only; never upload the raw network-flow record."""
-    secret = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SECRET_KEY")
-    if not secret:
-        return {"stored": False, "reason": "server_secret_not_configured"}
-    base_url = os.environ.get("SUPABASE_URL", "https://egwguyexqixmqytydesc.supabase.co").rstrip("/")
-    payload = result.to_dict()
-    if payload.get("status") != "success" or payload.get("anomaly_score") is None or payload.get("is_anomaly") is None:
-        return {"stored": False, "reason": "unsuccessful_inference"}
-    record = {
-        "source": source,
-        "model_version": str((_anomaly_agent.metadata if _anomaly_agent else {}).get("algorithm", "IsolationForest")),
-        "anomaly_score": float(payload["anomaly_score"]),
-        "is_anomaly": bool(payload["is_anomaly"]),
-        "feature_count": len(_anomaly_agent.feature_columns) if _anomaly_agent else 0,
-        "evidence": payload.get("evidence") or [],
-        "request_metadata": {"runtime": "vercel" if SERVERLESS_RUNTIME else "local"},
-    }
-    request = urllib.request.Request(
-        f"{base_url}/rest/v1/agent2_inference_events",
-        data=json.dumps(record, separators=(",", ":")).encode("utf-8"),
-        headers={
-            "apikey": secret,
-            "Authorization": f"Bearer {secret}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=4) as response:
-            if response.status not in (200, 201, 204):
-                return {"stored": False, "reason": f"supabase_http_{response.status}"}
-        return {"stored": True, "backend": "supabase"}
-    except urllib.error.HTTPError as exc:
-        return {"stored": False, "reason": f"supabase_http_{exc.code}"}
-    except (urllib.error.URLError, TimeoutError):
-        return {"stored": False, "reason": "supabase_unreachable"}
-    except Exception as exc:
-        return {"stored": False, "reason": f"supabase_error_{type(exc).__name__}"}
-
-
 @app.post("/api/agents/anomaly/score")
 def score_anomaly(payload: dict[str, Any]):
     """Run Agent 2 independently without requiring Agent 1 or evidence fusion."""
@@ -278,9 +228,7 @@ def score_anomaly(payload: dict[str, Any]):
     result = _anomaly_agent.score(flow)
     if result.status != "success":
         raise HTTPException(status_code=422, detail={"code": "AGENT_2_SCORING_ERROR", "message": result.message or "Anomaly scoring failed."})
-    response = result.to_dict()
-    response["supabase_persistence"] = _persist_agent2_event(result)
-    return response
+    return result.to_dict()
 
 
 @app.post("/api/analyze")

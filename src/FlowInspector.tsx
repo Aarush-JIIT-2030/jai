@@ -308,7 +308,6 @@ type AnomalyResult = {
   evidence: (string | Record<string, unknown>)[];
   status: string;
   message?: string | null;
-  supabase_persistence?: { stored: boolean; backend?: string; reason?: string };
 };
 
 export function Agent2Console({ ready }: { ready: boolean }) {
@@ -391,13 +390,6 @@ export function Agent2Console({ ready }: { ready: boolean }) {
             <div><small>ANOMALY RESULT</small><b>{result.is_anomaly == null ? "Unknown" : result.is_anomaly ? "Anomaly Flagged" : "Baseline-like"}</b></div>
             <div><small>ANOMALY INDEX · NOT A PROBABILITY</small><b>{result.anomaly_score == null ? "—" : result.anomaly_score.toFixed(5)}</b></div>
             <div><small>STATUS</small><b>{result.status}</b></div>
-          </div>
-          <div className="empty-inline" style={{ margin: "10px 0" }}>
-            Supabase audit: {result.supabase_persistence?.stored
-              ? "Score metadata saved to Supabase."
-              : result.supabase_persistence?.reason === "server_secret_not_configured"
-                ? "Scoring succeeded; Supabase server key is not configured in the API environment."
-                : "Score returned; Supabase audit was not confirmed (" + (result.supabase_persistence?.reason ?? "not reported") + ")."}
           </div>
           <b>Feature evidence</b>
           {result.evidence.length ? (

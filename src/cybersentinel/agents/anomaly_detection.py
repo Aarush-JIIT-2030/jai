@@ -301,45 +301,14 @@ class AnomalyDetectionAgent:
     @classmethod
     def load(cls, path: str | Path) -> "AnomalyDetectionAgent":
         payload = joblib.load(path)
-        if not isinstance(payload, dict):
-            raise ValueError("Anomaly model artifact must be a mapping.")
-        metadata = payload.get("metadata") or {}
-        if not isinstance(metadata, dict):
-            raise ValueError("Anomaly model metadata must be a mapping.")
-        # Version 1 artifacts predate the top-level format marker and calibrated
-        # score_scale field. Accept that known legacy layout only when all core
-        # fitted objects and the feature contract are present.
-        artifact_version = payload.get(
-            "artifact_format_version", metadata.get("artifact_format_version", 1)
-        )
-        if artifact_version not in (1, ARTIFACT_FORMAT_VERSION):
+        if payload.get("artifact_format_version") != ARTIFACT_FORMAT_VERSION:
             raise ValueError("Unsupported anomaly model artifact version.")
-        required = ("estimator", "imputer", "feature_columns", "threshold")
-        missing = [key for key in required if key not in payload]
-        if missing:
-            raise ValueError("Anomaly model artifact is missing required fields.")
-        feature_columns = payload["feature_columns"]
-        if not isinstance(feature_columns, (list, tuple)) or not feature_columns:
-            raise ValueError("Anomaly model artifact has no feature columns.")
-        threshold = float(payload["threshold"])
-        if not np.isfinite(threshold):
-            raise ValueError("Anomaly model threshold must be finite.")
-        score_scale_value = payload.get("score_scale", metadata.get("score_scale"))
-        if score_scale_value is None and artifact_version == 1:
-            score_scale_value = 1.0
-            metadata = {**metadata, "legacy_score_scale_fallback": True}
-        if score_scale_value is None:
-            raise ValueError("Anomaly model artifact is missing score calibration.")
-        score_scale = float(score_scale_value)
-        if not np.isfinite(score_scale) or score_scale <= 0:
-            raise ValueError("Anomaly model score scale must be finite and positive.")
-        metadata = {**metadata, "artifact_format_version": int(artifact_version)}
         return cls(
             estimator=payload["estimator"],
-            feature_columns=list(feature_columns),
+            feature_columns=payload["feature_columns"],
             imputer=payload["imputer"],
             profiles=payload.get("profiles", {}),
-            threshold=threshold,
-            metadata=metadata,
-            score_scale=score_scale,
+            threshold=float(payload["threshold"]),
+            metadata=payload.get("metadata", {}),
+            score_scale=float(payload.get("score_scale", 1.0)),
         )
