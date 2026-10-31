@@ -67,6 +67,7 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
     setError("");
     setSummary(null);
     setProgress(0);
+    let processedRows = 0;
     const aggregate: BatchResponse = {
       total_analyzed: 0,
       actions: { ALLOW: 0, BLOCK: 0, REVIEW: 0 },
@@ -105,12 +106,13 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
           aggregate.class_counts[className] = (aggregate.class_counts[className] || 0) + 1;
           if (aggregate.results.length < 20) aggregate.results.push(row);
         }
-        setProgress(Math.min(rows.length, offset + chunk.length));
+        processedRows = Math.min(rows.length, offset + chunk.length);
+        setProgress(processedRows);
         setSummary({ ...aggregate, results: [...aggregate.results], class_counts: { ...aggregate.class_counts } });
       }
     } catch (reason) {
       const detail = reason instanceof Error ? reason.message : "Batch replay stopped unexpectedly.";
-      setError(progress > 0 ? detail + " Partial results cover " + progress.toLocaleString() + " of " + rows.length.toLocaleString() + " rows." : detail);
+      setError(processedRows > 0 ? detail + " Partial results cover " + processedRows.toLocaleString() + " of " + rows.length.toLocaleString() + " rows." : detail);
     } finally {
       setBusy(false);
     }
