@@ -68,7 +68,7 @@ Read [`docs/judge-disclosures.md`](docs/judge-disclosures.md) before the live de
 
 - The CICIDS2017 feature-only split does not provide native Layer-3 source/destination addresses. **The current hardened branch does not turn TCP-stack fingerprints into IP addresses**; without a literal observed source IP, endpoint correlation and SOURCE_IP policy creation fail closed. If a compatibility build uses a fingerprint-derived pseudo-IP, it is synthetic, can collide for identical TCP-stack fingerprints, and must never be described as an observed address.
 - The documented train/eval feature overlap is 8.58% of evaluation rows and can make repeated-flow results optimistic.
-- Agent 1 confidence is uncalibrated unless the separate held-out calibration workflow was run. Agent 2 emits a raw anomaly score, not a probability.
+- Agent 1 confidence is uncalibrated unless the separate held-out calibration workflow was run. Agent 2 exports a bounded 0–1 anomaly index (higher means more anomalous), not a probability; its operating threshold is applied to the underlying Isolation Forest decision function.
 - The temporal correlator has a fixed 150-record cap and a configured 300-second time window when timestamps are available. Adaptive-defense policy duration defaults to 150 replay positions; these are fixed configuration values, not learned/adaptive parameters.
 - Validation is limited to CICIDS2017. The workflow is offline replay, not live network monitoring; generalization to other datasets and live environments is untested.
 
