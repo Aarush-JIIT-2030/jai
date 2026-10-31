@@ -11,6 +11,7 @@ import sys
 import pandas as pd
 
 from cybersentinel.replay import ReplayEngine
+from cybersentinel.replay.input_validation import validate_replay_input
 from validate_submissions import validate as validate_submission_bundle
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -71,6 +72,16 @@ def main() -> int:
         threat_path=args.threat_model,
         anomaly_path=args.anomaly_model,
     )
+
+    input_report = validate_replay_input(df, {
+        "Agent 1": engine.threat_agent.model.feature_columns,
+        "Agent 2": engine.anomaly_agent.feature_columns,
+    })
+    if not input_report["valid"]:
+        logger.error("Replay input validation failed: %s", json.dumps(input_report, indent=2))
+        return 2
+    logger.info("Replay input validated: %d records, %d numeric features, %d rows with both observed endpoints.",
+                input_report["rows"], input_report["feature_count"], input_report["rows_with_both_observed_endpoints"])
 
     def on_progress(done: int, total: int) -> None:
         pct = done / total * 100
