@@ -14,6 +14,10 @@ The Level 2 hidden input contains exactly 200 unlabelled records in organizer or
 
 A1/A2 predictions are generated for all records because the organizer requires one classification row per record, including records later blocked. The sequential replay gate then checks A5's active policies. A pre-filtered record is BLOCKed and does not enter A4/A5 state updates. An allowed record proceeds through A3/A4 and may create a policy for later records.
 
+## Submission schema source of truth
+
+The later Day 2 stage-page screenshots and the three downloaded header templates supplied for this replay are the schema used by this implementation. They differ from the earlier Track 1 Day 2 handout, which listed `policy.csv` with a `policy_action` column and described an empty `applied_policy_id` for ALLOW. For this hidden replay, follow the actual stage-page files: `policies.csv` with five columns, `active_policy_id` in `replay.csv`, and the literal `NONE` ALLOW sentinel. Do not mix the two contracts.
+
 ## Exact organizer CSV templates
 
 ### classification.csv
