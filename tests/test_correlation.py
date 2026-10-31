@@ -14,7 +14,7 @@ def test_endpoint_extraction():
     assert port == 80
 
 
-def test_tcp_stack_fingerprint_becomes_a_disclosed_synthetic_identity():
+def test_tcp_stack_fingerprint_does_not_become_an_endpoint_identity():
     agent = TemporalCorrelationAgent()
     flow = {
         "Init_Win_bytes_forward": 64240,
@@ -24,10 +24,12 @@ def test_tcp_stack_fingerprint_becomes_a_disclosed_synthetic_identity():
         "Flow Duration": 50000,
     }
     src, dst, port = agent.extract_endpoints(flow)
-    assert src.startswith("10.")
-    assert src == TemporalCorrelationAgent.derive_source_identity(flow)
+    assert src == ""
     assert dst == ""
     assert port == 443
+    result = agent.correlate("F000001", flow, threat_class="DOS", confidence=0.99)
+    assert result.status == "not_ready"
+    assert result.correlated is False
 
 
 def test_identical_tcp_fingerprints_share_the_same_synthetic_identity():
