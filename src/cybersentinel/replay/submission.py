@@ -168,7 +168,7 @@ class SubmissionValidator:
                 if action == "ALLOW":
                     allow_count += 1
                     if applied_pol != "":
-                        issues.append(f"Row {idx}: ALLOW action must have an empty active_policy_id, got '{applied_pol}'")
+                        issues.append(f"Row {idx}: ALLOW action must use active_policy_id=NONE, got '{applied_pol}'")
                 elif action == "BLOCK":
                     block_count += 1
                     if not applied_pol:
@@ -283,7 +283,7 @@ class SubmissionValidator:
                 if action == "ALLOW":
                     if active_id != "":
                         replay_res["valid"] = False
-                        replay_res["errors"].append(f"Record {rid}: ALLOW must have an empty active_policy_id.")
+                        replay_res["errors"].append(f"Record {rid}: ALLOW must use active_policy_id=NONE.")
                         replay_res["total_errors"] += 1
                     if source_frame is not None and matches:
                         replay_res["valid"] = False
