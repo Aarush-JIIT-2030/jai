@@ -36,6 +36,7 @@ class SubmissionValidator:
             return {"valid": False, "errors": [f"File not found: {file_path}"]}
 
         seen_records = set()
+        observed_records: list[str] = []
         row_count = 0
 
         with file_path.open("r", encoding="utf-8") as f:
@@ -54,6 +55,7 @@ class SubmissionValidator:
                 if rec_id in seen_records:
                     issues.append(f"Row {idx}: Duplicate record_id '{rec_id}'")
                 seen_records.add(rec_id)
+                observed_records.append(str(rec_id or ""))
 
                 if pred not in BENCHMARK_CLASSES:
                     issues.append(f"Row {idx}: Invalid predicted_class '{pred}'")
@@ -68,6 +70,10 @@ class SubmissionValidator:
                 if ev_status not in EVIDENCE_STATUSES:
                     issues.append(f"Row {idx}: Invalid evidence status '{ev_status}'")
 
+        if observed_records != [str(value) for value in expected_records]:
+            issues.append("classification.csv must contain every expected record_id exactly once in original replay order.")
+        if observed_records != [str(value) for value in expected_records]:
+            issues.append("replay.csv must contain every expected record_id exactly once in original replay order.")
         if len(expected_records) != row_count:
             issues.append(f"Row count mismatch: expected {len(expected_records)}, got {row_count}")
 
@@ -111,7 +117,7 @@ class SubmissionValidator:
                     issues.append(f"Row {idx}: Duplicate policy_id '{pol_id}'")
                 policies[pol_id] = row
 
-                if scope_type not in {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}:
+                if scope_type != "SOURCE_IP":
                     issues.append(f"Row {idx}: Unsupported scope_type '{scope_type}'")
 
                 scope_value = str(row.get("scope_value", "")).strip()
@@ -148,6 +154,7 @@ class SubmissionValidator:
 
         row_count = 0
         seen_records = set()
+        observed_records: list[str] = []
         allow_count = 0
         block_count = 0
 
@@ -166,6 +173,7 @@ class SubmissionValidator:
                 if rec_id in seen_records:
                     issues.append(f"Row {idx}: Duplicate record_id '{rec_id}'")
                 seen_records.add(rec_id)
+                observed_records.append(str(rec_id or ""))
 
                 if action not in ACTIONS:
                     issues.append(f"Row {idx}: Invalid action '{action}'")
