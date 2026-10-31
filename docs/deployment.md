@@ -2,7 +2,7 @@
 
 ## Supported execution mode
 
-CyberSentinel's authoritative workflow is local/offline replay. The FastAPI backend loads local model artifacts, reads the locally installed evaluation dataset, generates the three submission CSVs, and writes run history to local SQLite.
+CyberSentinel's authoritative workflow is local/offline replay. The FastAPI backend loads local model artifacts, reads the locally installed unlabelled hidden replay input, generates the three submission CSVs, and writes run history to local SQLite.
 
 Install and run the local stack from the repository root:
 
@@ -28,7 +28,7 @@ Important limitations:
 
 - `data/processed/*` and `models/*` are intentionally ignored by Git. A standard Git-triggered Vercel deployment therefore does not contain the organiser evaluation dataset or fitted model artifacts.
 - Without both model files, `/api/health` reports `model_ready: false` and inference endpoints return `503 MODEL_NOT_READY`. The UI can load while the model-backed product workflow remains unavailable.
-- `POST /api/replay/run-official` is a synchronous request. `vercel.json` currently sets Python function `maxDuration` to 30 seconds. A full evaluation replay may exceed that limit; run the official replay locally unless a separately tested background-job/artifact architecture is implemented.
+- `POST /api/replay/run-official` is a synchronous request. `vercel.json` currently sets Python function `maxDuration` to 30 seconds. A full hidden replay may exceed that limit; run the official replay locally unless a separately tested background-job/artifact architecture is implemented.
 - The backend stores run history in local SQLite (`data/cybersentinel_history.db`). Serverless filesystem state is not a durable shared database across invocations or instances.
 - Preview deployments are protected by Vercel SSO in the current project configuration, so external browser QA requires an authorised session.
 
@@ -43,6 +43,6 @@ Supabase is currently an optional frontend authentication integration. Guest mod
 - `GET /api/health`: API liveness and model availability.
 - `GET /api/models/status`: model artifact and agent metadata.
 - `GET /api/system/diagnostics`: local model, dataset, submission, history DB and simulated-firewall status.
-- `GET /api/replay/validate`: validates generated submission files against the original installed evaluation dataset.
+- `GET /api/replay/validate`: validates generated submission files against the original installed unlabelled hidden replay input.
 
 Use `docs/evaluation.md` for training, evaluation, replay and local submission reproduction. Use `docs/release-hardening.md` for causal replay and CSV acceptance invariants.
