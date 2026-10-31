@@ -4,6 +4,7 @@ import pytest
 
 from cybersentinel.agents.threat_detection.train import train_from_csv
 from scripts.train_anomaly import train_anomaly
+from scripts.train_models import train_models
 
 CLASSES = ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"]
 
@@ -70,3 +71,25 @@ def test_agent2_training_rejects_training_file_as_validation(tmp_path):
             str(path), str(tmp_path / "model.joblib"), str(tmp_path / "report.json"),
             validation_path=str(path),
         )
+
+
+
+def test_combined_training_workflow_reloads_both_real_model_artifacts(tmp_path):
+    training = small_frame(rows_per_class=20)
+    training_path = tmp_path / "training.csv"
+    training.to_csv(training_path, index=False)
+    manifest = train_models(
+        training_path=training_path,
+        validation_path=None,
+        model_dir=tmp_path / "models",
+        report_dir=tmp_path / "reports",
+        n_estimators=20,
+    )
+    assert manifest["status"] == "TRAINED_AND_RELOADED"
+    assert manifest["hidden_records_used_for_training_or_calibration"] is False
+    assert manifest["agent_1"]["training_rows"] == len(training)
+    assert manifest["agent_2"]["training_rows"] == 20
+    assert manifest["agent_1"]["confidence_calibrated"] is False
+    assert manifest["agent_2"]["threshold_calibrated"] is False
+    assert Path(manifest["agent_1"]["artifact"]).is_file()
+    assert Path(manifest["agent_2"]["artifact"]).is_file()
