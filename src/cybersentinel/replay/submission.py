@@ -214,7 +214,12 @@ class SubmissionValidator:
                     target["total_errors"] = target.get("total_errors", 0) + 1
 
         policy_map = policy_res.get("policies", {})
+        replay_path = output_dir / "replay.csv"
         if source_frame is not None:
+            if len(source_frame) != len(expected):
+                policy_res["valid"] = False
+                policy_res["errors"].append("Source frame row count does not match expected organizer input IDs.")
+                policy_res["total_errors"] = policy_res.get("total_errors", 0) + 1
             source_ip_columns = ("source_ip", "Source IP", "Source_IP", "src_ip", "src")
             source_ip_column = next((column for column in source_ip_columns if column in source_frame.columns), None)
             if source_ip_column is None and policy_map:
