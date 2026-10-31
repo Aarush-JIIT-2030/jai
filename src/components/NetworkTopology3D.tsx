@@ -28,7 +28,7 @@ const NODES_METADATA: Record<string, NodeData> = {
     flows: "Chronological flow stream",
     color: 0x38bdf8,
     description: "Checks policies activated by earlier records before allowing a flow into the decision pipeline. Classification outputs are still retained for every record.",
-    contract: "Input: Raw Flow 5-Tuple -> Output: Filter Decision (ALLOW / DROP)",
+    contract: "Input: Organizer flow record -> Output: Causal replay gate (ALLOW / BLOCK)",
   },
   agent1: {
     id: "agent1",
@@ -47,8 +47,8 @@ const NODES_METADATA: Record<string, NodeData> = {
     name: "Agent 2: Anomaly Detection",
     role: "Unsupervised Baseline Isolation Forest",
     category: "agent",
-    status: "ACTIVE",
-    latency: "Model benchmark metadata",
+    status: "MODEL-DEPENDENT",
+    latency: "Measured per inference",
     flows: "Awaiting measured replay",
     color: 0xa855f7, // Purple
     description: "Trained exclusively on benign baseline traffic with no label leakage. Computes a bounded anomaly index against the benign training baseline; the index is not a probability.",
@@ -63,7 +63,7 @@ const NODES_METADATA: Record<string, NodeData> = {
     latency: "Not independently measured",
     flows: "Deterministic evidence fusion",
     color: 0x10b981, // Emerald
-    description: "Fuses supervised and unsupervised evidence. Corroborated attacks trigger autonomous BLOCK recommendations; disagreements fail closed to explainable REVIEW.",
+    description: "Combines A1/A2 outputs into AGREE, CONFLICT, or UNCERTAIN evidence and a deterministic recommendation. The replay gate, not this schematic, determines the final ALLOW/BLOCK action.",
     contract: "Input: ThreatResult + AnomalyResult -> Output: Action + Rationale",
   },
   agent4: {
@@ -71,8 +71,8 @@ const NODES_METADATA: Record<string, NodeData> = {
     name: "Agent 4: Temporal Correlation",
     role: "Sliding-Window Campaign Correlator",
     category: "agent",
-    status: "ACTIVE",
-    latency: "Measured per replay",
+    status: "CODE PRESENT",
+    latency: "Not independently measured",
     flows: "Observed-window correlation",
     color: 0xf59e0b, // Amber
     description: "Maintains causal sliding windows to group multi-flow attack patterns: Horizontal Port Scans (>=5 ports), DDoS convergence, and brute-force auth sweeps.",
@@ -93,14 +93,14 @@ const NODES_METADATA: Record<string, NodeData> = {
   ingress: {
     id: "ingress",
     name: "Ingress Edge Cluster",
-    role: "Network Edge Sensor & Capture Interface",
+    role: "Offline Organizer Replay Input",
     category: "ingress",
     status: "OFFLINE INPUT",
     latency: "Not measured",
     flows: "Organizer-provided observed endpoints",
     color: 0x60a5fa,
     description: "Represents the offline organizer-input boundary. Only literal observed source/destination endpoint fields are used; missing endpoints remain unknown.",
-    contract: "Ingress Wire -> NetFlow 5-Tuple",
+    contract: "Organizer row -> 78 flow features + observed endpoint metadata",
   },
   target: {
     id: "target",
@@ -112,7 +112,7 @@ const NODES_METADATA: Record<string, NodeData> = {
     flows: "Schematic target; no live network connection",
     color: 0x34d399,
     description: "Illustrative protected service endpoint for the architecture view. No traffic is sent to or received from a real datacenter.",
-    contract: "Verified Clean Traffic Egress",
+    contract: "Illustrative target only; no live network egress",
   },
 };
 
