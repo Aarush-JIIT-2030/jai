@@ -114,10 +114,18 @@ class SubmissionValidator:
                 if action != "BLOCK":
                     issues.append(f"Row {idx}: Policy action must be BLOCK, got '{action}'")
 
+                scope_value = str(row.get("scope_value", "")).strip()
                 try:
-                    ipaddress.ip_address(str(row.get("scope_value", "")).strip())
+                    if scope_type in {"SOURCE_IP", "DESTINATION_IP"}:
+                        ipaddress.ip_address(scope_value)
+                    elif scope_type == "SRC_DST_PAIR":
+                        parts = scope_value.split("|")
+                        if len(parts) != 2:
+                            raise ValueError("expected source|destination")
+                        ipaddress.ip_address(parts[0].strip())
+                        ipaddress.ip_address(parts[1].strip())
                 except ValueError:
-                    issues.append(f"Row {idx}: SOURCE_IP scope_value must be a literal IP address.")
+                    issues.append(f"Row {idx}: scope_value does not match the literal IP format for {scope_type}.")
 
         return {
             "file": file_path.name,
