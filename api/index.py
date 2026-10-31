@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import io
+import json
+import base64
+import http.client
 import os
 import sys
 import tempfile
@@ -10,7 +13,7 @@ import time
 import zipfile
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -78,7 +81,7 @@ def get_pipeline() -> CyberSentinelPipeline | None:
 def health():
     pipeline = get_pipeline()
     threat_present = THREAT_MODEL.is_file()
-    anomaly_present = ANOMALY_MODEL.is_file()
+    anomaly_agent = get_anomaly_agent()
     return {
         "status": "ok",
         "service": "CyberSentinel API",
@@ -87,13 +90,17 @@ def health():
         "model_ready": pipeline is not None,
         "agents": {
             "agent_1_threat_detection": pipeline is not None and threat_present,
-            "agent_2_anomaly_detection": pipeline is not None and anomaly_present,
+            "agent_2_anomaly_detection": anomaly_agent is not None,
             "agent_3_evidence_fusion": pipeline is not None,
             "agent_4_temporal_correlation": pipeline is not None,
             "agent_5_adaptive_defense": pipeline is not None,
         },
         "readiness": "ready" if pipeline is not None else "not_ready",
-        "message": "Both model artifacts loaded; offline inference is ready." if pipeline else "API process is available, but verified model artifacts are missing or failed validation.",
+        "message": "Both model artifacts loaded; offline inference is ready." if pipeline else (
+            "Agent 2 is independently ready; the combined pipeline still requires both model artifacts."
+            if anomaly_agent is not None else
+            "API process is available, but one or more model artifacts are missing or failed validation."
+        ),
     }
 
 
@@ -147,10 +154,26 @@ def system_diagnostics():
 
 
 @app.get("/api/history")
-def get_history(limit: int = 15):
-    """Retrieve runs from local SQLite database."""
+def get_history(request: Request, limit: int = 15):
+    """Retrieve the authenticated user's replay history from Supabase."""
+    user_id, auth_error = _supabase_user_id(request)
+    key = _supabase_public_key()
+    if user_id and key:
+        connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=5)
+        try:
+            query = f"/rest/v1/replay_runs?select=run_id,dataset_name,total_records,blocked_records,allowed_records,policies_created,containment_rate,throughput_fps,status,created_at&order=created_at.desc&limit={max(1, min(limit, 50))}"
+            connection.request("GET", query, headers={"apikey": key, "Authorization": request.headers.get("authorization", "")})
+            response = connection.getresponse()
+            raw = response.read()
+            if response.status == 200:
+                return {"runs": json.loads(raw.decode("utf-8")), "source": "supabase"}
+            return {"runs": [], "source": "supabase", "error": f"supabase_http_{response.status}"}
+        except (OSError, TimeoutError):
+            return {"runs": [], "source": "supabase", "error": "supabase_unreachable"}
+        finally:
+            connection.close()
     if SERVERLESS_RUNTIME:
-        return {"runs": [], "source": "not_persistent_serverless", "message": "Run history is local-only and is not persisted by serverless preview deployments."}
+        return {"runs": [], "source": "supabase", "message": auth_error or "Sign in to load your private replay history."}
     try:
         runs = list_runs(limit=limit)
         normalized = [
@@ -171,7 +194,12 @@ def models_status():
             "models_ready": False,
             "agents": {
                 "threat_detection": {"artifact_present": THREAT_MODEL.is_file()},
-                "anomaly_detection": {"artifact_present": ANOMALY_MODEL.is_file()},
+                "anomaly_detection": {
+                    "artifact_present": ANOMALY_MODEL.is_file(),
+                    "runtime_ready": get_anomaly_agent() is not None,
+                    "feature_count": len(get_anomaly_agent().feature_columns) if get_anomaly_agent() else 0,
+                    "score_is_probability": False,
+                },
                 "evidence_fusion": {"code_available": True, "runtime_ready": False},
                 "temporal_correlation": {"code_available": True, "runtime_ready": False},
                 "adaptive_defense": {"code_available": True, "runtime_ready": False},
@@ -180,6 +208,7 @@ def models_status():
     return {
         "status": "ready",
         "models_ready": True,
+        "supabase_persistence_configured": _supabase_persistence_configured(),
         "agents": {
             "threat_detection": {
                 "backend": pipeline.threat_agent.model.metadata.get("backend"),
@@ -205,35 +234,161 @@ def models_status():
     }
 
 
+def _supabase_public_key() -> str | None:
+    return (os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY") or "").strip() or None
+
+
+def _supabase_user_id(request: Request) -> tuple[str | None, str | None]:
+    """Resolve the caller through Supabase Auth; never trust a client-supplied user id."""
+    token = request.headers.get("authorization", "")
+    if not token.lower().startswith("bearer "):
+        return None, "not_authenticated"
+    key = _supabase_public_key()
+    if not key:
+        return None, "supabase_public_key_not_configured"
+    connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=5)
+    try:
+        connection.request("GET", "/auth/v1/user", headers={"apikey": key, "Authorization": token})
+        response = connection.getresponse()
+        raw = response.read()
+        if response.status != 200:
+            return None, "supabase_auth_rejected"
+        user = json.loads(raw.decode("utf-8"))
+        user_id = user.get("id") if isinstance(user, dict) else None
+        return (str(user_id), None) if user_id else (None, "supabase_user_unavailable")
+    except (OSError, TimeoutError):
+        return None, "supabase_unreachable"
+    except Exception:
+        return None, "supabase_auth_error"
+    finally:
+        connection.close()
+
+
+def _supabase_insert_rows(table: str, rows: list[dict[str, Any]], request: Request) -> dict[str, Any]:
+    if not rows:
+        return {"stored": True, "backend": "supabase", "rows": 0}
+    user_id, auth_error = _supabase_user_id(request)
+    if not user_id:
+        return {"stored": False, "reason": auth_error or "not_authenticated"}
+    key = _supabase_public_key()
+    token = request.headers.get("authorization", "")
+    safe_rows = [{**row, "user_id": user_id} for row in rows]
+    connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=8)
+    try:
+        connection.request(
+            "POST", f"/rest/v1/{table}",
+            body=json.dumps(safe_rows, separators=(",", ":")),
+            headers={"apikey": key, "Authorization": token, "Content-Type": "application/json", "Prefer": "return=minimal"},
+        )
+        response = connection.getresponse()
+        status = response.status
+        response.read()
+        if status not in (200, 201, 204):
+            return {"stored": False, "reason": f"supabase_http_{status}"}
+        return {"stored": True, "backend": "supabase", "rows": len(safe_rows)}
+    except (OSError, TimeoutError):
+        return {"stored": False, "reason": "supabase_unreachable"}
+    except Exception as exc:
+        return {"stored": False, "reason": f"supabase_error_{type(exc).__name__}"}
+    finally:
+        connection.close()
+
+
+def _persist_agent2_event(result: AnomalyDetectionResult, request: Request, source: str = "agent2_independent") -> dict[str, Any]:
+    """Persist score metadata only; raw network-flow contents are never uploaded."""
+    payload = result.to_dict()
+    if payload.get("status") != "success" or payload.get("anomaly_score") is None or payload.get("is_anomaly") is None:
+        return {"stored": False, "reason": "unsuccessful_inference"}
+    record = {
+        "source": source,
+        "model_version": str((_anomaly_agent.metadata if _anomaly_agent else {}).get("algorithm", "IsolationForest")),
+        "anomaly_score": float(payload["anomaly_score"]),
+        "is_anomaly": bool(payload["is_anomaly"]),
+        "feature_count": len(_anomaly_agent.feature_columns) if _anomaly_agent else 0,
+        "evidence": payload.get("evidence") or [],
+        "request_metadata": {"runtime": "vercel" if SERVERLESS_RUNTIME else "local"},
+    }
+    return _supabase_insert_rows("agent2_inference_events", [record], request)
+
+
+def _persist_flow_events(results: list[dict[str, Any]], request: Request, source: str) -> dict[str, Any]:
+    records = []
+    agent2_records = []
+    for result in results:
+        threat = result.get("threat_detection") or {}
+        anomaly = result.get("anomaly_detection") or {}
+        records.append({
+            "source": source,
+            "record_id": str(result.get("record_id")) if result.get("record_id") is not None else None,
+            "predicted_class": threat.get("predicted_class"),
+            "anomaly_score": anomaly.get("anomaly_score"),
+            "is_anomaly": anomaly.get("is_anomaly"),
+            "final_class": result.get("final_class"),
+            "evidence_status": result.get("evidence_status"),
+            "action": result.get("action"),
+            "rationale": result.get("rationale") or [],
+            "latency_ms": result.get("latency_ms"),
+        })
+        if anomaly.get("anomaly_score") is not None and anomaly.get("is_anomaly") is not None:
+            agent2_records.append({
+                "source": "pipeline_analysis",
+                "model_version": "IsolationForest",
+                "anomaly_score": float(anomaly["anomaly_score"]),
+                "is_anomaly": bool(anomaly["is_anomaly"]),
+                "feature_count": len(_anomaly_agent.feature_columns) if _anomaly_agent else 0,
+                "evidence": anomaly.get("evidence") or [],
+                "request_metadata": {"runtime": "vercel" if SERVERLESS_RUNTIME else "local"},
+            })
+    flow_status = {"stored": True, "rows": 0} if not records else _supabase_insert_rows("flow_analysis_events", records, request)
+    for offset in range(0, len(agent2_records), 100):
+        status = _supabase_insert_rows("agent2_inference_events", agent2_records[offset:offset + 100], request)
+        if not status.get("stored"):
+            return {"stored": False, "flow_events": flow_status, "agent2_events": status}
+    return {"stored": bool(flow_status.get("stored")), "flow_events": flow_status, "agent2_rows": len(agent2_records)}
+
+
+def _persist_replay_run(run_id: str, dataset_name: str, metrics: dict[str, Any], status: str, request: Request, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+    record = {
+        "run_id": run_id, "dataset_name": dataset_name,
+        "total_records": int(metrics.get("total_records", 0)),
+        "blocked_records": int(metrics.get("blocked_records", 0)),
+        "allowed_records": int(metrics.get("allowed_records", 0)),
+        "policies_created": int(metrics.get("policies_created", 0)),
+        "containment_rate": metrics.get("containment_rate"),
+        "throughput_fps": metrics.get("throughput_fps"),
+        "elapsed_seconds": metrics.get("elapsed_seconds"),
+        "status": status, "metadata": metadata or {},
+    }
+    return _supabase_insert_rows("replay_runs", [record], request)
+
+
+def _supabase_persistence_configured() -> bool:
+    return bool(_supabase_public_key())
+
+
 @app.post("/api/agents/anomaly/score")
-def score_anomaly(payload: dict[str, Any]):
+def score_anomaly(payload: dict[str, Any], request: Request):
     """Run Agent 2 independently without requiring Agent 1 or evidence fusion."""
-    global _anomaly_agent
-    if _anomaly_agent is None:
-        if not ANOMALY_MODEL.is_file():
-            raise HTTPException(
-                status_code=503,
-                detail={"code": "AGENT_2_NOT_READY", "message": "Agent 2 model artifact is not installed."},
-            )
-        try:
-            _anomaly_agent = AnomalyDetectionAgent.load(ANOMALY_MODEL)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=503,
-                detail={"code": "AGENT_2_NOT_READY", "message": f"Agent 2 model could not be loaded: {type(exc).__name__}"},
-            )
+    agent = get_anomaly_agent()
+    if agent is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "AGENT_2_NOT_READY", "message": "Agent 2 model artifact is missing or failed validation."},
+        )
     flow = payload.get("flow", payload)
     if not isinstance(flow, dict) or not flow:
         raise HTTPException(status_code=422, detail="Provide a non-empty flow object.")
-    result = _anomaly_agent.score(flow)
+    result = agent.score(flow)
     if result.status != "success":
         raise HTTPException(status_code=422, detail={"code": "AGENT_2_SCORING_ERROR", "message": result.message or "Anomaly scoring failed."})
-    return result.to_dict()
+    response = result.to_dict()
+    response["supabase_persistence"] = _persist_agent2_event(result, request)
+    return response
 
 
 @app.post("/api/analyze")
 @app.post("/analyze")
-def analyze(payload: dict[str, Any]):
+def analyze(payload: dict[str, Any], request: Request):
     pipeline = get_pipeline()
     if pipeline is None:
         raise HTTPException(
@@ -251,6 +406,9 @@ def analyze(payload: dict[str, Any]):
     analysis["stateful_agents"] = "not_run; use chronological replay for A4/A5"
     threat_model = getattr(pipeline.threat_agent, "model", None)
     threat_metadata = getattr(threat_model, "metadata", {}) or {}
+    if flow.get("record_id") is not None:
+        analysis["record_id"] = str(flow["record_id"])
+    analysis["supabase_persistence"] = _persist_flow_events([analysis], request, "single_flow")
     analysis["model_provenance"] = {
         "a1_confidence_calibrated": bool(threat_metadata.get("confidence_calibrated", False)),
         "a2_score_is_probability": False,
@@ -260,7 +418,7 @@ def analyze(payload: dict[str, Any]):
 
 @app.post("/api/analyze/batch")
 @app.post("/analyze/batch")
-def analyze_batch(payload: BatchAnalyzeRequest):
+def analyze_batch(payload: BatchAnalyzeRequest, request: Request):
     pipeline = get_pipeline()
     if pipeline is None:
         raise HTTPException(
@@ -271,7 +429,11 @@ def analyze_batch(payload: BatchAnalyzeRequest):
     actions = {"ALLOW": 0, "BLOCK": 0, "REVIEW": 0}
     for result in results:
         actions[result["action"]] += 1
-    return {"total_analyzed": len(results), "actions": actions, "results": results}
+    for result, flow in zip(results, payload.flows):
+        if flow.get("record_id") is not None:
+            result["record_id"] = str(flow["record_id"])
+    persistence = _persist_flow_events(results, request, "batch_replay")
+    return {"total_analyzed": len(results), "actions": actions, "results": results, "supabase_persistence": persistence}
 
 
 @app.post("/api/fusion/simulate")
@@ -296,7 +458,7 @@ def simulate_fusion(payload: dict[str, Any]):
 
 
 @app.post("/api/replay/simulate")
-def simulate_replay(payload: ReplaySimulationRequest):
+def simulate_replay(payload: ReplaySimulationRequest, request: Request):
     """Run causal chronological replay over provided flow sequence."""
     pipeline = get_pipeline()
     if pipeline is None:
@@ -356,9 +518,11 @@ def simulate_replay(payload: ReplaySimulationRequest):
         elapsed_seconds=metrics["elapsed_seconds"],
         status="COMPLETED",
     )
+    cloud_persistence = _persist_replay_run(run_id, payload.dataset_name, metrics, "COMPLETED", request, {"mode": "supplied_batch_replay"})
 
     return {
         "run_id": run_id,
+        "supabase_persistence": cloud_persistence,
         "metrics": metrics,
         "policies_sample": results["policy_rows"][:20],
         "replay_sample": results["replay_rows"][:30],
@@ -367,7 +531,7 @@ def simulate_replay(payload: ReplaySimulationRequest):
 
 
 @app.post("/api/replay/run-official")
-def run_official_replay():
+def run_official_replay(request: Request):
     """Run the installed official evaluation stream and write the three submission CSVs."""
     if SERVERLESS_RUNTIME:
         raise HTTPException(status_code=503, detail={"code": "LOCAL_RUNTIME_REQUIRED", "message": "Replay execution and local SQLite history require the local Python runtime; serverless previews are read-only."})
@@ -438,8 +602,15 @@ def run_official_replay():
             elapsed_seconds=metrics["elapsed_seconds"],
             status="COMPLETED" if validation.get("all_valid") else "VALIDATION_FAILED",
         )
+        cloud_persistence = _persist_replay_run(
+            run_id, eval_file.name, metrics,
+            "COMPLETED" if validation.get("all_valid") else "VALIDATION_FAILED",
+            request,
+            {"mode": "official_hidden_replay", "validation_passed": bool(validation.get("all_valid"))},
+        )
         summary = {
             "run_id": run_id,
+            "supabase_persistence": cloud_persistence,
             "source": "installed_unlabelled_hidden_replay_input",
             "records_processed": int(metrics["total_records"]),
             "artifacts": {

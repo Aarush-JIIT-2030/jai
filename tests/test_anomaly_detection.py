@@ -1,3 +1,4 @@
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -130,3 +131,29 @@ def test_organizer_replay_metadata_is_not_an_anomaly_feature():
         "Destination Port", "Flow Duration", "Total Fwd Packets",
         "Flow Packets/s", "Flow Bytes/s",
     }
+
+
+
+def test_load_legacy_v1_artifact_without_top_level_version_or_score_scale(tmp_path):
+    fitted = AnomalyDetectionAgent().fit(benign_sample())
+    artifact = tmp_path / "legacy-agent2.joblib"
+    joblib.dump({
+        "estimator": fitted.estimator,
+        "imputer": fitted.imputer,
+        "feature_columns": fitted.feature_columns,
+        "profiles": fitted.profiles,
+        "threshold": fitted.threshold,
+        "metadata": {"artifact_format_version": 1, "algorithm": "IsolationForest"},
+    }, artifact)
+
+    restored = AnomalyDetectionAgent.load(artifact)
+    result = restored.score({
+        "Destination Port": 443,
+        "Flow Duration": 1200,
+        "Total Fwd Packets": 8,
+        "Flow Packets/s": 45,
+        "Flow Bytes/s": 18000,
+    })
+    assert result.status == "success"
+    assert result.anomaly_score is not None
+    assert restored.metadata["legacy_score_scale_fallback"] is True

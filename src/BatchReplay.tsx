@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiFetch } from "./lib/api";
 import Papa from "papaparse";
 import { Activity, FileSpreadsheet, Play, UploadCloud } from "lucide-react";
 
@@ -75,7 +76,7 @@ export function BatchReplay({ modelReady }: { modelReady: boolean }) {
       const chunkSize = 1000;
       for (let offset = 0; offset < rows.length; offset += chunkSize) {
         const chunk = rows.slice(offset, offset + chunkSize);
-        const response = await fetch("/api/analyze/batch", {
+        const response = await apiFetch("/api/analyze/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ flows: chunk }),

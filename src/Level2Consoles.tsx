@@ -264,7 +264,7 @@ export function EvidenceFusionStudio() {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/fusion/simulate", {
+      const response = await apiFetch("/api/fusion/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -361,7 +361,7 @@ export function TemporalCorrelationConsole() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/correlation/groups?limit=100");
+      const response = await apiFetch("/api/correlation/groups?limit=100");
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || "Correlation API unavailable.");
       setGroups(Array.isArray(payload.groups) ? payload.groups : []);
@@ -450,8 +450,8 @@ export function AdaptiveDefenseConsole() {
     setError("");
     try {
       const [policyResponse, overviewResponse] = await Promise.all([
-        fetch("/api/policies?limit=20"),
-        fetch("/api/overview"),
+        apiFetch("/api/policies?limit=20"),
+        apiFetch("/api/overview"),
       ]);
       const policyData = await policyResponse.json();
       if (!policyResponse.ok) throw new Error(policyData.detail?.message || policyData.detail || "Policy data unavailable.");
@@ -479,7 +479,7 @@ export function AdaptiveDefenseConsole() {
     setIsTesting(true);
     setMatchResult(null);
     try {
-      const response = await fetch("/api/policies/test", {
+      const response = await apiFetch("/api/policies/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_ip: testIdentity.trim(), current_step: testStep }),
@@ -580,7 +580,7 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
   const [inputStatus, setInputStatus] = useState<any>(null);
 
   useEffect(() => {
-    fetch("/api/system/diagnostics")
+    apiFetch("/api/system/diagnostics")
       .then(response => response.ok ? response.json() : Promise.reject(new Error("Local API unavailable")))
       .then(data => setInputStatus(data.hidden_replay_input ?? null))
       .catch(() => setInputStatus(null));
@@ -594,7 +594,7 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
     try {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch("/api/replay/input/upload", { method: "POST", body });
+      const response = await apiFetch("/api/replay/input/upload", { method: "POST", body });
       const payload = await response.json();
       if (!response.ok) {
         const detail = payload.detail;
@@ -614,7 +614,7 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
     setSummary(null);
     setError("");
     try {
-      const response = await fetch("/api/replay/run-official", { method: "POST" });
+      const response = await apiFetch("/api/replay/run-official", { method: "POST" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail?.message || payload.detail || "Official replay could not be started.");
       setSummary(payload);
@@ -718,7 +718,7 @@ export function SubmissionStudio() {
     setValidationError("");
     setValidationReport(null);
     try {
-      const response = await fetch("/api/replay/validate");
+      const response = await apiFetch("/api/replay/validate");
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail?.message || data.detail || "Validator endpoint unavailable.");
       setValidationReport(data);
@@ -732,7 +732,7 @@ export function SubmissionStudio() {
   async function triggerDownload(filename: string) {
     setDownloadError("");
     try {
-      const response = await fetch("/api/submissions/download/" + filename);
+      const response = await apiFetch("/api/submissions/download/" + filename);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.detail || filename + " has not been generated.");
@@ -822,7 +822,7 @@ export function ModelIntelligenceView() {
   const [evaluationError, setEvaluationError] = useState("");
 
   useEffect(() => {
-    fetch("/api/evaluation/all")
+    apiFetch("/api/evaluation/all")
       .then(async response => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail?.message || "Evaluation reports unavailable.");
@@ -833,7 +833,7 @@ export function ModelIntelligenceView() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/benchmarks")
+    apiFetch("/api/benchmarks")
       .then(async response => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail?.message || data.detail || "No generated benchmark report is available.");
@@ -952,7 +952,7 @@ export function AuditHistoryView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/history?limit=10")
+    apiFetch("/api/history?limit=10")
       .then(res => res.json())
       .then(data => {
         setRuns(data.runs || []);
@@ -968,9 +968,9 @@ export function AuditHistoryView() {
       <div className="panel-head">
         <div>
           <div className="panel-kicker">FORENSIC AUDIT TRAIL · OFFLINE SQLITE PERSISTENCE</div>
-          <h3>Local Execution & Replay Run History</h3>
+          <h3>Cloud Execution & Replay Run History</h3>
           <p>
-            Persisted locally in data/cybersentinel_history.db for compliance, auditability, and offline verification.
+            Persisted to your private Supabase account with row-level access controls. Raw flow data and uploaded CSV files remain local.
           </p>
         </div>
         <span className="panel-icon"><Database size={18} /></span>
@@ -978,14 +978,14 @@ export function AuditHistoryView() {
 
       {loading ? (
         <div style={{ padding: 24, textAlign: "center", color: "var(--muted)", fontSize: 12 }}>
-          Loading offline execution records from SQLite database…
+          Loading your private replay records from Supabase…
         </div>
       ) : runs.length === 0 ? (
         <div style={{ background: "var(--panel2)", padding: 20, borderRadius: 8, border: "1px solid var(--line)", textAlign: "center", margin: "14px 0" }}>
           <Database size={24} style={{ color: "var(--muted)", margin: "0 auto 8px auto", display: "block" }} />
           <b style={{ fontSize: 13, color: "var(--text)" }}>No Replay Runs Logged Yet</b>
           <p style={{ fontSize: 11, color: "var(--muted)", margin: "4px 0 0 0" }}>
-            Execute a run in Replay Studio to record chronological replay metrics into the local SQLite database.
+            Execute a run in Replay Studio to save its summary to your private Supabase history.
           </p>
         </div>
       ) : (
@@ -1015,7 +1015,7 @@ export function AuditHistoryView() {
                   <td style={{ padding: 8, fontFamily: "monospace" }}>{r.policies_created.toLocaleString()}</td>
                   <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 700 }}>{typeof r.containment_rate === "number" ? `${r.containment_rate.toFixed(2)}%` : "—"}</td>
                   <td style={{ padding: 8, fontFamily: "monospace" }}>{r.throughput_fps} fps</td>
-                  <td style={{ padding: 8, color: "var(--muted)" }}>{new Date(r.timestamp).toLocaleTimeString()}</td>
+                  <td style={{ padding: 8, color: "var(--muted)" }}>{new Date(r.created_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -1024,8 +1024,8 @@ export function AuditHistoryView() {
       )}
 
       <div className="panel-foot">
-        <span><LockKeyhole size={13} /> Zero cloud dependency · 100% offline local SQLite database</span>
-        <span>DATABASE: data/cybersentinel_history.db</span>
+        <span><LockKeyhole size={13} /> Private Supabase history · Raw network data stays local</span>
+        <span>DATABASE: public.replay_runs</span>
       </div>
     </section>
   );
@@ -1043,7 +1043,7 @@ export function SystemHealthView({ health }: { health: any }) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/system/diagnostics");
+      const response = await apiFetch("/api/system/diagnostics");
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || "Diagnostics endpoint unavailable.");
       setDiagnostics(payload);
