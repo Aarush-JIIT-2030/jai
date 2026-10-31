@@ -12,10 +12,9 @@ import pandas as pd
 
 CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE = {"AGREE", "DISAGREE", "INCOMPLETE"}
-CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly score", "evidence status"]
-POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value",
-                  "expires_after_record_id", "policy_action"]
-REPLAY_COLUMNS = ["record_id", "action", "applied_policy_id"]
+CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
+POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]
+REPLAY_COLUMNS = ["record_id", "action", "active_policy_id"]
 
 
 def _read(path: Path, expected: list[str]) -> pd.DataFrame:
@@ -61,7 +60,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
         errors.append("policy.csv policy IDs must be non-empty and unique.")
     policy_by_id = {row["policy_id"]: row for _, row in policy.iterrows()}
     for _, row in policy.iterrows():
-        if row["scope_type"] != "SOURCE_IP" or row["policy_action"] != "BLOCK":
+        if row["scope_type"] not in {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}:
             errors.append(f"Policy {row['policy_id']}: scope_type must be SOURCE_IP and action must be BLOCK.")
         try:
             ipaddress.ip_address(row["scope_value"])
@@ -76,7 +75,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
             errors.append(f"Policy {row['policy_id']}: expiry must follow activation.")
 
     for _, row in replay.iterrows():
-        action, applied, rid = row["action"], row["applied_policy_id"], row["record_id"]
+        action, applied, rid = row["action"], row["active_policy_id"], row["record_id"]
         if action not in {"ALLOW", "BLOCK"}:
             errors.append(f"Record {rid}: action must be ALLOW or BLOCK.")
         if action == "ALLOW" and applied:
