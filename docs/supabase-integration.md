@@ -18,6 +18,8 @@ The publishable key is public by design. RLS and the authenticated user's JWT en
 - `replay_runs`: per-user replay summaries and run metadata.
 - `replay_decisions`: per-record predicted class, anomaly index, evidence status and ALLOW/BLOCK result.
 - `replay_policies`: per-run adaptive policy scope and activation/expiry record IDs.
+- `replay_correlation_groups`: Agent 4 correlation groups, observed record membership and supporting evidence for each replay run.
+- `replay_correlation_groups`: Agent 4 groups and their observed record membership for each replay run.
 - `analysis_runs`: evaluation-run summary schema retained for the evaluation workflow.
 
 All user-owned tables use RLS with `auth.uid() = user_id`. The browser can only read and insert its own rows. The server verifies the bearer token with Supabase Auth; client-supplied user IDs are never trusted.
@@ -28,8 +30,10 @@ The live Supabase project records the following versions. The corresponding vers
 
 - `20261031073431_add_user_scoped_cybersentinel_audit.sql`
 - `20261031074022_tighten_user_audit_table_grants.sql`
-- `20261031074154_persist_replay_decisions_policies_and_simulation_events.sql
-- `20261031074806_tighten_analysis_run_snapshot_permissions.sql``
+- `20261031074154_persist_replay_decisions_policies_and_simulation_events.sql`
+- `20261031074806_tighten_analysis_run_snapshot_permissions.sql`
+- `20261031075817_index_agent2_user_id.sql`
+- `20261031080141_persist_replay_correlation_groups.sql`
 
 Earlier timestamp-named placeholder files are retained as no-ops so older checkouts do not replay already-applied schema changes.
 
@@ -38,7 +42,7 @@ Earlier timestamp-named placeholder files are retained as no-ops so older checko
 1. Sign in through the Supabase Auth gate.
 2. Run Agent 2 independent scoring and verify an `agent2_inference_events` row for the signed-in user.
 3. Run single-flow and batch analysis and verify `flow_analysis_events`.
-4. Run chronological replay and verify `replay_runs`, `replay_decisions` and `replay_policies`.
+4. Run chronological replay and verify `replay_runs`, `replay_decisions`, `replay_policies` and `replay_correlation_groups`.
 5. Sign in as another user and verify that the first user's rows are not visible.
 6. Confirm unauthenticated requests to operational API routes receive HTTP 401.
 
