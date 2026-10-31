@@ -140,7 +140,7 @@ class ReplayEngine:
                         attack_type=correlation.attack_type or t_class or "ATTACK",
                         confidence=t_conf, duration=duration,
                     )
-            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id})
+            replay_rows.append({"record_id": record_id, "action": action, "applied_policy_id": applied_id})
             if progress_callback and (step % 25000 == 0 or step == total_rows - 1):
                 progress_callback(step + 1, total_rows)
 
@@ -155,6 +155,7 @@ class ReplayEngine:
                 "activated_after_record_id": policy.activated_after_record_id,
                 "scope_type": policy.scope_type, "scope_value": policy.scope_value,
                 "expires_after_record_id": record_ids[expiry_step],
+                "policy_action": policy.policy_action,
                                             })
         attack_count = sum(label != "BENIGN" for label in labels) if has_label else None
         benign_count = sum(label == "BENIGN" for label in labels) if has_label else None
@@ -190,12 +191,12 @@ class ReplayEngine:
         results = self.run_replay(df)
         files = {
             "classification": (["record_id", "predicted_class", "anomaly_score", "evidence_status"], results["classification_rows"]),
-            "policies": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"], results["policy_rows"]),
-            "replay": (["record_id", "action", "active_policy_id"], results["replay_rows"]),
+            "policies": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"], results["policy_rows"]),
+            "replay": (["record_id", "action", "applied_policy_id"], results["replay_rows"]),
         }
         paths = {}
         for name, (headers, rows) in files.items():
-            path = out_path / f"{name}.csv"
+            path = out_path / ("policy.csv" if name == "policies" else f"{name}.csv")
             path.write_text(self.export_csv(rows, headers), encoding="utf-8")
             paths[name] = path
         logger.info("Generated submission files in %s", out_path)
