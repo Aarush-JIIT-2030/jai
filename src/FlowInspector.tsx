@@ -22,6 +22,7 @@ type FlowResult = {
     message?: string;
   };
   latency_ms?: number;
+  supabase_persistence?: { stored: boolean; rows?: number; reason?: string; flow_events?: { stored: boolean; rows?: number; reason?: string }; agent2_rows?: number };
 };
 
 export function FlowInspector({ modelReady }: { modelReady: boolean }) {
@@ -208,6 +209,11 @@ export function FlowInspector({ modelReady }: { modelReady: boolean }) {
       {/* Analysis results derived only from model outputs */}
       {result && (
         <div className="dataset-loaded" style={{ marginTop: 18, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+          <div className="empty-inline" style={{ marginBottom: 12 }}>
+            Supabase audit: {result.supabase_persistence?.stored
+              ? "Analysis metadata saved to your private account."
+              : "Analysis completed, but cloud persistence was not confirmed (" + (result.supabase_persistence?.reason ?? "not reported") + ")."}
+          </div>
           <div className="dataset-facts" style={{ margin: "0 0 16px 0" }}>
             <div>
               <small>FINAL CLASS</small>
