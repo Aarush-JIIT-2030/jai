@@ -15,7 +15,7 @@ EVIDENCE = {"AGREE", "CONFLICT", "UNCERTAIN"}
 ACTIONS = {"ALLOW", "BLOCK"}
 SCOPES = {"SOURCE_IP"}
 ALLOW_SENTINEL = ""
-CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly score", "evidence status"]
+CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
 POLICY_COLUMNS = [
     "policy_id", "activated_after_record_id", "scope_type",
     "scope_value", "expires_after_record_id", "policy_action",
