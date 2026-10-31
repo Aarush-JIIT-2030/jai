@@ -74,6 +74,17 @@ def prepare(training_pack: Path, hidden_pack: Path, data_dir: Path) -> dict:
     sequence = pd.to_numeric(hidden["seq"], errors="coerce")
     if sequence.isna().any() or sequence.tolist() != list(range(1, 201)):
         raise ValueError("Hidden seq must be exactly 1..200 in organizer order.")
+    expected_ids = [f"F{index:06d}" for index in range(1, 201)]
+    if hidden["record_id"].astype(str).tolist() != expected_ids:
+        raise ValueError("Hidden record IDs must be F000001 through F000200 in organizer order.")
+    days = pd.to_datetime(hidden["day"], errors="coerce", utc=True)
+    offsets = hidden["time_offset"].astype(str).str.extract(r"^(?P<minutes>\\d+):(?P<seconds>\\d{1,2}(?:\\.\\d+)?)$")
+    if days.isna().any() or offsets.isna().any(axis=None):
+        raise ValueError("Hidden day/time_offset metadata contains an invalid value.")
+    elapsed = pd.to_numeric(offsets["minutes"], errors="coerce") * 60 + pd.to_numeric(offsets["seconds"], errors="coerce")
+    timestamps = days + pd.to_timedelta(elapsed, unit="s")
+    if timestamps.isna().any() or not timestamps.is_monotonic_increasing:
+        raise ValueError("Hidden day/time_offset values must form valid increasing timestamps.")
     if hidden["source_ip"].map(lambda value: _valid_ip(value)).eq(False).any():
         raise ValueError("Hidden input contains a missing or invalid observed source_ip.")
     if hidden["destination_ip"].map(lambda value: _valid_ip(value)).eq(False).any():
@@ -81,8 +92,8 @@ def prepare(training_pack: Path, hidden_pack: Path, data_dir: Path) -> dict:
     feature_metadata = HIDDEN_REQUIRED
     feature_columns = [column for column in hidden.columns if column not in feature_metadata]
     numeric_features = hidden[feature_columns].apply(pd.to_numeric, errors="coerce")
-    if len(feature_columns) != 78 or not numeric_features.notna().any(axis=None):
-        raise ValueError(f"Expected the organizer's 78 numeric flow features; found {len(feature_columns)} columns.")
+    if len(feature_columns) != 78 or numeric_features.isna().any(axis=None):
+        raise ValueError(f"Expected exactly 78 complete numeric flow features; found {len(feature_columns)} columns.")
 
     paths = {
         data_dir / "raw" / "training" / "flows.parquet": training_bytes,
