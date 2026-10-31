@@ -133,7 +133,7 @@ def test_independent_official_csv_validator_rejects_fingerprint_scope(tmp_path):
     policies = pd.read_csv(tmp_path / "policy.csv")
     policies.loc[0, "scope_value"] = "10.1.2.3"
     policies.to_csv(tmp_path / "policy.csv", index=False)
-    assert any("source IP does not match" in error for error in validate_official_csvs(input_path, tmp_path))
+    assert any("does not match the observed SOURCE_IP" in error for error in validate_official_csvs(input_path, tmp_path))
 
 
 def test_independent_official_csv_validator_rejects_block_before_activation(tmp_path):
@@ -141,7 +141,7 @@ def test_independent_official_csv_validator_rejects_block_before_activation(tmp_
     replay = pd.read_csv(tmp_path / "replay.csv", keep_default_na=False)
     replay.loc[0, ["action", "applied_policy_id"]] = ["BLOCK", "POL-00001"]
     replay.to_csv(tmp_path / "replay.csv", index=False)
-    assert any("not active" in error for error in validate_official_csvs(input_path, tmp_path))
+    assert any("outside its activation-exclusive/expiry-inclusive window" in error for error in validate_official_csvs(input_path, tmp_path))
 
 
 def test_bundle_validator_rejects_blocked_record_with_different_observed_source_ip(tmp_path):
