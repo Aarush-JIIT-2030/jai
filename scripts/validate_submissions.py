@@ -184,7 +184,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, required=True, help="Original unlabelled organizer hidden replay input CSV or Parquet")
-    parser.add_argument("--output-dir", type=Path, required=True, help="Directory containing classification.csv, policy.csv and replay.csv")
+    parser.add_argument("--output-dir", type=Path, required=True, help="Directory containing classification.csv, policies.csv and replay.csv")
     args = parser.parse_args()
     try:
         errors = validate(args.input, args.output_dir)
