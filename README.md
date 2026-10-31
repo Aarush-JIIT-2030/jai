@@ -37,6 +37,12 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                                       │
                                       ▼
                          ┌─────────────────────────┐
+                         │ Agent 5: Active Policy  │
+                         │ Gate: BLOCK or ALLOW    │
+                         └────────────┬────────────┘
+                                      │ ALLOW only
+                                      ▼
+                         ┌─────────────────────────┐
                          │Agent 4: Temp Correlation│
                          │ (Scan / DDoS / Brute)   │
                          └────────────┬────────────┘
@@ -49,10 +55,10 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
 ```
 
 1. **Agent 1 (Threat Detection):** Supervised five-class Random Forest (400 estimators by default; optional XGBoost backend) for `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN`. Confidence is the maximum temperature-scaled `predict_proba` output when the optional held-out validation calibration workflow is run; otherwise it is explicitly uncalibrated.
-2. **Agent 2 (Anomaly Detection):** Independent Isolation Forest trained on benign training rows only. The baseline threshold is the first percentile of benign training decision scores; the optional held-out validation workflow selects a threshold that maximizes attack recall under a configured benign false-positive ceiling. Anomaly scores are raw decision-function values, not probabilities.
+2. **Agent 2 (Anomaly Detection):** Independent Isolation Forest trained on benign training rows only. The baseline threshold is the first percentile of benign training decision scores; the optional held-out validation workflow selects a threshold that maximizes attack recall under a configured benign false-positive ceiling. The exported anomaly value is a bounded 0–1 index (higher means more anomalous), not a probability; the threshold is applied to the underlying decision function.
 3. **Agent 3 (Evidence Fusion):** Tactical arbiter combining classification and anomaly signals into deterministic `ALLOW`, `BLOCK`, or `REVIEW` decisions (`AGREE`, `DISAGREE`, `INCOMPLETE`). Disagreements are explicitly routed to analyst review.
 4. **Agent 4 (Temporal Correlation):** Stateful chronological correlator maintaining a 150-flow sliding window to detect distributed Port Scans ($\ge 5$ distinct destination ports), DDoS volumetric surges, and repeated SSH/FTP authentication sweeps.
-5. **Agent 5 (Adaptive Defense):** Dynamic policy lifecycle manager that evaluates incoming flows against active unexpired rules before analysis and generates forward-looking temporary quarantine policies (`POL-XXXXX`, `scope_type = "SOURCE_IP"`, `expires_after = step + 150`).
+5. **Agent 5 (Adaptive Defense):** Dynamic policy lifecycle manager that checks active unexpired rules before correlation and policy updates and generates forward-looking temporary quarantine policies (`POL-XXXXX`, `scope_type = "SOURCE_IP"`, `expires_after = step + 150`).
 
 ---
 
