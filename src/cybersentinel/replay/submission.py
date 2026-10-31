@@ -72,8 +72,6 @@ class SubmissionValidator:
 
         if observed_records != [str(value) for value in expected_records]:
             issues.append("classification.csv must contain every expected record_id exactly once in original replay order.")
-        if observed_records != [str(value) for value in expected_records]:
-            issues.append("replay.csv must contain every expected record_id exactly once in original replay order.")
         if len(expected_records) != row_count:
             issues.append(f"Row count mismatch: expected {len(expected_records)}, got {row_count}")
 
@@ -122,14 +120,10 @@ class SubmissionValidator:
 
                 scope_value = str(row.get("scope_value", "")).strip()
                 try:
-                    if scope_type in {"SOURCE_IP", "DESTINATION_IP"}:
+                    if scope_type == "SOURCE_IP":
                         ipaddress.ip_address(scope_value)
-                    elif scope_type == "SRC_DST_PAIR":
-                        parts = scope_value.split("|")
-                        if len(parts) != 2:
-                            raise ValueError("expected source|destination")
-                        ipaddress.ip_address(parts[0].strip())
-                        ipaddress.ip_address(parts[1].strip())
+                    else:
+                        raise ValueError("only SOURCE_IP is supported by the organizer contract")
                 except ValueError:
                     issues.append(f"Row {idx}: scope_value does not match the literal IP format for {scope_type}.")
 
@@ -189,6 +183,8 @@ class SubmissionValidator:
                     elif applied_pol not in valid_policies:
                         issues.append(f"Row {idx}: BLOCK references unknown policy '{applied_pol}'")
 
+        if observed_records != [str(value) for value in expected_records]:
+            issues.append("replay.csv must contain every expected record_id exactly once in original replay order.")
         if len(expected_records) != row_count:
             issues.append(f"Row count mismatch: expected {len(expected_records)}, got {row_count}")
 
