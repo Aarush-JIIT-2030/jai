@@ -123,7 +123,7 @@ def system_diagnostics():
         },
         "submission_artifacts": files,
         "history_database": {"present": history_db.is_file()},
-        "source_identity": "literal observed source IP only; missing or invalid source IP disables endpoint correlation and SOURCE_IP policy creation",
+        "source_identity": "observed source IP preferred; if absent, a deterministic synthetic TCP-fingerprint identity is used when all three fingerprint fields are finite; otherwise source correlation and SOURCE_IP policy creation are unavailable",
         "firewall": {"mode": "simulated-only", "host_firewall_modified": False},
     }
 
