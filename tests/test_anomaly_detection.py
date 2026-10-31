@@ -49,6 +49,7 @@ def test_outlier_returns_feature_evidence():
     result = agent.score(outlier)
     assert result.status == "success"
     assert result.is_anomaly is True
+    assert result.anomaly_score is not None and 0.0 <= result.anomaly_score <= 1.0
     assert result.evidence
 
 
@@ -73,10 +74,15 @@ def test_score_frame_vectorized():
     assert all(isinstance(r.is_anomaly, bool) for r in results)
 
 
-def test_anomaly_score_contract_is_raw_and_evidence_is_structured():
+def test_anomaly_score_contract_is_bounded_and_evidence_is_structured():
     agent = AnomalyDetectionAgent().fit(benign_sample())
     assert agent.metadata["score_is_probability"] is False
-    assert "decision_function" in agent.metadata["score_definition"]
+    assert "range [0,1]" in agent.metadata["score_definition"]
+    assert agent.score_scale is not None and agent.score_scale > 0
+    normal_score = agent.score({"Destination Port": 443, "Flow Duration": 1200,
+                                "Total Fwd Packets": 8, "Flow Packets/s": 45,
+                                "Flow Bytes/s": 18000}).anomaly_score
+    assert normal_score is not None and 0.0 <= normal_score <= 1.0
     outlier = {"Destination Port": 65500, "Flow Duration": 9_000_000,
                "Total Fwd Packets": 50000, "Flow Packets/s": 900000,
                "Flow Bytes/s": 90000000}
