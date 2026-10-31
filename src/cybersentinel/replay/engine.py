@@ -190,19 +190,23 @@ class ReplayEngine:
         writer.writerows(rows)
         return output.getvalue()
 
-    def generate_submission_files(self, df: pd.DataFrame, output_dir: str | Path = "submissions") -> dict[str, Path]:
+    def write_submission_files(self, results: dict[str, Any], output_dir: str | Path = "submissions") -> dict[str, Path]:
+        """Write already-computed replay results using the exact organizer templates."""
         out_path = Path(output_dir)
         out_path.mkdir(parents=True, exist_ok=True)
-        results = self.run_replay(df)
         files = {
-            "classification": (["record_id", "predicted_class", "anomaly score", "evidence status"], [{**row, "anomaly score": row["anomaly_score"], "evidence status": row["evidence_status"]} for row in results["classification_rows"]]),
-            "policy": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"], results["policy_rows"]),
+            "classification": (["record_id", "predicted_class", "anomaly_score", "evidence_status"], results["classification_rows"]),
+            "policies": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"], results["policy_rows"]),
             "replay": (["record_id", "action", "active_policy_id"], results["replay_rows"]),
         }
-        paths = {}
+        paths: dict[str, Path] = {}
         for name, (headers, rows) in files.items():
             path = out_path / f"{name}.csv"
             path.write_text(self.export_csv(rows, headers), encoding="utf-8")
             paths[name] = path
-        logger.info("Generated submission files in %s", out_path)
+        logger.info("Generated organizer submission files in %s", out_path)
         return paths
+
+    def generate_submission_files(self, df: pd.DataFrame, output_dir: str | Path = "submissions") -> dict[str, Path]:
+        """Run replay once, then write its exact organizer CSV outputs."""
+        return self.write_submission_files(self.run_replay(df), output_dir)
