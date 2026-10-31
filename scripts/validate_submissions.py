@@ -13,7 +13,7 @@ import pandas as pd
 CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE = {"AGREE", "CONFLICT", "UNCERTAIN"}
 ACTIONS = {"ALLOW", "BLOCK"}
-SCOPES = {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}
+SCOPES = {"SOURCE_IP"}
 ALLOW_SENTINEL = ""
 CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly score", "evidence status"]
 POLICY_COLUMNS = [
