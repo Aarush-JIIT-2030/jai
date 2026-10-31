@@ -61,11 +61,11 @@ python scripts/validate_submissions.py \
 
 The exact templates are:
 
-- `classification.csv`: `record_id,predicted_class,anomaly score,evidence status`
+- `classification.csv`: `record_id,predicted_class,anomaly_score,evidence_status`
 - `replay.csv`: `record_id,action,active_policy_id`
-- `policy.csv`: `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
+- `policies.csv`: `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
 
-The validator verifies exact headers, all hidden IDs in original order, five-class labels, finite 0–1 anomaly scores, organizer evidence states, literal observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, `ALLOW` with an empty `active_policy_id`, and the lexicographically smallest matching policy for every `BLOCK`.
+The validator verifies exact headers, all hidden IDs in original order, five-class labels, finite 0–1 anomaly scores, organizer evidence states, literal observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, `ALLOW` with `active_policy_id=NONE`, and the lexicographically smallest matching policy for every `BLOCK`.
 
 A limited `--limit` run is a smoke test only and cannot be submitted. The hidden set has no labels, so attack/benign accuracy, false-block rate, and containment rate must not be inferred from its predictions. A local validation pass is not organizer acceptance; only an actual successful organizer response/receipt proves acceptance.
 
