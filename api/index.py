@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+import io
 import os
 import sys
+import tempfile
 import time
+import zipfile
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -459,6 +462,75 @@ def run_official_replay():
             status_code=500,
             detail={"code": "OFFICIAL_REPLAY_FAILED", "type": type(exc).__name__, "message": "Official replay failed; inspect backend logs for details."},
         ) from exc
+
+
+@app.post("/api/replay/input/upload")
+async def upload_replay_input(file: UploadFile = File(...)):
+    """Install a real organizer CSV or the known cyber-hidden.zip without extracting paths."""
+    if SERVERLESS_RUNTIME:
+        raise HTTPException(status_code=503, detail={
+            "code": "LOCAL_RUNTIME_REQUIRED",
+            "message": "Replay input files are stored locally. Use the local Python API, not a serverless preview.",
+        })
+    filename = (file.filename or "").casefold()
+    try:
+        payload = await file.read(20 * 1024 * 1024 + 1)
+    finally:
+        await file.close()
+    if len(payload) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Upload exceeds the 20 MiB compressed-file limit.")
+
+    if filename.endswith(".csv"):
+        csv_payload = payload
+    elif filename.endswith(".zip"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                try:
+                    entry = archive.getinfo("Cyber/hidden/records.csv")
+                except KeyError as exc:
+                    raise HTTPException(status_code=422, detail={
+                        "code": "HIDDEN_CSV_NOT_FOUND",
+                        "message": "ZIP must contain the organizer file Cyber/hidden/records.csv.",
+                    }) from exc
+                if entry.file_size > 50 * 1024 * 1024 or entry.is_dir():
+                    raise HTTPException(status_code=413, detail="Uncompressed replay CSV exceeds the 50 MiB limit.")
+                if entry.compress_size and entry.file_size / entry.compress_size > 1000:
+                    raise HTTPException(status_code=413, detail="ZIP compression ratio exceeds the safety limit.")
+                csv_payload = archive.read(entry)
+        except zipfile.BadZipFile as exc:
+            raise HTTPException(status_code=422, detail="Uploaded ZIP archive is invalid.") from exc
+    else:
+        raise HTTPException(status_code=415, detail="Upload an organizer .csv file or cyber-hidden.zip.")
+
+    try:
+        frame = pd.read_csv(io.BytesIO(csv_payload), dtype={"record_id": str}, keep_default_na=False)
+        report = validate_replay_input(frame)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail={
+            "code": "REPLAY_INPUT_PARSE_FAILED",
+            "message": f"Replay input could not be parsed: {type(exc).__name__}.",
+        }) from exc
+    if not report["valid"]:
+        raise HTTPException(status_code=422, detail={"code": "REPLAY_INPUT_INVALID", "report": report})
+
+    destination = BASE_DIR / "data" / "processed" / "hidden_replay_input.csv"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix=".hidden-replay-", suffix=".csv", dir=destination.parent, delete=False) as handle:
+            handle.write(csv_payload)
+            temporary_path = Path(handle.name)
+        os.replace(temporary_path, destination)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
+
+    return {
+        "installed": True,
+        "path": "data/processed/hidden_replay_input.csv",
+        "input_validation": report,
+        "message": "Organizer input installed locally. No endpoints or timestamps were generated or imputed.",
+    }
 
 
 @app.get("/api/replay/validate")
