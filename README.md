@@ -122,16 +122,16 @@ The three files are `classification.csv`, `replay.csv`, and `policies.csv`. The 
 
 ---
 
-## 6. WebGL 3D SOC Command Center
+## 6. Analyst Console & Investigation Workbench
 
-The frontend provides a dark SOC command platform with 11 operational consoles. Screens show actual backend data when available and explicit unavailable/empty states otherwise; fabricated fallback incidents, policy rows, benchmark matrices, and replay progress are not presented. The console includes:
-1. **Overview / SOC Command Center:** WebGL 3D network topology with 5-agent satellite orbits, interactive pointer tilt, threat-level toggle (`LOW`, `ELEVATED`, `CRITICAL`), real aggregate telemetry, and 2D canvas fallback.
-2. **Five-Agent Architecture:** Deep-dive cards showing model parameters, input/output schemas, and microsecond latencies for Agents 1–5.
-3. **Flow Inspector:** Granular flow lookup by ID, preset attack injections (Slowloris DoS, PortScan probe, SSH Brute), feature importance, and multi-agent evidence breakdown.
-4. **Evidence Fusion:** Live interactive 3x3 decision matrix simulator with confidence sliders and explainable rationale output.
+The frontend provides an analyst-focused offline replay console. Data panels show backend artifacts when available and explicit unavailable/empty states otherwise. The 3D topology and particle effects are illustrative UI animations, not live network telemetry. Manual fusion scenarios are explicitly marked as what-if inputs. The console includes:
+1. **Overview / SOC Command Center:** Illustrative WebGL 3D five-agent architecture view with interactive pointer tilt, visual-only schematic states, and 2D canvas fallback; it does not claim live network telemetry.
+2. **Five-Agent Architecture:** Deep-dive cards showing model parameters and input/output contracts; measured latency appears only when a real benchmark/replay report exists.
+3. **Flow Inspector:** Single-flow offline analysis for a user-supplied flow record, with the actual Agent 2 deviation evidence returned by the trained model; no synthetic attack presets or heuristic feature-impact scores.
+4. **Evidence Fusion:** Manual what-if fusion simulator that calls the backend decision rules; inputs are explicitly not presented as observed flows or model predictions.
 5. **Temporal Investigations:** Multi-flow incident tracker grouping coordinated Port Scans, DDoS amplification, and brute force campaigns.
 6. **Adaptive Defense:** Stateful policy manager displaying active vs. expired host quarantine rules and interactive pre-filter tester.
-7. **Replay Studio:** Interactive chronological playback with speed toggles (1x, 5x, 20x), progress bar, and streaming event telemetry.
+7. **Replay Studio:** Chronological playback of generated replay artifacts with explicit backend progress and no fabricated traffic events.
 8. **Submission Studio:** One-click official CSV bundle downloads (`/api/submissions/download/*`) and automated submission auditor.
 9. **Model Intelligence:** Interactive 5x5 confusion matrix, per-class PR/F1 tables, and isolation forest calibration curves.
 10. **Audit & Local History:** Offline SQLite persistence (`data/cybersentinel_history.db`) logging historical runs.
