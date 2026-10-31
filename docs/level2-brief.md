@@ -6,20 +6,20 @@ For JAI 2026 Track 1 (Agentic AI for Cybersecurity), CyberSentinel delivers a 5-
 
 ```mermaid
 flowchart TD
-    F[Chronological input row] --> A1[Agent 1: five-class prediction]
-    F --> A2[Agent 2: BENIGN-only anomaly score]
-    A1 --> PF{Existing active policy matches this source identity?}
-    A2 --> PF
-    PF -->|Yes| BLK[Simulated BLOCK + applied policy ID]
-    PF -->|No| A3[Agent 3: AGREE / CONFLICT / UNCERTAIN]
-    BLK --> CLASS[(classification.csv retains row evidence)]
-    A3 --> CLASS
-    A3 --> A4[Agent 4: temporal correlation]
-    A4 --> A5[Agent 5: forward-only temporary policy]
-    A5 --> POLICY[(policy.csv)]
-    BLK --> REPLAY[(replay.csv)]
-    A3 --> REPLAY
-    A5 -.->|Policy applies only to later rows| PF
+    A[Chronological offline flow row] --> D1[Agent 1: five-class prediction]
+    A --> D2[Agent 2: anomaly score]
+    D1 --> PF{Agent 5: check earlier active policy}
+    D2 --> PF
+    PF --> F3[Agent 3: evidence fusion for every row]
+    F3 --> CLASS[(classification.csv: every row)]
+    PF -->|Policy matches| B[Replay action BLOCK + policy ID]
+    PF -->|No policy match| C4[Agent 4: correlate allowed row]
+    C4 --> R5[Agent 5: create forward-only policy if warranted]
+    R5 --> POLICY[(policy.csv)]
+    B --> REPLAY[(replay.csv)]
+    C4 --> ALLOW[Replay action ALLOW]
+    ALLOW --> REPLAY
+    R5 -.->|Only later rows can match| PF
 ```
 
 ---
