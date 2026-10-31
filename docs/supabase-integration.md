@@ -46,3 +46,6 @@ A successful build alone does not complete this smoke test. The deployed app mus
 
 ## Evaluation snapshots
 The Model Intelligence view can save a compact evaluation snapshot to `analysis_runs`. It stores metrics and report metadata only; evaluation CSVs and hidden replay data are not uploaded. The Audit History view shows replay runs and evaluation snapshots separately.
+
+## Database performance
+The user ownership foreign key on `agent2_inference_events.user_id` is indexed to keep per-user audit reads and cascading deletes efficient.
