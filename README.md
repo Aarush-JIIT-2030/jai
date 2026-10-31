@@ -3,12 +3,8 @@
 **Multi-Agent Network Intrusion Detection & Adaptive Defense**  
 *JAI Agentic AI International Summit 2026 · Track 1: Agentic AI for Cybersecurity*
 
-[![Python Tests](https://img.shields.io/badge/pytest-60%20passed-brightgreen.svg)]()
-[![Frontend Build](https://img.shields.io/badge/vite%20build-passing-brightgreen.svg)]()
-[![Model Accuracy](https://img.shields.io/badge/accuracy-99.9956%25-blue.svg)]()
-[![Holdout Macro F1](https://img.shields.io/badge/macro--F1-0.999897-blue.svg)]()
-[![Replay Throughput](https://img.shields.io/badge/throughput-7%2C101%20FPS-purple.svg)]()
-[![Submission Status](https://img.shields.io/badge/submission-READY__FOR__SUBMISSION-success.svg)]()
+[![Python tests](https://github.com/kaustubhdua/jai-hack/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/kaustubhdua/jai-hack/actions/workflows/python-tests.yml)
+[![Frontend build](https://github.com/kaustubhdua/jai-hack/actions/workflows/frontend-build.yml/badge.svg?branch=main)](https://github.com/kaustubhdua/jai-hack/actions/workflows/frontend-build.yml)
 
 CyberSentinel is an offline multi-agent cybersecurity command platform that analyzes network-flow records, correlates multi-flow attack campaigns, fuses supervised and unsupervised evidence, and enforces temporary simulated quarantine policies. All tactical decisions—`ALLOW`, `BLOCK`, and `REVIEW`—are simulated. CyberSentinel never monitors live network sockets, injects malicious packets, or alters host operating system firewalls.
 
@@ -29,7 +25,7 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                    ▼                                     ▼
         ┌───────────────────────┐             ┌─────────────────────┐
         │  Agent 1: Threat Det  │             │ Agent 2: Anomaly Det│
-        │ (Random Forest 99.99%)│             │ (Isolation Forest)  │
+        │ (Random Forest, 400 estimators by default)│             │ (Isolation Forest)  │
         └──────────┬────────────┘             └──────────┬──────────┘
                    │                                     │
                    └──────────────────┬──────────────────┘
@@ -52,76 +48,44 @@ CyberSentinel decomposes enterprise threat response into five specialized, coope
                          └─────────────────────────┘
 ```
 
-1. **Agent 1 (Threat Detection):** Supervised multiclass Random Forest (100 estimators) classifying flows into `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN` with model confidence from predict_proba (not probability-calibrated).
-2. **Agent 2 (Anomaly Detection):** Independent, unsupervised Isolation Forest ($c=0.05$) scoring continuous statistical deviations to catch zero-day attacks without label access.
+1. **Agent 1 (Threat Detection):** Supervised five-class Random Forest (400 estimators by default; optional XGBoost backend) for `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, and `PORT_SCAN`. Its confidence is the maximum `predict_proba` output and is not calibrated.
+2. **Agent 2 (Anomaly Detection):** Independent Isolation Forest trained on benign training rows only. The current implementation uses 200 trees and sets its threshold from the first percentile of training decision scores; anomaly scores are not probabilities.
 3. **Agent 3 (Evidence Fusion):** Tactical arbiter combining classification and anomaly signals into deterministic `ALLOW`, `BLOCK`, or `REVIEW` decisions (`AGREE`, `DISAGREE`, `INCOMPLETE`). Disagreements are explicitly routed to analyst review.
 4. **Agent 4 (Temporal Correlation):** Stateful chronological correlator maintaining a 150-flow sliding window to detect distributed Port Scans ($\ge 5$ distinct destination ports), DDoS volumetric surges, and repeated SSH/FTP authentication sweeps.
 5. **Agent 5 (Adaptive Defense):** Dynamic policy lifecycle manager that evaluates incoming flows against active unexpired rules before analysis and generates forward-looking temporary quarantine policies (`POL-XXXXX`, `scope_type = "SOURCE_IP"`, `expires_after = step + 150`).
 
 ---
 
-## 2. Historical Baseline Metrics (114,185 Holdout Flows — Pre-Correction)
+## 2. Evaluation Status & Dataset Boundaries
 
-The following values are copied from the previous local baseline report and predate the shared TCP-stack identity correction and metric-semantics fixes. They are historical reference values, **not current release verification**. Regenerate the three CSVs and all replay metrics using the current branch before submission. The dataset and model binaries are not committed to this public repository.
+The data audit in [`docs/data-intelligence.md`](docs/data-intelligence.md) records the supplied split sizes, schema, cleaning decisions, and class counts. It also found 8,161 distinct feature vectors shared by training and evaluation, covering 9,795 evaluation rows (8.58%). Keep this overlap caveat with any score; the official evaluation set remains unchanged, but repeated feature vectors can make holdout results optimistic.
 
-### Agent 1: Multiclass Classification
-* **Overall Accuracy:** `99.9956%` (114,180 / 114,185 correct flows)
-* **Macro-Averaged Precision:** `0.999983`
-* **Macro-Averaged Recall:** `0.999811`
-* **Macro-Averaged F1-Score:** `0.999897`
-* **Inference Speed:** `0.0205 ms / flow` (`48,867 flows / second` on CPU)
+The repository does not include organizer data, prepared Parquet files, trained model artifacts, or generated submission CSVs. Those local files are excluded by `.gitignore`. Historical metrics in the release reports are snapshots from earlier code/data runs, not current performance claims. Reproduce the benchmark with the current code and authorized local inputs before quoting results.
 
-#### Holdout Confusion Matrix & Class Support:
-| True Class \ Predicted | BENIGN | BRUTE_FORCE | DOS | DDOS | PORT_SCAN | Precision | Recall | F1-Score | Support |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **BENIGN** | **60,001** | 0 | 0 | 0 | 0 | 0.9999 | 1.0000 | 0.9999 | 60,001 |
-| **BRUTE_FORCE** | 1 | **1,383** | 0 | 0 | 0 | 1.0000 | 0.9993 | 0.9996 | 1,384 |
-| **DOS** | 2 | 0 | **23,998** | 0 | 0 | 1.0000 | 0.9999 | 0.9999 | 24,000 |
-| **DDOS** | 0 | 0 | 0 | **14,400** | 0 | 1.0000 | 1.0000 | 1.0000 | 14,400 |
-| **PORT_SCAN** | 2 | 0 | 0 | 0 | **14,398** | 1.0000 | 0.9998 | 0.9999 | 14,400 |
+## 3. Causal Replay Behavior
 
-### Agent 2: Anomaly Detection
-* **Benign False Positive Rate (FPR):** `0.958317%` (only 575 false outliers in 60,001 true benign flows)
-* **Isolation Forest Threshold:** `0.033250`
-* **Inference Speed:** `0.0603 ms / flow` (`16,595 flows / second`)
+The chronological replay engine enforces these invariants:
+
+1. Only policies active before record `N` may affect record `N`.
+2. A record cannot trigger a policy that blocks itself.
+3. Classifications are recorded for every input flow, including flows later blocked by an already-active simulated policy.
+4. Policies expire after their configured replay interval.
+
+All actions are simulated. The system does not modify a host firewall or inspect live network traffic.
 
 ---
 
-## 3. Causal Replay Engine & Replay Invariants
+## 4. Local Replay Outputs
 
-The CyberSentinel Causal Replay Engine (`cybersentinel.replay.ReplayEngine`) processes packet streams chronologically without temporal cheating:
+The repository includes a generator for the three replay CSVs:
 
-* **Total Records Processed:** **114,185 flows**
-* **Replay Execution Time:** **17.84 seconds**
-* **Vectorized Throughput:** **6,400.6 Flows / Second**
-* **Active Policies Activated:** **19,546 rules** (77.2% bloat reduction via consensus gating & window-bounded correlation)
-* **Replay Actions:** **54,828 Blocked** (48,219 confirmed attacks contained — 89.0% containment) | **59,357 Allowed** (53,392 benign flows preserved — 89.0% availability)
-* **False Block Reduction:** Reduced false blocks from 28,423 down to **6,609** (76.7% improvement via sliding-window counter eviction)
+```bash
+python scripts/generate_submissions.py \
+  --input data/processed/eval_prepared.parquet \
+  --output-dir outputs/submission
+```
 
-### Core Invariants Enforced:
-1. **Pre-Filter Precedence:** When flow $N$ arrives from `source_ip`, active policies activated prior to $N$ ($< N$) apply *before* inspecting the flow.
-2. **Triggering Flow Protection:** The record that triggers a policy is never blocked by its own rule (`action = ALLOW`, `applied_policy_id = ""`).
-3. **Universal Classification:** Predictions are generated and logged for all 114,185 records, including records that are subsequently dropped by active policies.
-4. **Deterministic Policy Expiration:** Policies expire strictly after their calibrated duration (150 records), restoring availability once the threat subsides.
-
----
-
-## 4. Official Submission Bundle & Automated Validator
-
-Generated via `scripts/generate_submissions.py` and validated via `SubmissionValidator`:
-
-| Submission File | Rows | Schema Header | Validation Status |
-| :--- | :--- | :--- | :--- |
-| **`classification.csv`** | 114,185 | `record_id,predicted_class,anomaly score,evidence status` | **VALID (0 errors)** |
-| **`policy.csv`** | 19,546 | `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action` | **VALID (0 errors)** |
-| **`replay.csv`** | 114,185 | `record_id,action,applied_policy_id` | **VALID (0 errors)** |
-
-* **Validation Audit:** `outputs/submission/validation_report.json` certifies:
-  * 0 duplicate or missing `record_id` entries
-  * 100% canonical taxonomy conformance
-  * All `applied_policy_id` references match active unexpired policies
-  * 0 ground-truth label leakage
-  * Complete quality assurance deliverables documented in [`release/qa-reports/`](release/qa-reports/)
+This requires locally supplied evaluation data and trained model artifacts. Generated files and validation reports are ignored by Git. The current checkout alone therefore does not establish that a fresh full-data replay passed or that a submission is ready. See [`docs/level2-brief.md`](docs/level2-brief.md) for the repository’s replay output schemas.
 
 ---
 
@@ -145,8 +109,8 @@ The frontend provides a dark SOC command platform with 11 operational consoles. 
 ## 6. Installation & Quickstart
 
 ### Prerequisites
-* Python 3.10+ (Tested on Python 3.14 on Windows)
-* Node.js 18+ and npm
+* Python 3.10+ (CI currently uses Python 3.11)
+* Node.js 20+ and npm (CI uses Node 20)
 
 ### 1. Backend Setup
 ```bash
@@ -155,24 +119,24 @@ git clone https://github.com/kaustubhdua/jai-hack.git
 cd jai-hack
 
 # Install Python ML dependencies
-pip install -e ".[ml]"
+pip install -e ".[dev,ml]"
 ```
 
 ### 2. Run Reproducible Benchmark Suite
 ```bash
-# Reproduces holdout metrics (99.9956% acc, 0.958% benign FPR)
-$env:PYTHONPATH="src"; python scripts/reproduce_benchmarks.py
+# Recomputes metrics from the authorized local dataset and model artifacts
+python scripts/reproduce_benchmarks.py
 ```
 
 ### 3. Generate Official Submission Files
 ```bash
 # Runs causal replay and generates classification.csv, policy.csv, replay.csv
-$env:PYTHONPATH="src"; python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
+python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
 ```
 
 ### 4. Run the Pytest Suite
 ```bash
-$env:PYTHONPATH="src"; python -m pytest tests -q
+python -m pytest tests -q
 ```
 
 ### 5. Frontend Setup & Build
@@ -180,7 +144,7 @@ $env:PYTHONPATH="src"; python -m pytest tests -q
 # Install frontend dependencies
 npm install
 
-# Build production bundle (0 TypeScript errors)
+# Type-check and build
 npm run build
 
 # Start local development server
@@ -210,10 +174,13 @@ If the dataset or models are missing, the API returns an explicit unavailable re
 
 The prepared feature dataset may not contain native Layer 3 source IP fields. In that case the system derives a synthetic, stable identity from TCP-stack fingerprint fields. This is not an observed IP address and can collide for clients with identical fingerprints. If the required fingerprint fields are missing, policy creation fails closed rather than inventing a host identity. See `release/benchmarks/source-ip-scope-audit.md`.
 
-## 7. Open-Source Attribution & AI Disclosure
+## 7. Third-Party, Reference & AI Disclosures
 
-* **Core Libraries:** `scikit-learn`, `pandas`, `numpy`, `joblib`, `fastapi`, `pydantic`, `three`, `react`, `lucide-react`, `vite`.
-* **Dataset:** CICIDS2017 flow data provided by Canadian Institute for Cybersecurity and JAI 2026 Hackathon Organizers.
-* **AI Assistance Disclosure:** Antigravity and ChatGPT were used for code review, debugging, test design, documentation, and UI implementation assistance. Team members remain responsible for understanding and presenting the submitted code.
-* **UI/UX Reference Disclosure:** The user-supplied CICRCombined-main archive was reviewed as a design-pattern reference for accessible focus states, reduced-motion support, responsive navigation, async states, and restrained transitions. Its README identifies the project as ISC-licensed; no CICR source files or components were copied into CyberSentinel. The patterns were independently implemented in CyberSentinel's existing React/Three.js application.
-* **Architecture Reference Disclosure:** The user-supplied `Vaibhav-Patidar/cybersentinel` repository was reviewed for high-level three-agent data-pipeline and evidence-presentation ideas. CyberSentinel's five-agent implementation and code were developed separately; no source files were copied from that repository.
+* **Dependencies:** `scikit-learn`, `pandas`, `numpy`, `joblib`, `fastapi`, `pydantic`, `three`, `react`, `lucide-react`, and `vite`. Their respective licenses apply.
+* **Project license:** No project-level `LICENSE` file is currently present. The maintainers should choose and add one before presenting this repository as reusable open-source software; no license is inferred here.
+* **Dataset:** CICIDS2017 flow data and the challenge’s class mapping are governed by their respective providers and organizer terms. No challenge data is committed.
+* **AI assistance:** The team reports using Antigravity and ChatGPT for code review, debugging, test design, documentation, and UI implementation assistance. Team members remain responsible for understanding and presenting the submitted code.
+* **UI/UX reference:** The team reports reviewing the user-supplied `CICRCombined-main` archive for design patterns only. The related public project is [amancodes8/CICRCombined](https://github.com/amancodes8/CICRCombined). The team reports that no source files or components were copied; verify the exact archive’s license before any code reuse.
+* **Architecture reference:** [Vaibhav-Patidar/cybersentinel](https://github.com/Vaibhav-Patidar/cybersentinel) was reviewed for high-level data-pipeline and evidence-presentation ideas. The team reports that no source files were copied.
+
+Historical release and QA documents are indexed in [`release/README.md`](release/README.md); their old pass statuses are not current verification.

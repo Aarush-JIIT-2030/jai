@@ -17,8 +17,8 @@ python scripts/train_anomaly.py \
   --report-out reports/generated/agent2-training.json
 ```
 
-## Measured Holdout Performance (114,185 Flows)
+## Evaluation Status
 
-- **Benign False Positive Rate (FPR):** 0.958% (< 1.0% operational target).
-- **Attack Anomaly Recall:** 11.71% (identifies high-volume / destructive outlier flows).
-- **Inference Latency:** ~0.040 ms/flow.
+No current official-evaluation FPR, attack recall, or latency result is reproducible from this repository alone because the evaluation data and trained model artifact are not committed. Older release reports contain different values; treat them as historical and do not cite them as current.
+
+To produce current metrics, train from the authorized benign training rows, evaluate against the untouched evaluation split, and retain the report with the code revision and dataset hashes. See [`docs/evaluation.md`](evaluation.md).

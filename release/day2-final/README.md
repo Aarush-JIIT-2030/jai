@@ -1,10 +1,12 @@
+> **Archive notice:** This directory records a prior Day 2 release snapshot. Its operational status, metrics, test counts, and CSV validation refer to that earlier environment; they are not current verification for `main`. Current data, model, and generated submission artifacts are not committed. Re-run checks against the current branch before citing any result.
+
 # CyberSentinel — Day 2 Final Release Package
 
 **Event:** Jaypee Agentic AI International Summit & Hackathon (JAI 2026)  
 **Track:** Track 1 — Agentic AI for Cybersecurity  
 **Challenge:** CyberSentinel: Multi-Agent Network Intrusion Detection & Adaptive Defense  
 **Branch:** `day2/five-agent-local`  
-**Status:** FULLY OPERATIONAL (Local Offline Environment)
+**Status:** Historical local snapshot; current release readiness is unverified.
 
 ---
 

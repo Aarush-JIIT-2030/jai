@@ -1,56 +1,37 @@
-# Official Holdout Benchmark Evaluation
+# Evaluation Status and Reproduction
 
-## Evaluation Methodology
+## Current status
 
-The system was evaluated strictly against the untouched official evaluation split (`data/processed/eval_prepared.parquet`), containing 114,185 flows. Neither agent was exposed to these rows during training, imputation fitting, or threshold selection.
+No current full-data evaluation is reproducible from this repository alone. The organizer dataset, prepared Parquet files, trained model artifacts, and generated submission outputs are excluded from Git. The latest GitHub Actions runs verify the Python test suite and frontend build; they do not verify model metrics or a full replay.
 
-## Holdout Performance Summary
+See [`docs/data-intelligence.md`](data-intelligence.md) for the recorded dataset audit. It reports 8,161 exact feature vectors shared by training and evaluation, covering 9,795 evaluation rows (8.58%). Keep this caveat with any measured holdout score. Do not alter the official evaluation file to remove the overlap.
 
-```
-========================================================================================
-CYBERSENTINEL OFFICIAL HOLDOUT BENCHMARK (114,185 FLOWS)
-========================================================================================
+The scores and throughput figures in older release reports describe earlier artifacts. Treat them as historical until reproduced using the current code and authorized data.
 
-METRIC                             MEASURED VALUE        BENCHMARK GOAL     STATUS
-----------------------------------------------------------------------------------------
-Overall Classification Accuracy    99.9956%              > 95.0%            EXCEEDS
-Macro-Averaged F1 Score            0.999897              > 0.900            EXCEEDS
-Macro-Averaged Precision           0.999983              > 0.900            EXCEEDS
-Macro-Averaged Recall              0.999811              > 0.900            EXCEEDS
-Benign False Positive Rate (FPR)   0.958%                < 1.0%             OPTIMAL
-Threat Classifier Latency          0.016 ms / flow       < 1.0 ms           HIGH-THROUGHPUT
-Anomaly Detector Latency           0.040 ms / flow       < 1.0 ms           HIGH-THROUGHPUT
-----------------------------------------------------------------------------------------
-```
+## Reproduction procedure
 
-### Per-Class Evaluation Metrics
-
-| Class | Ground Truth | Correct Predictions | Precision | Recall | F1-Score |
-|---|---:|---:|---:|---:|---:|
-| `BENIGN` | 60,001 | 60,001 | 0.999917 | 1.000000 | 0.999958 |
-| `BRUTE_FORCE` | 1,384 | 1,383 | 1.000000 | 0.999277 | 0.999639 |
-| `DOS` | 24,000 | 23,998 | 1.000000 | 0.999917 | 0.999958 |
-| `DDOS` | 14,400 | 14,400 | 1.000000 | 1.000000 | 1.000000 |
-| `PORT_SCAN` | 14,400 | 14,398 | 1.000000 | 0.999861 | 0.999931 |
-
-### Confusion Matrix
-
-```
-                 Predicted
-           BENIGN  BRUTE_FORCE   DOS   DDOS  PORT_SCAN
-BENIGN     60001        0         0      0       0
-BRUTE_F        1     1383         0      0       0
-DOS            2        0     23998      0       0
-DDOS           0        0         0  14400       0
-PORT_SCAN      2        0         0      0   14398
-```
-
-## Reproduction Command
+1. Obtain the organizer-provided training and evaluation files and the exact organizer class mapping.
+2. Run the cleaning/preparation workflow on the training split; fit feature selection and imputation on training data only.
+3. Train Agent 1 and Agent 2 from the training split. Agent 2 uses benign training rows only.
+4. Evaluate on the untouched evaluation split with the current scripts:
 
 ```bash
+python -m cybersentinel.data.cleaning \
+  --train data/raw/training/flows.parquet \
+  --eval data/raw/eval/flows.parquet \
+  --out-dir data/processed
+
+python scripts/train_anomaly.py \
+  --train data/processed/training_prepared.parquet \
+  --model-out models/anomaly_detection/model.joblib
+
 python scripts/evaluate_benchmark.py \
   --eval data/processed/eval_prepared.parquet \
   --threat-model models/threat_detection/model.joblib \
   --anomaly-model models/anomaly_detection/model.joblib \
   --output reports/generated/official-evaluation.json
 ```
+
+5. Save the report with the code revision, dataset file hashes, split sizes, class-level metrics, and overlap caveat. Do not describe a score as current unless it came from that run.
+
+For the replay workflow, use `scripts/generate_submissions.py` and validate the generated files locally. Dataset, model, and submission artifacts belong in local ignored paths unless the organizers explicitly authorize publishing them.

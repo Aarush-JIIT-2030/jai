@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Reproducible benchmark verification script for CyberSentinel Day 1 + Day 2.
 
-Scres the untouched 114,185 evaluation dataset (eval_prepared.parquet) and
+Scores the untouched 114,185 evaluation dataset (eval_prepared.parquet) and
 verifies all reported metrics for Agent 1 (Threat Detection), Agent 2 (Anomaly
 Detection), Agent 3 (Evidence Fusion), Agent 4 (Temporal Correlation), and
 Agent 5 (Adaptive Defense).

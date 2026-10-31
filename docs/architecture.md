@@ -13,7 +13,7 @@ flowchart TD
     end
 
     subgraph Detection ["2. Independent Detection (A1 + A2)"]
-        ALW --> D1[Agent 1: Threat Detection<br/>Supervised Multiclass LightGBM<br/>Class + Confidence]
+        ALW --> D1[Agent 1: Threat Detection<br/>Random Forest default; optional XGBoost<br/>Class + Uncalibrated Confidence]
         ALW --> D2[Agent 2: Anomaly Detection<br/>Unsupervised Isolation Forest<br/>Score + Feature Evidence]
     end
 
@@ -40,12 +40,12 @@ flowchart TD
 
 1. **Agent 1 (Threat Detection Agent):**
    - Implements supervised five-class classification (`BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, `PORT_SCAN`).
-   - Uses class-weighted LightGBM with robust imputation for missing, infinite, and out-of-distribution values.
-   - Outputs predicted class and calibrated confidence score $[0.0, 1.0]$.
+   - Uses the current `RandomForestClassifier` backend by default (400 estimators, `balanced_subsample` class weights); XGBoost is an optional backend. Missing and infinite numeric values are median-imputed from training data.
+   - Outputs the predicted class and the maximum `predict_proba` value. This model-derived confidence is not probability-calibrated.
 
 2. **Agent 2 (Anomaly Detection Agent):**
    - Independent baseline trained strictly on benign baseline network traffic.
-   - Uses Isolation Forest with threshold calibration ($\approx 0.0332$).
+   - Uses a 200-tree Isolation Forest trained on benign training rows; its threshold is the first percentile of training decision scores. The score is not a probability.
    - Flags deviations without consuming Agent 1 outputs or labels.
    - Extracts feature-level evidence tags (e.g., `unusual_packet_rate`, `abnormal_flow_duration`).
 

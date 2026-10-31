@@ -12,7 +12,7 @@ flowchart TD
 
     subgraph A5_Pre["Agent 5: Pre-Filter Phase"]
         PF{Active Policy<br/>Match Source IP?}
-        BLK[Immediate Simulated BLOCK<br/>applied_policy_id = POL-XXXXX<br/>0ms Inference Cost]
+        BLK[Immediate Simulated BLOCK<br/>applied_policy_id = POL-XXXXX<br/>No model inference for matched flow]
     end
 
     subgraph Detection["Tri-Agent Core (Analyzed Flows)"]
@@ -85,7 +85,7 @@ python scripts/generate_submissions.py \
    * Never uses future records or ground-truth labels during decision making.
    * Policies only apply to *later* incoming records, strictly adhering to real-world causality.
 2. **Pre-Filtering Computational Advantage:**
-   * Once an attacker's Source IP is placed on temporary block by Agent 5, subsequent attack flows are stopped at the edge (0ms ML inference), protecting SOC computing resources.
+   * An active policy match skips model inference for that flow. This is a simulated replay behavior, not a measured end-to-end latency claim. When native source IP is absent, the policy identity is derived from flow features and must not be described as a real IP; see the [scope audit](../release/benchmarks/source-ip-scope-audit.md).
 3. **Defense-in-Depth Trade-Off:**
-   * Achieved **99.9956% holdout accuracy** on Agent 1, **0.958% benign false-positive rate** on Agent 2, and over **99% attack containment** with zero firewall disruption.
+   * Report only metrics reproduced on the current code and authorized data. Include macro-F1 and per-class results, state the evaluation split and its repeated-feature overlap, and describe ALLOW/BLOCK/REVIEW as simulated actions. Older release reports contain historical figures, not current results.
 
