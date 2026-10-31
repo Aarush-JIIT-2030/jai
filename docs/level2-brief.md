@@ -12,7 +12,7 @@ flowchart TD
 
     subgraph A5_Pre["Agent 5: Pre-Filter Phase"]
         PF{Active Policy<br/>Match Source IP?}
-        BLK[Immediate Simulated BLOCK<br/>active_policy_id = POL-XXXXX<br/>Classification and fusion evidence still retained; skip correlation and policy updates]
+        BLK[Immediate Simulated BLOCK<br/>applied_policy_id = POL-XXXXX<br/>Classification and fusion evidence still retained; skip correlation and policy updates]
     end
 
     subgraph Detection["Tri-Agent Core (Analyzed Flows)"]
@@ -31,11 +31,11 @@ flowchart TD
         ALW[Simulated ALLOW<br/>active_policy_id = empty]
     end
 
-    F --> PF
-    PF -- Yes --> BLK
-    PF -- No --> A1 & A2
+    F --> A1 & A2
     A1 & A2 --> A3
-    A3 --> A4
+    A3 --> PF
+    PF -- Yes --> BLK
+    PF -- No --> A4
     A4 --> PG
     PG -- Attack Detected --> POL
     PG -- Benign Traffic --> ALW
