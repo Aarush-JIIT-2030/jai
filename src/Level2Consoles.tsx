@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import {
   Activity, Check, Database, Download, FileSpreadsheet, Fingerprint,
   Gauge, Layers, LockKeyhole, Play, RefreshCw,
-  ShieldAlert, ShieldCheck, Copy, FileCode2, Terminal
+  ShieldAlert, ShieldCheck
 } from "lucide-react";
 const NetworkTopology3D = lazy(() => import("./components/NetworkTopology3D").then(module => ({ default: module.NetworkTopology3D })));
 
