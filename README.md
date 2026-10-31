@@ -91,17 +91,34 @@ All actions are simulated. The system does not modify a host firewall or inspect
 
 ---
 
-## 5. Local Replay Outputs
+## 5. Reproducible Local Training and Replay
 
-The repository includes a generator for the three replay CSVs:
+Install the organizer data packs into ignored local paths. The installer verifies the training/evaluation partition sizes and SHA-256 values against the supplied manifest, and validates the exact 200-row unlabelled hidden input:
 
 ```bash
+python scripts/prepare_challenge_data.py \
+  --training-pack cyber-pack.zip \
+  --hidden-pack cyber-hidden.zip
+
+pip install -e ".[dev,ml]"
+
+# Train A1 and A2 from the authorized training partition only.
+python scripts/train_models.py --train data/raw/training/flows.parquet
+
+# Optional: pass --validation only when organizers provide a separate labelled
+# validation partition. Never use hidden records or the held-out evaluation split
+# for model fitting or calibration.
+
 python scripts/generate_submissions.py \
+  --input data/processed/hidden_replay_input.csv \
+  --output-dir outputs/submission
+
+python scripts/validate_submissions.py \
   --input data/processed/hidden_replay_input.csv \
   --output-dir outputs/submission
 ```
 
-Generated files, model artifacts, and organizer data are ignored by Git. The supported local workflow is documented below and in [`docs/level2-brief.md`](docs/level2-brief.md). A fresh full replay and independent validation are required before claiming submission readiness.
+The three files are `classification.csv`, `replay.csv`, and `policies.csv`. The independent validator checks exact headers, all 200 IDs and their order, the anomaly-score range, evidence taxonomy, observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, the `NONE` ALLOW sentinel, and the lexicographically smallest matching policy for every BLOCK. A limited run is only a smoke test. A local validator pass is not proof of organizer acceptance.
 
 ---
 
