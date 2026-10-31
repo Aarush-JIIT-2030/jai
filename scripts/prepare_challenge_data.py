@@ -12,6 +12,7 @@ import tempfile
 import zipfile
 
 import pandas as pd
+import numpy as np
 
 TRAIN_MEMBER = "Cyber/training/flows.parquet"
 EVAL_MEMBER = "Cyber/eval/flows.parquet"
@@ -78,7 +79,7 @@ def prepare(training_pack: Path, hidden_pack: Path, data_dir: Path) -> dict:
     if hidden["record_id"].astype(str).tolist() != expected_ids:
         raise ValueError("Hidden record IDs must be F000001 through F000200 in organizer order.")
     days = pd.to_datetime(hidden["day"], errors="coerce", utc=True)
-    offsets = hidden["time_offset"].astype(str).str.extract(r"^(?P<minutes>\\d+):(?P<seconds>\\d{1,2}(?:\\.\\d+)?)$")
+    offsets = hidden["time_offset"].astype(str).str.extract(r"^(?P<minutes>\d+):(?P<seconds>\d{1,2}(?:\.\d+)?)$")
     if days.isna().any() or offsets.isna().any(axis=None):
         raise ValueError("Hidden day/time_offset metadata contains an invalid value.")
     elapsed = pd.to_numeric(offsets["minutes"], errors="coerce") * 60 + pd.to_numeric(offsets["seconds"], errors="coerce")
@@ -94,6 +95,8 @@ def prepare(training_pack: Path, hidden_pack: Path, data_dir: Path) -> dict:
     numeric_features = hidden[feature_columns].apply(pd.to_numeric, errors="coerce")
     if len(feature_columns) != 78 or numeric_features.isna().any(axis=None):
         raise ValueError(f"Expected exactly 78 complete numeric flow features; found {len(feature_columns)} columns.")
+    if not np.isfinite(numeric_features.to_numpy(dtype=float)).all():
+        raise ValueError("Hidden flow features must contain only finite numeric values.")
 
     paths = {
         data_dir / "raw" / "training" / "flows.parquet": training_bytes,
