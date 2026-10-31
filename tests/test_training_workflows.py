@@ -94,6 +94,7 @@ def test_combined_training_workflow_reloads_both_real_model_artifacts(tmp_path):
     assert manifest["a1"]["training_rows"] == 85
     assert manifest["a2"]["training_rows"] == 17
     assert manifest["a1"]["confidence_calibrated"] is True
-    assert manifest["a2"]["threshold_calibrated"] is True
+    assert manifest["a2"]["threshold_calibrated"] is False
+    assert manifest["a2"]["threshold_selection_source"] == "benign_training_distribution"
     assert Path(manifest["a1"]["artifact"]).is_file()
     assert Path(manifest["a2"]["artifact"]).is_file()
