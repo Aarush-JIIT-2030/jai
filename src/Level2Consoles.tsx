@@ -562,7 +562,7 @@ export function AdaptiveDefenseConsole() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, margin: "14px 0" }}>
         {[
-          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policy.csv"],
+          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policies.csv"],
           ["ATTACKS CONTAINED", metric ? metric.attacks_contained.toLocaleString() : "—", metric ? metric.attack_containment_rate.toFixed(2) + "% of attack records" : "Requires labelled evaluation data"],
           ["BENIGN PRESERVED", metric ? metric.benign_preserved.toLocaleString() : "—", metric ? metric.benign_preservation_rate.toFixed(2) + "% of benign records" : "Requires labelled evaluation data"],
           ["FALSE BLOCKS", metric ? metric.false_blocks.toLocaleString() : "—", metric ? (100 - metric.benign_preservation_rate).toFixed(2) + "% of benign records" : "Requires labelled evaluation data"],
@@ -594,7 +594,7 @@ export function AdaptiveDefenseConsole() {
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Test the real backend pre-filter matcher</div>
         <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 10px" }}>Enter a policy scope value and the record position to check activation and expiry. The matcher does not create or alter policies.</p>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input type="text" value={testIdentity} onChange={event => setTestIdentity(event.target.value)} placeholder="SOURCE_IP scope value from policy.csv" style={{ flex: "1 1 220px", minWidth: 0, padding: "8px 10px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", fontSize: 11, fontFamily: "monospace" }} />
+          <input type="text" value={testIdentity} onChange={event => setTestIdentity(event.target.value)} placeholder="SOURCE_IP scope value from policies.csv" style={{ flex: "1 1 220px", minWidth: 0, padding: "8px 10px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", fontSize: 11, fontFamily: "monospace" }} />
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--muted)" }}>Record step <input type="number" min="1" value={testStep} onChange={event => setTestStep(Math.max(1, Number.parseInt(event.target.value, 10) || 1))} style={{ width: 86, padding: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)" }}/></label>
           <button className="primary-btn" onClick={testFilter} disabled={isTesting}>{isTesting ? "Checking…" : "Test matcher"}</button>
         </div>
@@ -809,8 +809,8 @@ export function SubmissionStudio() {
 
   const fileCards = [
     { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly_score,evidence_status" },
-    { filename: "policy.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policy?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action" },
-    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record with policy references.", rows: validationReport?.replay?.row_count, header: "record_id,action,applied_policy_id" },
+    { filename: "policies.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action" },
+    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record with policy references.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
   ];
 
   return (
@@ -851,7 +851,7 @@ export function SubmissionStudio() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10, fontSize: 10, color: "var(--muted)" }}>
             <div>classification.csv · {validationReport.classification?.row_count ?? "—"} rows · {validationReport.classification?.total_errors ?? "—"} errors</div>
-            <div>policy.csv · {validationReport.policy?.policy_count ?? "—"} policies · {validationReport.policy?.total_errors ?? "—"} errors</div>
+            <div>policies.csv · {validationReport.policies?.policy_count ?? "—"} policies · {validationReport.policies?.total_errors ?? "—"} errors</div>
             <div>replay.csv · {validationReport.replay?.row_count ?? "—"} rows · {validationReport.replay?.total_errors ?? "—"} errors</div>
           </div>
           {!validationReport.all_valid && <div style={{ marginTop: 9, fontSize: 10, color: "#ffb4a4" }}>Do not submit until every mandatory validator error is resolved.</div>}
