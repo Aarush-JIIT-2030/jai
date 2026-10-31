@@ -98,11 +98,18 @@ export default function App() {
       setHistoryMessage(typeof data.message === "string" ? data.message : "");
     } catch {
       setHistory([]);
-      setHistoryMessage("Local replay history is unavailable until the Python API is running.");
+      setHistoryMessage("Private replay history is unavailable. Check the API connection and your Supabase session.");
     }
   }, []);
 
-  useEffect(() => { void loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    if (supabase && !authSession) {
+      setHistory([]);
+      setHistoryMessage("");
+      return;
+    }
+    void loadHistory();
+  }, [loadHistory, authSession]);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -123,7 +130,14 @@ export default function App() {
       setHealth({ status: "unavailable", service: "CyberSentinel API", model_ready: false });
     }
   }, []);
-  useEffect(() => { void checkHealth(); void loadOverview(); }, [checkHealth, loadOverview]);
+  useEffect(() => {
+    void checkHealth();
+    if (supabase && !authSession) {
+      setOverview(null);
+      return;
+    }
+    void loadOverview();
+  }, [checkHealth, loadOverview, authSession]);
 
   function inspectFile(file?: File) {
     if (!file) return;
@@ -175,7 +189,7 @@ export default function App() {
         ["Adaptive Defense", ShieldAlert],
         ["Replay Studio", Play],
         ["Model Intelligence", Cpu],
-        ["Audit & Local History", Database],
+        ["Audit & History", Database],
         ["Settings & Health", SlidersHorizontal],
       ].map(([name, Icon]: any) => (
         <button
@@ -190,7 +204,7 @@ export default function App() {
         </button>
       ))}
       <div className="nav-label nav-label-lower">DOCUMENTATION & REPO</div>
-      <a className="nav-item" href="https://github.com/kaustubhdua/jai-hack/tree/feat/cybersentinel-release-hardening/docs" target="_blank" rel="noreferrer"><CircleHelp size={16}/>Product documentation<ArrowUpRight size={13} className="nav-external"/></a>
+      <a className="nav-item" href="https://github.com/kaustubhdua/jai-hack/tree/main/docs" target="_blank" rel="noreferrer"><CircleHelp size={16}/>Product documentation<ArrowUpRight size={13} className="nav-external"/></a>
       <div className="sidebar-bottom">
         <div className="system-card">
           <div className="system-card-head"><span className="pulse-dot" /> SYSTEM STATUS</div>
@@ -213,7 +227,7 @@ export default function App() {
         <div className="top-actions">
           <div className="env-pill"><span className="pulse-dot" /> OFFLINE REPLAY MODE</div>
           <button className="icon-btn" title="Refresh API and replay status" onClick={() => { void checkHealth(); void loadOverview(); }}><RefreshCw size={16} /></button>
-          <div className="top-avatar">L</div>
+          <div className="top-avatar">{session.user.display_name.slice(0,1).toUpperCase()}</div>
         </div>
       </header>
       <div className="page-wrap">
