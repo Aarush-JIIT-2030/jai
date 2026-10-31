@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Train both production agents from the authorized training partition only."""
+"""Train both CyberSentinel production agents from the authorized training partition."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 
-from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
 from cybersentinel.agents.threat_detection.model import BENCHMARK_CLASSES, ThreatDetectionModel
-from cybersentinel.agents.threat_detection.train import train_from_csv
+from cybersentinel.agents.threat_detection.train import load_label_mapping, train_from_csv
+from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 from scripts.train_anomaly import train_anomaly
 
 
@@ -21,123 +25,194 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _read_frame(path: Path) -> pd.DataFrame:
+    if path.suffix.lower() in {".parquet", ".pq"}:
+        return pd.read_parquet(path)
+    return pd.read_csv(path, low_memory=False)
+
+
+def _write_frame(frame: pd.DataFrame, path: Path) -> None:
+    frame.to_parquet(path, index=False)
+
+
 def train_models(
     training_path: Path,
-    validation_path: Path | None,
     model_dir: Path,
     report_dir: Path,
+    validation_path: Path | None = None,
     label_column: str = "label",
+    label_map: Path | None = None,
+    calibration_fraction: float = 0.15,
+    random_state: int = 42,
     backend: str = "random_forest",
     n_estimators: int = 400,
     max_benign_fpr: float = 0.02,
-    label_map: Path | None = None,
 ) -> dict:
+    """Train A1 and benign-only A2, using only training data and a separate calibration split."""
+    training_path = Path(training_path)
+    model_dir = Path(model_dir)
+    report_dir = Path(report_dir)
     if not training_path.is_file():
         raise FileNotFoundError(f"Training partition not found: {training_path}")
-    if validation_path is not None and not validation_path.is_file():
-        raise FileNotFoundError(f"Separate labelled validation partition not found: {validation_path}")
-    if validation_path is not None and validation_path.resolve() == training_path.resolve():
-        raise ValueError("Validation data must be a separate partition; training data cannot calibrate itself.")
+    if not 0.0 <= calibration_fraction < 0.5:
+        raise ValueError("calibration_fraction must be in [0, 0.5).")
+    if validation_path is None and calibration_fraction == 0:
+        validation_source = None
+    elif validation_path is not None:
+        validation_path = Path(validation_path)
+        if not validation_path.is_file():
+            raise FileNotFoundError(f"Labelled validation partition not found: {validation_path}")
+        validation_source = "organizer_provided_labelled_validation"
+    else:
+        validation_source = "internal_stratified_holdout_from_training_partition"
+
+    training_frame = _read_frame(training_path)
+    if label_column not in training_frame.columns:
+        raise ValueError(f"Training label column {label_column!r} is missing.")
+    raw_training_labels = training_frame[label_column].astype("string").str.strip()
+    if raw_training_labels.isna().any() or (raw_training_labels == "").any():
+        raise ValueError("Training labels contain missing or empty values.")
+    mapping = load_label_mapping(label_map, raw_training_labels.unique().tolist())
+    training_frame[label_column] = raw_training_labels.map(mapping).astype(str)
+    if set(training_frame[label_column].unique()) != set(BENCHMARK_CLASSES):
+        raise ValueError(f"Training partition must contain all five canonical classes: {sorted(BENCHMARK_CLASSES)}")
+
+    if validation_path is not None:
+        validation_frame = _read_frame(validation_path)
+        if label_column not in validation_frame.columns:
+            raise ValueError(f"Validation label column {label_column!r} is missing.")
+        raw_validation_labels = validation_frame[label_column].astype("string").str.strip()
+        if raw_validation_labels.isna().any() or (raw_validation_labels == "").any():
+            raise ValueError("Validation labels contain missing or empty values.")
+        unknown = sorted(set(raw_validation_labels.unique()) - set(mapping))
+        if unknown:
+            raise ValueError(f"Validation contains labels not present in the training mapping: {unknown}")
+        validation_frame[label_column] = raw_validation_labels.map(mapping).astype(str)
+        fit_frame = training_frame
+        calibration_frame = validation_frame
+    elif calibration_fraction > 0:
+        fit_frame, calibration_frame = train_test_split(
+            training_frame,
+            test_size=calibration_fraction,
+            random_state=random_state,
+            stratify=training_frame[label_column],
+        )
+        fit_frame = fit_frame.reset_index(drop=True)
+        calibration_frame = calibration_frame.reset_index(drop=True)
+    else:
+        fit_frame = training_frame
+        calibration_frame = None
 
     model_dir.mkdir(parents=True, exist_ok=True)
     report_dir.mkdir(parents=True, exist_ok=True)
-    threat_model_path = model_dir / "threat_detection" / "model.joblib"
-    anomaly_model_path = model_dir / "anomaly_detection" / "model.joblib"
-    threat_report_path = report_dir / "threat_detection_training.json"
-    anomaly_report_path = report_dir / "anomaly_training.json"
+    a1_path = model_dir / "threat_detection" / "model.joblib"
+    a2_path = model_dir / "anomaly_detection" / "model.joblib"
+    a1_report = report_dir / "threat_detection_training.json"
+    a2_report = report_dir / "anomaly_training.json"
 
-    threat_report = train_from_csv(
-        str(training_path),
-        label_column,
-        str(threat_model_path),
-        label_map=str(label_map) if label_map else None,
-        validation_csv=str(validation_path) if validation_path else None,
-        calibration_validation_csv=str(validation_path) if validation_path else None,
-        report_out=str(threat_report_path),
-        backend=backend,
-        n_estimators=n_estimators,
-    )
-    anomaly_report = train_anomaly(
-        str(training_path),
-        str(anomaly_model_path),
-        str(anomaly_report_path),
-        validation_path=str(validation_path) if validation_path else None,
-        max_benign_fpr=max_benign_fpr,
-    )
+    with tempfile.TemporaryDirectory(prefix="cybersentinel-train-") as temporary:
+        temporary_dir = Path(temporary)
+        fit_path = temporary_dir / "training_fit.parquet"
+        validation_fit_path = temporary_dir / "training_calibration.parquet"
+        _write_frame(fit_frame, fit_path)
+        if calibration_frame is not None:
+            _write_frame(calibration_frame, validation_fit_path)
+            validation_arg = validation_fit_path
+        else:
+            validation_arg = None
 
-    # Reload both persisted artifacts and verify their inference contracts.
-    threat = ThreatDetectionModel.load(threat_model_path)
-    anomaly = AnomalyDetectionAgent.load(anomaly_model_path)
-    if set(threat.label_encoder.classes_) != set(BENCHMARK_CLASSES):
-        raise RuntimeError("Reloaded Agent 1 artifact does not expose all five organizer classes.")
-    if not threat.feature_columns or not anomaly.feature_columns:
-        raise RuntimeError("Reloaded model artifact has an empty feature schema.")
+        threat_report = train_from_csv(
+            fit_path,
+            label_column=label_column,
+            model_out=a1_path,
+            label_map=None,
+            validation_csv=validation_arg,
+            calibration_validation_csv=validation_arg,
+            report_out=a1_report,
+            backend=backend,
+            n_estimators=n_estimators,
+        )
+        anomaly_report = train_anomaly(
+            fit_path,
+            model_out=a2_path,
+            report_out=a2_report,
+            validation_path=validation_arg,
+            label_column=label_column,
+            max_benign_fpr=max_benign_fpr,
+        )
+
+    # Reload both artifacts so a successful training exit is not mistaken for a loadable model.
+    threat = ThreatDetectionModel.load(a1_path)
+    anomaly = AnomalyDetectionAgent.load(a2_path)
+    if set(threat.classes_) != set(BENCHMARK_CLASSES):
+        raise RuntimeError("Reloaded A1 artifact does not contain all five benchmark classes.")
+    if int(threat.metadata.get("training_rows") or 0) <= 0:
+        raise RuntimeError("Reloaded A1 artifact has no training-row provenance.")
     if int(anomaly.metadata.get("training_rows") or 0) <= 0:
-        raise RuntimeError("Agent 2 artifact training metadata is invalid.")
+        raise RuntimeError("Reloaded A2 artifact has no benign-training-row provenance.")
 
     manifest = {
-        "status": "TRAINED_AND_RELOADED",
         "training_source": str(training_path),
         "training_sha256": _sha256(training_path),
-        "validation_source": str(validation_path) if validation_path else None,
+        "training_rows": int(len(training_frame)),
+        "model_training_rows": int(len(fit_frame)),
+        "label_column": label_column,
+        "label_mapping": mapping,
+        "class_counts_training_partition": training_frame[label_column].value_counts().sort_index().to_dict(),
+        "class_counts_model_fit": fit_frame[label_column].value_counts().sort_index().to_dict(),
+        "validation_source": validation_source,
+        "validation_path": str(validation_path) if validation_path else None,
         "validation_sha256": _sha256(validation_path) if validation_path else None,
-        "validation_used_for": (
-            ["Agent 1 confidence temperature calibration and metrics", "Agent 2 anomaly threshold selection"]
-            if validation_path else []
-        ),
-        "hidden_records_used_for_training_or_calibration": False,
-        "agent_1": {
-            "artifact": str(threat_model_path),
-            "artifact_sha256": _sha256(threat_model_path),
-            "backend": backend,
+        "validation_rows": int(len(calibration_frame)) if calibration_frame is not None else 0,
+        "class_counts_validation": calibration_frame[label_column].value_counts().sort_index().to_dict() if calibration_frame is not None else None,
+        "calibration_fraction": calibration_fraction if validation_path is None else None,
+        "split_random_state": random_state if validation_path is None and calibration_frame is not None else None,
+        "a1": {
+            "artifact": str(a1_path),
+            "artifact_sha256": _sha256(a1_path),
             "training_rows": threat.metadata.get("training_rows"),
-            "features": len(threat.feature_columns),
-            "classes": sorted(threat.label_encoder.classes_.tolist()),
-            "confidence_calibrated": bool(threat.metadata.get("confidence_calibrated")),
-            "report": str(threat_report_path),
+            "confidence_calibrated": bool(threat.metadata.get("confidence_calibrated", False)),
         },
-        "agent_2": {
-            "artifact": str(anomaly_model_path),
-            "artifact_sha256": _sha256(anomaly_model_path),
-            "algorithm": anomaly.metadata.get("algorithm"),
+        "a2": {
+            "artifact": str(a2_path),
+            "artifact_sha256": _sha256(a2_path),
             "training_rows": anomaly.metadata.get("training_rows"),
-            "features": len(anomaly.feature_columns),
-            "threshold": anomaly.threshold,
             "threshold_calibrated": anomaly_report.get("threshold_calibration") is not None,
-            "report": str(anomaly_report_path),
+            "score_is_probability": False,
+            "score_range": [0.0, 1.0],
+            "higher_score_means": "more anomalous",
         },
-        "disclosure": (
-            "Without a separate labelled validation partition, Agent 1 confidence remains uncalibrated "
-            "and Agent 2 uses its training-only benign baseline threshold."
-        ),
+        "reports": {"a1": str(a1_report), "a2": str(a2_report)},
+        "evaluation_data_used_for_training_or_calibration": False,
+        "hidden_data_used_for_training_or_calibration": False,
+        "disclosure": "The held-out evaluation partition and unlabelled hidden replay input are never used for fitting, calibration, or threshold selection.",
     }
     manifest_path = report_dir / "training_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--train", type=Path, default=Path("data/raw/training/flows.parquet"))
-    parser.add_argument("--validation", type=Path, help="Optional separate labelled validation CSV/Parquet; never pass the hidden input.")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Train both production CyberSentinel agents.")
+    parser.add_argument("--train", type=Path, required=True, help="Organizer training Parquet/CSV.")
+    parser.add_argument("--validation", type=Path, default=None, help="Optional separate labelled validation file.")
     parser.add_argument("--label-column", default="label")
-    parser.add_argument("--label-map", type=Path, help="Exact organizer-provided mapping JSON, required only if raw labels are not canonical.")
-    parser.add_argument("--model-dir", type=Path, default=Path("models"))
-    parser.add_argument("--report-dir", type=Path, default=Path("reports/generated"))
-    parser.add_argument("--backend", choices=("random_forest", "xgboost"), default="random_forest")
+    parser.add_argument("--label-map", type=Path, default=None, help="Optional organizer-supplied raw-label mapping JSON.")
+    parser.add_argument("--calibration-fraction", type=float, default=0.15, help="Stratified holdout fraction from training when no external validation is supplied; use 0 to disable calibration.")
+    parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument("--backend", choices=["random_forest", "xgboost"], default="random_forest")
     parser.add_argument("--n-estimators", type=int, default=400)
     parser.add_argument("--max-benign-fpr", type=float, default=0.02)
+    parser.add_argument("--model-dir", type=Path, default=Path("models"))
+    parser.add_argument("--report-dir", type=Path, default=Path("reports/generated"))
     args = parser.parse_args()
-    if args.n_estimators < 10:
-        parser.error("--n-estimators must be at least 10.")
-    print(json.dumps(train_models(
-        args.train, args.validation, args.model_dir, args.report_dir,
-        label_column=args.label_column, backend=args.backend,
-        n_estimators=args.n_estimators, max_benign_fpr=args.max_benign_fpr,
-        label_map=args.label_map,
-    ), indent=2))
-    return 0
+    manifest = train_models(
+        args.train, args.model_dir, args.report_dir, args.validation,
+        args.label_column, args.label_map, args.calibration_fraction,
+        args.random_state, args.backend, args.n_estimators, args.max_benign_fpr,
+    )
+    print(json.dumps(manifest, indent=2))
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
