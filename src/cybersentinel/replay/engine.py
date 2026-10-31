@@ -173,8 +173,8 @@ class ReplayEngine:
         results = self.run_replay(df)
         files = {
             "classification": (["record_id", "predicted_class", "anomaly_score", "evidence_status"], results["classification_rows"]),
-            "policy": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"], results["policy_rows"]),
-            "replay": (["record_id", "action", "applied_policy_id"], results["replay_rows"]),
+            "policies": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"], results["policy_rows"]),
+            "replay": (["record_id", "action", "active_policy_id"], results["replay_rows"]),
         }
         paths = {}
         for name, (headers, rows) in files.items():
