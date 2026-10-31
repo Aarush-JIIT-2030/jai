@@ -152,7 +152,7 @@ export function FiveAgentArchitectureView() {
       latency: "See measured replay report",
       throughput: "Not independently measured",
       accuracy: "Causality assertions are tested; see current replay validation",
-      classes: "ALLOW (empty active_policy_id), BLOCK (smallest matching active policy ID)",
+      classes: "ALLOW (active_policy_id=NONE), BLOCK (smallest matching active policy ID)",
       description: "Checks earlier active policies before downstream correlation. Confirmed attacks can create a forward-only simulated SOURCE_IP block with a fixed default 150-position lifetime; it never blocks its own trigger row.",
     },
   ];
@@ -510,7 +510,7 @@ export function AdaptiveDefenseConsole() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, margin: "14px 0" }}>
         {[
-          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policy.csv"],
+          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policies.csv"],
           ["ATTACKS CONTAINED", hasGroundTruthMetrics ? metric.attacks_contained.toLocaleString() : "—", hasGroundTruthMetrics ? metric.attack_containment_rate.toFixed(2) + "% of attack records" : "Not measurable on unlabelled replay input"],
           ["BENIGN PRESERVED", hasGroundTruthMetrics ? metric.benign_preserved.toLocaleString() : "—", hasGroundTruthMetrics ? metric.benign_preservation_rate.toFixed(2) + "% of benign records" : "Not measurable on unlabelled replay input"],
           ["FALSE BLOCKS", hasGroundTruthMetrics && typeof metric.false_blocks === "number" ? metric.false_blocks.toLocaleString() : "—", hasGroundTruthMetrics ? (100 - metric.benign_preservation_rate).toFixed(2) + "% of benign records" : "Not measurable on unlabelled replay input"],
@@ -752,9 +752,9 @@ export function SubmissionStudio() {
   }
 
   const fileCards = [
-    { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly score,evidence status" },
-    { filename: "policy.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action" },
-    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record; ALLOW leaves the policy ID blank and BLOCK references the smallest matching active policy ID.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
+    { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly_score,evidence_status" },
+    { filename: "policy.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id" },
+    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record; ALLOW uses NONE and BLOCK references the smallest matching active policy ID.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
   ];
 
   return (
