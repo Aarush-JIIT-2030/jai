@@ -179,11 +179,11 @@ class TemporalCorrelationAgent:
 
         # Check Pattern 2: Distributed Denial of Service (many sources targeting single destination)
         sources_targeting_dest = self.dest_source_counts[dst_ip] if dst_ip else {}
-        if dst_ip and len(sources_targeting_dest) >= 8 and (threat_class in ("DDOS", "DOS") or dport in (80, 443, 8080)):
+        if dst_ip and len(sources_targeting_dest) >= 8 and threat_class in ("DDOS", "DOS"):
             correlated = True
             attack_type = "DDOS"
             evidence.append(
-                f"Destination {dst_ip}:{dport} targeted by {len(sources_targeting_dest)} distinct source endpoints."
+                f"Destination {dst_ip}:{dport} targeted by {len(sources_targeting_dest)} distinct source endpoints; the current flow is independently classified as {threat_class}."
             )
 
         # Check Pattern 3: Authentication Brute Force (repeated hits to SSH/FTP/RDP)
@@ -191,11 +191,11 @@ class TemporalCorrelationAgent:
             f for f in self.history
             if f["src_ip"] == src_ip and f["dport"] in (21, 22, 23, 3389)
         ]
-        if len(recent_auth_flows) >= 4:
+        if len(recent_auth_flows) >= 4 and threat_class == "BRUTE_FORCE":
             correlated = True
             attack_type = "BRUTE_FORCE"
             evidence.append(
-                f"Source {src_ip} executed {len(recent_auth_flows)} rapid auth attempts on port {recent_auth_flows[-1]['dport']}."
+                f"Source {src_ip} generated {len(recent_auth_flows)} recent authentication flows on port {recent_auth_flows[-1]['dport']}; the current flow is independently classified as BRUTE_FORCE."
             )
 
         # Check Pattern 4: Volumetric DoS Surge from single source
