@@ -133,7 +133,7 @@ def test_independent_official_csv_validator_rejects_fingerprint_scope(tmp_path):
     policies = pd.read_csv(tmp_path / "policies.csv")
     policies.loc[0, "scope_value"] = "10.1.2.3"
     policies.to_csv(tmp_path / "policies.csv", index=False)
-    assert any("does not match the input-derived SOURCE_IP identity" in error for error in validate_official_csvs(input_path, tmp_path))
+    assert any("scope_value must exactly match the observed SOURCE_IP" in error for error in validate_official_csvs(input_path, tmp_path))
 
 
 def test_independent_official_csv_validator_rejects_block_before_activation(tmp_path):
@@ -141,7 +141,7 @@ def test_independent_official_csv_validator_rejects_block_before_activation(tmp_
     replay = pd.read_csv(tmp_path / "replay.csv", keep_default_na=False)
     replay.loc[0, ["action", "active_policy_id"]] = ["BLOCK", "POL-00001"]
     replay.to_csv(tmp_path / "replay.csv", index=False)
-    assert any("outside its activation-exclusive/expiry-inclusive window" in error for error in validate_official_csvs(input_path, tmp_path))
+    assert any("BLOCK has no active policy matching" in error for error in validate_official_csvs(input_path, tmp_path))
 
 
 def test_bundle_validator_rejects_blocked_record_with_different_observed_source_ip(tmp_path):
@@ -163,7 +163,7 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
     report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2"], source_frame=source)
 
     assert report["all_valid"] is False
-    assert any("does not match observed endpoints" in error for error in report["policies"]["errors"])
+    assert any("does not match the input-derived SOURCE_IP identity" in error for error in report["replay"]["errors"])
 
 def test_independent_official_csv_validator_rejects_fingerprint_derived_source_scope(tmp_path):
     fingerprint = {
