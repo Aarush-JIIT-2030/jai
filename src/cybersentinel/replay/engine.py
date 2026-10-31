@@ -172,6 +172,7 @@ class ReplayEngine:
             "elapsed_seconds": round(elapsed, 2),
             "throughput_fps": round(total_rows / max(0.001, elapsed), 1),
             "missing_native_source_ip_rows": sum(1 for row in flow_records if not TemporalCorrelationAgent.has_observed_source_ip(row)),
+            "synthetic_source_identity_rows": sum(1 for row in flow_records if not TemporalCorrelationAgent.has_observed_source_ip(row)),
             "source_identity_mode": ("MIXED_OBSERVED_AND_SYNTHETIC" if any(TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records) and any(not TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records) else ("SYNTHETIC_FINGERPRINT" if flow_records and not any(TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records) else "OBSERVED_ONLY")),
         }
         return {"classification_rows": classification_rows, "policy_rows": policy_rows,
