@@ -113,8 +113,8 @@ class ReplayEngine:
             None,
         )
         flow_records = df.to_dict(orient="records")
-        # Only observed source IPs may become SOURCE_IP defense scopes.
-        # Fingerprint-derived identities remain correlation-only and can never block.
+        # Only literal observed source IPs may be used by correlation or SOURCE_IP defense.
+        # The endpoint extractor validates the address; feature fingerprints are never identities.
         native_src_ips = [
             str(flow.get(src_ip_col, "")).strip()
             if src_ip_col and pd.notna(flow.get(src_ip_col)) else ""
