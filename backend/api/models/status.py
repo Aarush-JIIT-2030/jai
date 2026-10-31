@@ -1,6 +1,6 @@
 """Dedicated Vercel function route for /api/models/status."""
 from fastapi import FastAPI
-from api.index import models_status
+from backend.api.index import models_status
 
 app = FastAPI()
 
