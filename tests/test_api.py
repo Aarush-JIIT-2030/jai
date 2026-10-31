@@ -67,8 +67,8 @@ def test_single_flow_endpoint_returns_pipeline_result(monkeypatch):
     response = TestClient(index.app).post("/api/analyze", json={"flow": {"Flow Duration": 100, "Destination Port": 80}})
     assert response.status_code == 200
     assert response.json()["action"] == "ALLOW"
-    assert "temporal_correlation" in response.json()
-    assert "adaptive_defense" in response.json()
+    assert response.json()["execution_mode"] == "single_record_model_inference"
+    assert response.json()["stateful_agents"].startswith("not_run")
 
 
 def test_batch_endpoint_returns_aggregated_actions(monkeypatch):
