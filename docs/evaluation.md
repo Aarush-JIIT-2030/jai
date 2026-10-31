@@ -1,67 +1,55 @@
-# Evaluation Status and Reproduction
+# Model Training, Evaluation and Hidden Replay
 
-## Current status
+## Dataset boundaries
 
-No current full-data evaluation is reproducible from this repository alone. The organizer dataset, prepared Parquet files, trained model artifacts, and generated submission outputs are excluded from Git. CI verifies code and frontend build; it does not verify model metrics or a full organizer replay.
+The organizer's `cyber-pack.zip` contains the labelled CICIDS2017 training and evaluation partitions. Its manifest records 456,737 training rows and 114,185 evaluation rows with five canonical classes. The separate `cyber-hidden.zip` contains exactly 200 unlabelled Level 2 records with literal source/destination endpoints and organizer sequence/time metadata.
 
-See [data-intelligence.md](data-intelligence.md) for the recorded dataset audit. It reports 8,161 exact feature vectors shared by training and evaluation, covering 9,795 evaluation rows (8.58%). Keep this caveat with any measured holdout score. Do not alter the official evaluation file to remove the overlap.
+The data audit found 8,161 exact feature vectors shared by training and evaluation, covering 9,795 evaluation rows (8.58%). Keep this overlap caveat with any evaluation score. Do not alter the official evaluation partition to remove it.
 
-Historical scores and throughput figures describe earlier artifacts. Treat them as historical until reproduced using the current code and authorized data.
+## 1. Install and verify organizer packs
 
-## Reproduction procedure
+```bash
+python scripts/prepare_challenge_data.py \
+  --training-pack cyber-pack.zip \
+  --hidden-pack cyber-hidden.zip
+```
 
-If the organisers provide a separate labelled validation file, prepare it with the exact training-fitted preprocessing state before using either calibration workflow:
+This writes the training and evaluation Parquet partitions plus `data/processed/hidden_replay_input.csv` into ignored local paths. The installer verifies the training/evaluation byte counts and SHA-256 hashes against the organizer manifest, checks the hidden input's 200 unique IDs and exact 1..200 sequence, confirms the 78 numeric flow features and validates observed endpoint fields. It does not add labels to hidden rows.
 
-~~~bash
-python scripts/prepare_validation.py \
-  --input data/raw/validation/flows.parquet \
-  --preprocessor-state data/processed/preprocessing_state.json \
-  --output data/processed/labelled_validation_prepared.parquet
-~~~
+Install the ML dependencies:
 
-This reuses training medians, feature selection, and feature order. It rejects schema drift and excludes record IDs from the ML matrix. Keep the original replay metadata/input separately for endpoint correlation and policy validation.
+```bash
+python -m pip install -e ".[dev,ml]"
+```
 
-1. Obtain the organizer-provided training and labelled validation files, the exact organizer class mapping, and the hidden replay input/API contract.
-2. Run cleaning/preparation on the permitted labelled training and validation files. Fit feature selection and imputation on training data only. Keep replay metadata (organizer record IDs, endpoints and timestamps, if supplied) separate from the ML feature matrix.
-3. Train Agent 1 on training data. Use a separate labelled validation split for temperature calibration; never calibrate on hidden replay records.
-4. Train Agent 2 on BENIGN rows from training data only. Its optional threshold calibration uses labelled validation rows and records the configured benign false-positive ceiling.
-5. Evaluate on a separate permitted labelled evaluation split, if supplied. Hidden replay records are unlabeled for decision-making and must never be used for fitting, calibration, threshold selection, or tuning.
+## 2. Train both production agents
 
-### Agent 1 training
+```bash
+python scripts/train_models.py \
+  --train data/raw/training/flows.parquet
+```
 
-~~~bash
-python -m cybersentinel.agents.threat_detection.train \
-  --train data/processed/training_prepared.parquet \
-  --label-column label \
-  --calibration-validation data/processed/labelled_validation_prepared.parquet \
-  --model-out models/threat_detection/model.joblib \
-  --report-out reports/generated/threat_detection_training.json
-~~~
+This trains A1 on the five labelled classes and A2 on BENIGN training rows only. It reloads both saved artifacts and writes per-agent reports plus `reports/generated/training_manifest.json`. The hidden input is not read by the training command.
 
-Omit --calibration-validation only when no separate labelled validation file is supplied. In that case the artifact explicitly remains uncalibrated; do not describe its maximum predict_proba output as calibrated confidence.
+A separate labelled validation partition is optional. If and only if organizers provide one, pass it with `--validation path/to/labelled_validation.parquet`. A1 uses it for temperature calibration and validation metrics; A2 uses it for threshold selection under the configured benign-FPR ceiling. Do not pass the hidden input. Do not use the held-out evaluation partition as a calibration/tuning set.
 
-### Agent 2 training
+When no separate labelled validation file is supplied, A1 confidence remains uncalibrated and A2 uses its training-only benign baseline threshold. This is explicitly recorded in the training manifest.
 
-~~~bash
-python scripts/train_anomaly.py \
-  --train data/processed/training_prepared.parquet \
-  --validation data/processed/labelled_validation_prepared.parquet \
-  --max-benign-fpr 0.02 \
-  --model-out models/anomaly_detection/model.joblib \
-  --report-out reports/generated/anomaly_training.json
-~~~
+## 3. Evaluate on the untouched labelled evaluation partition
 
-The validation file must contain the canonical label column and both BENIGN and attack rows. Threshold selection maximizes validation attack recall subject to the configured benign FPR ceiling. These are tuning metrics, not an unbiased final performance estimate.
-
-### Evaluation and replay
-
-~~~bash
+```bash
 python scripts/evaluate_benchmark.py \
-  --eval data/processed/heldout_evaluation_prepared.parquet \
+  --eval data/raw/evaluation/flows.parquet \
   --threat-model models/threat_detection/model.joblib \
   --anomaly-model models/anomaly_detection/model.joblib \
-  --output reports/generated/official-evaluation.json
+  --output reports/generated/official_evaluation.json
+```
 
+This command loads existing artifacts and scores the labelled evaluation partition. It does not fit, calibrate, or select thresholds. Treat its output as the current evaluation only when it was produced by the exact current code revision and verified input hashes. Include the 8.58% repeated-feature overlap caveat.
+
+## 4. Generate and independently validate all 200 hidden records
+
+```bash
 python scripts/generate_submissions.py \
   --input data/processed/hidden_replay_input.csv \
   --output-dir outputs/submission
@@ -69,10 +57,18 @@ python scripts/generate_submissions.py \
 python scripts/validate_submissions.py \
   --input data/processed/hidden_replay_input.csv \
   --output-dir outputs/submission
-~~~
+```
 
-Use the organizer's exact input and record order. Do not use hidden ground-truth labels or future rows to make replay decisions. A limited --limit run is a smoke test only and is not submission-ready.
+The exact templates are:
 
-Save each report with the code revision, source file hashes, split sizes, class-level metrics, calibration provenance, and the dataset-overlap caveat. Do not describe a score as current unless it came from that exact run.
+- `classification.csv`: `record_id,predicted_class,anomaly_score,evidence_status`
+- `replay.csv`: `record_id,action,active_policy_id`
+- `policies.csv`: `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
 
-Dataset, model, and submission artifacts belong in local ignored paths unless the organizers explicitly authorize publishing them.
+The validator verifies exact headers, all hidden IDs in original order, five-class labels, finite 0–1 anomaly scores, organizer evidence states, literal observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, `ALLOW` with `NONE`, and the lexicographically smallest matching policy for every `BLOCK`.
+
+A limited `--limit` run is a smoke test only and cannot be submitted. The hidden set has no labels, so attack/benign accuracy, false-block rate, and containment rate must not be inferred from its predictions. A local validation pass is not organizer acceptance; only an actual successful organizer response/receipt proves acceptance.
+
+## Artifact hygiene
+
+Organizer data, fitted model binaries, reports, generated CSVs, and local databases are excluded from Git. Do not commit them unless organizers explicitly authorize publication. Preserve local SHA-256 hashes, code revision, training provenance, and validation report for reproducibility.
