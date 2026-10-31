@@ -1,1 +1,0 @@
-"""Model status API routes."""
