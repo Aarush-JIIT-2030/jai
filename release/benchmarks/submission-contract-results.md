@@ -10,7 +10,7 @@ The Day 2 briefing requires three CSVs and explicitly specifies the following re
 
 Exact required columns, in order:
 
-`record_id,predicted_class,anomaly score,evidence status`
+`record_id,predicted_class,anomaly_score,evidence_status`
 
 Requirements:
 
@@ -21,16 +21,16 @@ Requirements:
 - Do not submit actual/ground-truth labels.
 - Anomaly score and evidence status must reflect the implemented Agent 2 / Agent 3 outputs.
 
-## 2. policy.csv
+## 2. policies.csv
 
 Exact required columns, in order:
 
-`policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
+`policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
 
 Requirements:
 
 - Use organiser-provided record IDs.
-- Scored interface requires `scope_type=SOURCE_IP` and `policy_action=BLOCK`.
+- Scored interface requires `scope_type` must be a supported observed endpoint scope; BLOCK is implicit in a policy row and replay action.
 - A policy is activated only after its triggering record.
 - Expiry must follow the implementation's documented record-boundary convention.
 - Policy scope values derived from anonymised features must be disclosed as derived identities, never represented as native IP observations.
@@ -39,14 +39,14 @@ Requirements:
 
 The briefing's explicit per-record clarification requires:
 
-`record_id,action,applied_policy_id`
+`record_id,action,active_policy_id`
 
 Requirements:
 
 - Every evaluation record exactly once.
 - `action` must be `ALLOW` or `BLOCK`.
 - `BLOCK` must reference a valid policy that was activated earlier and is still active for that record.
-- `ALLOW` must have an empty `applied_policy_id`.
+- `ALLOW` must have an empty `active_policy_id`.
 - A policy cannot block the record that triggered its creation.
 
 ## 4. Required validation
