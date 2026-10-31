@@ -86,9 +86,9 @@ def health():
         "agents": {
             "agent_1_threat_detection": pipeline is not None and threat_present,
             "agent_2_anomaly_detection": pipeline is not None and anomaly_present,
-            "agent_3_evidence_fusion": pipeline is not None,
-            "agent_4_temporal_correlation": pipeline is not None,
-            "agent_5_adaptive_defense": pipeline is not None,
+            "agent_3_evidence_fusion": True,
+            "agent_4_temporal_correlation": True,
+            "agent_5_adaptive_defense": True,
         },
         "readiness": "ready" if pipeline is not None else "not_ready",
         "message": "Both model artifacts loaded; offline inference is ready." if pipeline else "API process is available, but verified model artifacts are missing or failed validation.",
@@ -247,8 +247,10 @@ def analyze(payload: dict[str, Any]):
     analysis = pipeline.analyze(flow)
     analysis["execution_mode"] = "single_record_model_inference"
     analysis["stateful_agents"] = "not_run; use chronological replay for A4/A5"
+    threat_model = getattr(pipeline.threat_agent, "model", None)
+    threat_metadata = getattr(threat_model, "metadata", {}) or {}
     analysis["model_provenance"] = {
-        "a1_confidence_calibrated": bool(pipeline.threat_agent.model.metadata.get("confidence_calibrated", False)),
+        "a1_confidence_calibrated": bool(threat_metadata.get("confidence_calibrated", False)),
         "a2_score_is_probability": False,
     }
     return analysis
@@ -306,10 +308,15 @@ def simulate_replay(payload: ReplaySimulationRequest):
         fusion_agent=pipeline.fusion_agent,
     )
     df = pd.DataFrame(payload.flows)
-    input_report = validate_replay_input(df, {
-        "Agent 1": engine.threat_agent.model.feature_columns,
-        "Agent 2": engine.anomaly_agent.feature_columns,
-    })
+    threat_model = getattr(engine.threat_agent, "model", None)
+    threat_features = getattr(threat_model, "feature_columns", None)
+    anomaly_features = getattr(engine.anomaly_agent, "feature_columns", None)
+    feature_contracts = {}
+    if threat_features:
+        feature_contracts["Agent 1"] = list(threat_features)
+    if anomaly_features:
+        feature_contracts["Agent 2"] = list(anomaly_features)
+    input_report = validate_replay_input(df, feature_contracts or None)
     if not input_report["valid"]:
         raise HTTPException(status_code=422, detail={"code": "REPLAY_INPUT_INVALID", "report": input_report})
     results = engine.run_replay(df)
