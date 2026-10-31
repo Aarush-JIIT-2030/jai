@@ -156,6 +156,7 @@ class ReplayEngine:
                 "scope_type": policy.scope_type, "scope_value": policy.scope_value,
                 "expires_after_record_id": record_ids[expiry_step],
                 "policy_action": policy.policy_action,
+                "policy_action": policy.policy_action,
                                                             })
         observed_source_flags = [TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records]
         observed_identity_count = sum(observed_source_flags)
