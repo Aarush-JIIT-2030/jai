@@ -1,4 +1,4 @@
-"""Replay metrics must distinguish observed, synthetic, and unavailable source identities."""
+"""Replay metrics must distinguish observed and unavailable source identities."""
 import pandas as pd
 
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
@@ -33,7 +33,7 @@ def test_source_identity_metrics_count_only_observed_endpoints():
     assert metrics["missing_native_source_ip_rows"] == 2
     assert metrics["synthetic_source_identity_rows"] == 0
     assert metrics["unresolved_source_identity_rows"] == 2
-    assert metrics["source_identity_mode"] == "MIXED_OBSERVED_AND_SYNTHETIC"
+    assert metrics["source_identity_mode"] == "OBSERVED_AND_UNRESOLVED"
     assert metrics["synthetic_source_identity_rows"] == sum(
         not TemporalCorrelationAgent.has_observed_source_ip(row)
         and bool(TemporalCorrelationAgent.derive_source_identity(row))
