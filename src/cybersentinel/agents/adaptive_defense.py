@@ -105,7 +105,11 @@ class AdaptiveDefenseAgent:
 
     @staticmethod
     def _is_valid_ip_scope(value: str) -> bool:
-        """Accept only a literal observed IP address for simulated scope."""
+        """Accept an IP-formatted observed or deterministic synthetic source identity.
+
+        The caller must preserve and disclose the identity origin; IP syntax alone
+        does not prove that a value was observed on the network.
+        """
         try:
             ipaddress.ip_address(str(value).strip())
             return True
