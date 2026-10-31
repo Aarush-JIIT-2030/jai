@@ -142,3 +142,55 @@ def test_correlation_groups_empty_when_no_replay_state(monkeypatch):
     assert payload["groups"] == []
     assert payload["total"] == 0
     assert payload["synthetic"] is False
+
+
+def test_submission_validation_uses_original_input_not_output_ids(monkeypatch, tmp_path):
+    import pandas as pd
+
+    data_dir = tmp_path / "data" / "processed"
+    data_dir.mkdir(parents=True)
+    (data_dir / "eval_prepared.parquet").write_bytes(b"fixture")
+    output_dir = tmp_path / "outputs" / "submission"
+    output_dir.mkdir(parents=True)
+    (output_dir / "classification.csv").write_text(
+        "record_id,predicted_class,anomaly score,evidence status\\n1,BENIGN,0.1,AGREE\\n",
+        encoding="utf-8",
+    )
+    (output_dir / "policy.csv").write_text(
+        "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action\\n",
+        encoding="utf-8",
+    )
+    (output_dir / "replay.csv").write_text(
+        "record_id,action,applied_policy_id\\n1,ALLOW,\\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(index, "BASE_DIR", tmp_path)
+    monkeypatch.setattr(
+        index.pd, "read_parquet",
+        lambda _path: pd.DataFrame({"record_id": [1, 2]}),
+    )
+
+    response = TestClient(index.app).get("/api/replay/validate")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["all_valid"] is False
+    assert payload["classification"]["row_count"] == 1
+    assert any("expected 2, got 1" in error for error in payload["classification"]["errors"])
+    assert payload["replay"]["row_count"] == 1
+
+
+def test_submission_validation_refuses_to_claim_valid_without_source_dataset(monkeypatch, tmp_path):
+    output_dir = tmp_path / "outputs" / "submission"
+    output_dir.mkdir(parents=True)
+    (output_dir / "classification.csv").write_text(
+        "record_id,predicted_class,anomaly score,evidence status\\n1,BENIGN,0.1,AGREE\\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(index, "BASE_DIR", tmp_path)
+
+    response = TestClient(index.app).get("/api/replay/validate")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "INPUT_DATASET_NOT_AVAILABLE"
+    assert response.json()["valid"] is False
