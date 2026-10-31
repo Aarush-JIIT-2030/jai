@@ -98,7 +98,7 @@ def prepare(training_pack: Path, hidden_pack: Path, data_dir: Path) -> dict:
             "hidden_pack": hidden_pack.name,
         },
         "training": {
-            "path": str(paths[next(path for path in paths if path.parts[-3:] == ("raw", "training", "flows.parquet"))].relative_to(data_dir)),
+            "path": str(next(path for path in paths if path.parts[-3:] == ("raw", "training", "flows.parquet")).relative_to(data_dir)),
             "rows": int(cyber["training"]["rows"]),
             "sha256": sha256(training_bytes),
         },
