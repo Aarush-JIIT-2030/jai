@@ -140,7 +140,7 @@ class ReplayEngine:
                         attack_type=correlation.attack_type or t_class or "ATTACK",
                         confidence=t_conf, duration=duration,
                     )
-            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id if action == "BLOCK" else ""})
+            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id if action == "BLOCK" else "NONE"})
             if progress_callback and (step % 25000 == 0 or step == total_rows - 1):
                 progress_callback(step + 1, total_rows)
 
