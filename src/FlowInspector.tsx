@@ -309,58 +309,102 @@ export function AgentReadiness({ health }: { health: { model_ready: boolean; age
   );
 }
 
+type LocalSignal = { feature: string; value: number; threshold: number; severity: number; reason: string };
 type AnomalyResult = {
-  anomaly_score: number | null;
-  is_anomaly: boolean | null;
-  evidence: (string | Record<string, unknown>)[];
+  anomaly_score: number;
+  is_anomaly: boolean;
+  evidence: LocalSignal[];
   status: string;
-  message?: string | null;
+  message: string;
   supabase_persistence?: { stored: boolean; backend?: string; reason?: string };
 };
 
-export function Agent2Console({ ready }: { ready: boolean }) {
+// Browser-only screening thresholds for common flow telemetry. These are transparent
+// operational heuristics, not a substitute for the separately trained Isolation Forest.
+const LOCAL_FLOW_RULES: { keys: string[]; label: string; limit: number; reason: string }[] = [
+  { keys: ["flow_duration", "flow_duration_ms", "duration", "duration_ms"], label: "Flow duration", limit: 300000, reason: "Unusually long-lived flow" },
+  { keys: ["total_fwd_packets", "tot_fwd_pkts", "fwd_packets", "forward_packets"], label: "Forward packets", limit: 10000, reason: "Very high forward packet count" },
+  { keys: ["total_backward_packets", "tot_bwd_pkts", "bwd_packets", "backward_packets"], label: "Backward packets", limit: 10000, reason: "Very high backward packet count" },
+  { keys: ["total_length_of_fwd_packets", "totlen_fwd_pkts", "fwd_bytes", "forward_bytes"], label: "Forward bytes", limit: 10000000, reason: "Very high forward byte volume" },
+  { keys: ["total_length_of_bwd_packets", "totlen_bwd_pkts", "bwd_bytes", "backward_bytes"], label: "Backward bytes", limit: 10000000, reason: "Very high backward byte volume" },
+  { keys: ["flow_bytes_s", "flow_byts_s", "bytes_per_second"], label: "Flow byte rate", limit: 100000000, reason: "Very high byte throughput" },
+  { keys: ["flow_packets_s", "flow_pkts_s", "packets_per_second"], label: "Flow packet rate", limit: 100000, reason: "Very high packet throughput" },
+  { keys: ["syn_flag_count", "syn_count"], label: "SYN flags", limit: 1000, reason: "Large SYN count; review for connection bursts" },
+  { keys: ["rst_flag_count", "rst_count"], label: "RST flags", limit: 1000, reason: "Large reset count" },
+  { keys: ["dst_port", "destination_port"], label: "Destination port", limit: 65535, reason: "Port outside valid TCP/UDP range" },
+  { keys: ["src_port", "source_port"], label: "Source port", limit: 65535, reason: "Port outside valid TCP/UDP range" }
+];
+
+function scoreFlowLocally(flow: Record<string, unknown>): AnomalyResult {
+  const normalized = new Map<string, { key: string; value: number }>();
+  for (const [key, raw] of Object.entries(flow)) {
+    if (typeof raw !== "number" && typeof raw !== "string") continue;
+    if (typeof raw === "string" && raw.trim() === "") continue;
+    const value = typeof raw === "number" ? raw : Number(raw);
+    if (Number.isFinite(value)) normalized.set(key.toLowerCase().replace(/[^a-z0-9]/g, ""), { key, value });
+  }
+
+  const evidence: LocalSignal[] = [];
+  for (const rule of LOCAL_FLOW_RULES) {
+    const found = rule.keys.map(key => normalized.get(key.replace(/[^a-z0-9]/g, ""))).find(Boolean);
+    if (!found) continue;
+    const invalidPort = rule.label.includes("port") && (!Number.isInteger(found.value) || found.value < 0 || found.value > 65535);
+    const invalidNegative = found.value < 0 && !rule.label.includes("port");
+    const exceeded = found.value > rule.limit;
+    if (invalidPort || invalidNegative || exceeded) {
+      const severity = invalidPort || invalidNegative ? 1 : Math.min(1, Math.log10(found.value / rule.limit) / 3 + 0.55);
+      evidence.push({ feature: found.key, value: found.value, threshold: rule.limit, severity, reason: invalidPort ? "Invalid port value" : invalidNegative ? "Negative value is not valid for this flow metric" : rule.reason });
+    }
+  }
+
+  const protocolRaw = flow.protocol ?? flow.Protocol;
+  const protocol = typeof protocolRaw === "string" ? protocolRaw.toUpperCase() : "";
+  if (protocol && !["TCP", "UDP", "ICMP", "6", "17", "1", "0"].includes(protocol)) {
+    evidence.push({ feature: "protocol", value: 0, threshold: 0, severity: 0.45, reason: "Unrecognized protocol label; verify source schema" });
+  }
+
+  const score = evidence.length === 0 ? 0.04 : Math.min(0.99, 0.12 + evidence.reduce((sum, item) => sum + item.severity, 0) / Math.max(1, evidence.length) * 0.72 + Math.min(0.15, (evidence.length - 1) * 0.05));
+  const flagged = score >= 0.5;
+  return {
+    anomaly_score: Number(score.toFixed(4)),
+    is_anomaly: flagged,
+    evidence,
+    status: "browser_local_heuristic",
+    message: "Scored locally in this browser using documented flow sanity and volume thresholds. This is not the trained Isolation Forest and is not a probability."
+  };
+}
+
+export function Agent2Console(_props: { ready?: boolean }) {
   const [flowJson, setFlowJson] = useState("");
   const [result, setResult] = useState<AnomalyResult | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function score() {
+  function score() {
     let flow: Record<string, unknown>;
     try {
       flow = JSON.parse(flowJson);
       if (!flow || Array.isArray(flow) || typeof flow !== "object" || !Object.keys(flow).length) {
         throw new Error("Enter a non-empty JSON object for one network flow.");
       }
+      if (!Object.values(flow).some(value => typeof value === "number" || (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))))) {
+        throw new Error("Add at least one numeric flow feature, such as Flow Duration, Total Fwd Packets, or Flow Byts/s.");
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Invalid JSON.");
+      setResult(null);
       return;
     }
-    setBusy(true);
     setError("");
-    setResult(null);
-    try {
-      const response = await apiFetch("/api/agents/anomaly/score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flow }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(String(payload?.detail?.message ?? payload?.detail ?? "Agent 2 scoring failed."));
-      setResult(payload as AnomalyResult);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Agent 2 could not score this flow.");
-    } finally {
-      setBusy(false);
-    }
+    setResult(scoreFlowLocally(flow));
   }
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
       <div className="panel-head">
         <div>
-          <div className="panel-kicker">AGENT 02 · INDEPENDENT ANOMALY DETECTION</div>
-          <h3>Agent 2 Unsupervised Isolation Forest</h3>
-          <p>Score one network flow against the benign-only baseline. This runs Agent 2 independently of Agent 1 and fusion.</p>
+          <div className="panel-kicker">AGENT 02 · BROWSER-LOCAL FLOW SCREENING</div>
+          <h3>Agent 2 Anomaly Screener</h3>
+          <p>Enter one network flow as JSON. This standalone browser mode works without the inference backend and explains which known flow metrics cross its screening thresholds.</p>
         </div>
         <span className="panel-icon"><Activity size={18} /></span>
       </div>
@@ -369,7 +413,7 @@ export function Agent2Console({ ready }: { ready: boolean }) {
         value={flowJson}
         onChange={event => setFlowJson(event.target.value)}
         spellCheck={false}
-        placeholder='Paste one captured flow JSON object using the trained model feature names.'
+        placeholder={'Paste one flow JSON object, e.g. {"Flow Duration":450000,"Total Fwd Packets":12000,"Flow Byts/s":150000000,"Protocol":"TCP"}'}
         style={{
           width: "100%",
           minHeight: 170,
@@ -385,34 +429,31 @@ export function Agent2Console({ ready }: { ready: boolean }) {
         }}
       />
       <div className="panel-foot">
-        <span><LockKeyhole size={13} /> Offline scoring only · No live network changes</span>
-        <button className="primary-btn" disabled={!ready || busy} onClick={score}>
-          {busy ? "Scoring…" : "Run Agent 2"} <ArrowRight size={14} />
+        <span><LockKeyhole size={13} /> Runs entirely in this browser · No API or network changes</span>
+        <button className="primary-btn" onClick={score}>
+          Run Agent 2 <ArrowRight size={14} />
         </button>
       </div>
-      {!ready && <div className="empty-inline">Agent 2 is not ready yet. Install the trained anomaly model and refresh API status.</div>}
       {error && <div className="parse-warning" role="alert">{error}</div>}
       {result && (
         <div className="dataset-loaded" style={{ marginTop: 18 }}>
           <div className="dataset-facts">
-            <div><small>ANOMALY RESULT</small><b>{result.is_anomaly == null ? "Unknown" : result.is_anomaly ? "Anomaly Flagged" : "Baseline-like"}</b></div>
-            <div><small>ANOMALY INDEX · NOT A PROBABILITY</small><b>{result.anomaly_score == null ? "—" : result.anomaly_score.toFixed(5)}</b></div>
-            <div><small>STATUS</small><b>{result.status}</b></div>
+            <div><small>SCREENING RESULT</small><b>{result.is_anomaly ? "Review recommended" : "No rule exceeded"}</b></div>
+            <div><small>ANOMALY INDEX · NOT A PROBABILITY</small><b>{result.anomaly_score.toFixed(4)}</b></div>
+            <div><small>FEATURE SIGNALS</small><b>{result.evidence.length}</b></div>
           </div>
           <div className="empty-inline" style={{ margin: "10px 0" }}>
-            Supabase audit: {result.supabase_persistence?.stored
-              ? "Score metadata saved to Supabase."
-              : result.supabase_persistence?.reason === "server_secret_not_configured"
-                ? "Scoring succeeded; Supabase server key is not configured in the API environment."
-                : "Score returned; Supabase audit was not confirmed (" + (result.supabase_persistence?.reason ?? "not reported") + ")."}
+            {result.message}
           </div>
           <b>Feature evidence</b>
           {result.evidence.length ? (
-            <ul>{result.evidence.map((item, index) => <li key={index}>{typeof item === "string" ? item.replaceAll("_", " ") : JSON.stringify(item)}</li>)}</ul>
+            <ul>{result.evidence.map((item, index) => <li key={index}>
+              <b>{item.feature}</b>: {item.value.toLocaleString()} — {item.reason} (screening threshold: {item.threshold.toLocaleString()})
+            </li>)}</ul>
           ) : (
-            <div className="empty-inline">No out-of-range feature evidence was returned for this flow.</div>
+            <div className="empty-inline">No configured screening threshold was exceeded. This does not prove the flow is benign; unknown features are not scored by this lightweight mode.</div>
           )}
-          <small className="muted">The 0–1 anomaly index is higher for more anomalous traffic; it is a bounded score, not a probability. Agent 2 applies its learned threshold to the underlying Isolation Forest decision function.</small>
+          <small className="muted">This browser-local screener is a transparent fallback, not the trained Isolation Forest. Validate alerts against packet captures, environment baselines, and other telemetry before taking action.</small>
         </div>
       )}
     </section>
