@@ -443,6 +443,6 @@ function Agent({ number, title, desc, status, icon: Icon }: { number: string; ti
     <div className="agent-number">{number}</div>
     <div className="agent-icon"><Icon size={17} /></div>
     <div className="agent-copy"><b>{title}</b><span>{desc}</span></div>
-    <span className={"agent-status " + (status === "Active" ? "ready" : "pending")}>{status}</span>
+    <span className={"agent-status " + (status === "Active" || status === "Ready" ? "ready" : "pending")}>{status}</span>
   </div>;
 }
