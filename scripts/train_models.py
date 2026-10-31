@@ -9,9 +9,9 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 
-from cybersentinel.agents.threat_detection.model import BENCHMARK_CLASSES, ThreatDetectionModel
+from cybersentinel.agents.threat_detection.model import BENCHMARK_CLASSES, ThreatDetectionModel, numeric_features
 from cybersentinel.agents.threat_detection.train import load_label_mapping, train_from_csv
 from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 from scripts.train_anomaly import train_anomaly
@@ -91,14 +91,36 @@ def train_models(
         fit_frame = training_frame
         calibration_frame = validation_frame
     elif calibration_fraction > 0:
-        fit_frame, calibration_frame = train_test_split(
-            training_frame,
-            test_size=calibration_fraction,
-            random_state=random_state,
-            stratify=training_frame[label_column],
-        )
-        fit_frame = fit_frame.reset_index(drop=True)
-        calibration_frame = calibration_frame.reset_index(drop=True)
+        # Keep identical numeric feature vectors in one partition to prevent
+        # duplicate-row leakage between model fitting and calibration.
+        group_features = numeric_features(training_frame.drop(columns=[label_column]))
+        groups = pd.util.hash_pandas_object(group_features, index=False).to_numpy()
+        group_labels = pd.DataFrame({"group": groups, "label": training_frame[label_column].to_numpy()})
+        conflicting = group_labels.groupby("group")["label"].nunique()
+        if (conflicting > 1).any():
+            raise ValueError("Identical numeric feature rows have conflicting labels; resolve the source data before calibration.")
+        groups_per_class = group_labels.drop_duplicates("group").groupby("label")["group"].nunique()
+        requested_splits = max(2, round(1.0 / calibration_fraction))
+        n_splits = min(requested_splits, int(groups_per_class.min()))
+        if n_splits < 2:
+            raise ValueError("Not enough distinct feature groups per class for a leakage-safe calibration holdout.")
+        splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        all_classes = set(BENCHMARK_CLASSES)
+        selected_split = None
+        for fit_indices, calibration_indices in splitter.split(group_features, training_frame[label_column], groups):
+            fit_classes = set(training_frame.iloc[fit_indices][label_column])
+            calibration_classes = set(training_frame.iloc[calibration_indices][label_column])
+            if fit_classes == all_classes and calibration_classes == all_classes:
+                selected_split = (fit_indices, calibration_indices)
+                break
+        if selected_split is None:
+            raise ValueError("Could not form a group-isolated calibration holdout containing all five classes; provide a separate labelled validation set or adjust --calibration-fraction.")
+        fit_indices, calibration_indices = selected_split
+        fit_groups, calibration_groups = set(groups[fit_indices]), set(groups[calibration_indices])
+        if fit_groups & calibration_groups:
+            raise RuntimeError("Feature-group leakage detected between model-fit and calibration partitions.")
+        fit_frame = training_frame.iloc[fit_indices].reset_index(drop=True)
+        calibration_frame = training_frame.iloc[calibration_indices].reset_index(drop=True)
     else:
         fit_frame = training_frame
         calibration_frame = None
