@@ -166,15 +166,15 @@ def test_submission_validation_uses_original_input_not_output_ids(monkeypatch, t
     output_dir = tmp_path / "outputs" / "submission"
     output_dir.mkdir(parents=True)
     (output_dir / "classification.csv").write_text(
-        "record_id,predicted_class,anomaly_score,evidence_status\\n1,BENIGN,0.1,AGREE\\n",
+        "record_id,predicted_class,anomaly_score,evidence_status\n1,BENIGN,0.1,AGREE\n",
         encoding="utf-8",
     )
     (output_dir / "policies.csv").write_text(
-        "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id\\n",
+        "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id\n",
         encoding="utf-8",
     )
     (output_dir / "replay.csv").write_text(
-        "record_id,action,active_policy_id\\n1,ALLOW,NONE\\n",
+        "record_id,action,active_policy_id\n1,ALLOW,NONE\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(index, "BASE_DIR", tmp_path)
