@@ -63,7 +63,7 @@ The exact templates are:
 
 - `classification.csv`: `record_id,predicted_class,anomaly_score,evidence_status`
 - `replay.csv`: `record_id,action,active_policy_id`
-- `policies.csv`: `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
+- `policy.csv`: `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
 
 The validator verifies exact headers, all hidden IDs in original order, five-class labels, finite 0–1 anomaly scores, organizer evidence states, literal observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, `ALLOW` with `NONE`, and the lexicographically smallest matching policy for every `BLOCK`.
 
