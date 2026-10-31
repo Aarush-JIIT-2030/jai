@@ -62,7 +62,17 @@ The data audit in [`docs/data-intelligence.md`](docs/data-intelligence.md) recor
 
 The repository does not include organizer data, prepared Parquet files, trained model artifacts, or generated submission CSVs. Those local files are excluded by `.gitignore`. Historical metrics in the release reports are snapshots from earlier code/data runs, not current performance claims. Reproduce the benchmark with the current code and authorized local inputs before quoting results.
 
-## 3. Causal Replay Behavior
+## 3. Known Limitations & Judge Disclosure
+
+Read [`docs/judge-disclosures.md`](docs/judge-disclosures.md) before the live demo. In brief:
+
+- The CICIDS2017 feature-only split does not provide native Layer-3 source/destination addresses. **The current hardened branch does not turn TCP-stack fingerprints into IP addresses**; without a literal observed source IP, endpoint correlation and SOURCE_IP policy creation fail closed. If a compatibility build uses a fingerprint-derived pseudo-IP, it is synthetic, can collide for identical TCP-stack fingerprints, and must never be described as an observed address.
+- The documented train/eval feature overlap is 8.58% of evaluation rows and can make repeated-flow results optimistic.
+- Agent 1 confidence is uncalibrated unless the separate held-out calibration workflow was run. Agent 2 emits a raw anomaly score, not a probability.
+- The temporal correlator has a fixed 150-record cap and a configured 300-second time window when timestamps are available. Adaptive-defense policy duration defaults to 150 replay positions; these are fixed configuration values, not learned/adaptive parameters.
+- Validation is limited to CICIDS2017. The workflow is offline replay, not live network monitoring; generalization to other datasets and live environments is untested.
+
+## 4. Causal Replay Behavior
 
 The chronological replay engine enforces these invariants:
 
@@ -75,7 +85,7 @@ All actions are simulated. The system does not modify a host firewall or inspect
 
 ---
 
-## 4. Local Replay Outputs
+## 5. Local Replay Outputs
 
 The repository includes a generator for the three replay CSVs:
 
@@ -89,7 +99,7 @@ This requires locally supplied evaluation data and trained model artifacts. Gene
 
 ---
 
-## 5. WebGL 3D SOC Command Center
+## 6. WebGL 3D SOC Command Center
 
 The frontend provides a dark SOC command platform with 11 operational consoles. Screens show actual backend data when available and explicit unavailable/empty states otherwise; fabricated fallback incidents, policy rows, benchmark matrices, and replay progress are not presented. The console includes:
 1. **Overview / SOC Command Center:** WebGL 3D network topology with 5-agent satellite orbits, interactive pointer tilt, threat-level toggle (`LOW`, `ELEVATED`, `CRITICAL`), real aggregate telemetry, and 2D canvas fallback.
@@ -106,7 +116,7 @@ The frontend provides a dark SOC command platform with 11 operational consoles. 
 
 ---
 
-## 6. Installation & Quickstart
+## 7. Installation & Quickstart
 
 ### Prerequisites
 * Python 3.10+ (CI currently uses Python 3.11)
@@ -174,10 +184,10 @@ If the dataset or models are missing, the API returns an explicit unavailable re
 
 The prepared feature dataset may not contain native Layer 3 source IP fields. Fingerprint-derived identities are not observed endpoints and are therefore not used for temporal endpoint correlation or SOURCE_IP defense policies. If the native source IP is missing or invalid, endpoint correlation and policy creation fail closed. This can reduce correlation/policy coverage on feature-only data, but avoids inventing host identities or falsely blocking unrelated clients. See `release/benchmarks/source-ip-scope-audit.md`.
 
-## 7. Third-Party, Reference & AI Disclosures
+## 8. Third-Party, Reference & AI Disclosures
 
 * **Dependencies:** `scikit-learn`, `pandas`, `numpy`, `joblib`, `fastapi`, `pydantic`, `three`, `react`, `lucide-react`, and `vite`. Their respective licenses apply.
-* **Project license:** No project-level `LICENSE` file is currently present. The maintainers should choose and add one before presenting this repository as reusable open-source software; no license is inferred here.
+* **Project license:** MIT License; see [`LICENSE`](LICENSE). Third-party dependencies and CICIDS2017/challenge datasets retain their own licenses and terms.
 * **Dataset:** CICIDS2017 flow data and the challenge’s class mapping are governed by their respective providers and organizer terms. No challenge data is committed.
 * **AI assistance:** The team reports using Antigravity and ChatGPT for code review, debugging, test design, documentation, and UI implementation assistance. Team members remain responsible for understanding and presenting the submitted code.
 * **UI/UX reference:** The team reports reviewing the user-supplied `CICRCombined-main` archive for design patterns only. The related public project is [amancodes8/CICRCombined](https://github.com/amancodes8/CICRCombined). The team reports that no source files or components were copied; verify the exact archive’s license before any code reuse.
