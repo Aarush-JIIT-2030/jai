@@ -1,31 +1,34 @@
-# Release hardening notes
+# Release Hardening — Current Contract
 
-## Causal replay invariants
+## Data and provenance
+- Organizer training/evaluation Parquet partitions are installed locally only after byte-count and SHA-256 verification against `cyber-pack.zip/manifest.json`.
+- The separate hidden archive supplies 200 unlabelled records with IDs F000001–F000200, exact 1-based `seq`, 78 finite numeric features, literal source/destination IPs, ports, protocol, day and time offset.
+- Hidden records are never used for training, calibration, or threshold selection.
+- CICIDS2017 training/evaluation feature partitions do not supply native endpoints. The hidden replay's endpoint metadata is separate and is used as observed input. No IP is synthesized from TCP fingerprints.
 
-- The organizer-provided row order is authoritative; record IDs are identifiers, not arithmetic counters.
-- A policy is created after its triggering record. It can affect only a later row.
-- Policy lifetime is tracked internally by replay position and exported as the organizer record ID at the expiry position.
-- Policy lookup occurs before the fusion decision for each row.
-- Classification is emitted for every row independently of the replay action.
-- Agent 4 prefers literal observed source and destination IP addresses. Destination IP is never synthesized. If source IP is absent, the current fallback derives an IP-shaped synthetic source identity from the finite TCP-stack fingerprint tuple (`Init_Win_bytes_forward`, `min_seg_size_forward`, `Fwd Header Length`); identical tuples map together and the truncated 24-bit hash can collide. This identity is not an observed address.
-- Agent 5 accepts syntactically valid IPv4/IPv6 source identities for simulated scope. A valid IP string can be synthetic; do not present scope validation as proof of packet-observed provenance.
-- Invalid destination values are ignored, invalid destination ports are normalized to 0, and incomplete fingerprints leave the source identity unresolved (no source policy can be created).
-- Missing/invalid model evidence is not replaced with benign or normal defaults; fusion returns UNCERTAIN/REVIEW.
+## Model artifact workflow
+- `scripts/train_models.py` trains A1 from all five canonical training classes and A2 from BENIGN training rows only.
+- Both artifacts are reloaded after training; feature schema, class set, training provenance and SHA-256 hashes are recorded.
+- A separate labelled validation file is optional and must be organizer-authorized. Without it, A1 confidence remains uncalibrated and A2 uses its training-only benign threshold.
+- The labelled evaluation partition is reserved for final evaluation and is not used for fitting or calibration.
 
-## Validation
+## Replay and CSV contract
+- A1/A2 outputs and A3 evidence are retained for every hidden row because `classification.csv` requires complete coverage.
+- Existing A5 policies are checked before an allowed row enters A4 correlation or A5 policy updates. Blocked rows do not update temporal or defense state.
+- Policy activation is exclusive; expiry is inclusive. A policy cannot block its trigger record.
+- `classification.csv`: `record_id,predicted_class,anomaly_score,evidence_status`.
+- `replay.csv`: `record_id,action,active_policy_id`; ALLOW uses `NONE`; BLOCK uses the lexicographically smallest matching active policy ID.
+- `policies.csv`: `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`. The ledger has no `policy_action` column and may have zero or more rows.
+- Policy scopes are literal `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR` values from the policy's trigger record. No wildcard, CIDR, hash, or synthetic identity is allowed.
 
-Run:
+## UI truthfulness
+- Flow Inspector has no preloaded synthetic attack records and shows only the actual Agent 2 evidence payload returned by the backend; heuristic feature-impact bars were removed.
+- Fusion Studio is explicitly a manual what-if simulator, not a model prediction or observed flow.
+- 3D topology and particle animation are explicitly illustrative and not live network telemetry.
+- Static/unverified latency claims were removed. Latency is displayed only when measured from a request/replay.
 
-```bash
-python scripts/validate_submissions.py --input PATH_TO_ORGANIZER_INPUT --output-dir submissions/
-```
-
-The independent validator verifies record coverage and ordering, exact official headers, five-class predictions, allowed evidence states, finite anomaly scores, unique policy IDs, IP-formatted scopes, policy activation/expiry ordering, causal BLOCK references, and scope consistency against the original input row. For `SOURCE_IP`, it recomputes the same deterministic fallback identity when native source IP is absent; therefore a syntactically valid scope is not necessarily an observed address.
-
-The API bundle validator and independent CLI validator both compare every BLOCK policy to the identity derived from its original input row. Destination scopes still require literal observed destination IP metadata.
-
-## Explicit limitations
-
-- When native source IP is absent but all three fingerprint fields are finite, the implementation uses a deterministic synthetic identity. It can collide and can create false blocks; it is not a substitute for a captured IP. If the fingerprint is incomplete, source correlation/policy creation is unavailable.
-- The official hidden input, organizer API endpoint/schema and credentials must be supplied by the organizers before final full replay and submission can be verified.
-- Repository CI validates code and frontend build only. It is not a substitute for evaluation on the official hidden records.
+## Verification boundary
+- GitHub Actions verifies the Python tests and frontend type-check/build.
+- CI does not prove the organizer data can be parsed in a separate local environment, model training has been run on the supplied archives, or the hidden submission has been generated.
+- A local CSV validator pass is not organizer acceptance. Only an organizer upload receipt proves acceptance.
+- All defense policies and ALLOW/BLOCK actions are simulated offline; no host firewall or live network is modified.
