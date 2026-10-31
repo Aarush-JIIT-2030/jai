@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict, deque
 import ipaddress
+import hashlib
+import math
 from datetime import datetime
 from typing import Any
 import pandas as pd
@@ -48,7 +50,7 @@ class TemporalCorrelationAgent:
 
     @staticmethod
     def derive_source_identity(flow: dict[str, Any]) -> str:
-        """Return only a literal observed source IP; never synthesize an endpoint."""
+        """Prefer observed source IP; otherwise derive a disclosed synthetic TCP fingerprint ID."""
         for key in ("source_ip", "Source IP", "Source_IP", "src_ip", "src"):
             value = flow.get(key)
             if value is None or not str(value).strip():
@@ -57,7 +59,19 @@ class TemporalCorrelationAgent:
                 return str(ipaddress.ip_address(str(value).strip()))
             except ValueError:
                 continue
-        return ""
+        fingerprint_keys = ("Init_Win_bytes_forward", "min_seg_size_forward", "Fwd Header Length")
+        normalized = []
+        for key in fingerprint_keys:
+            try:
+                numeric = float(flow.get(key))
+            except (TypeError, ValueError, OverflowError):
+                return ""
+            if not math.isfinite(numeric):
+                return ""
+            normalized.append(format(numeric, ".12g"))
+        digest = hashlib.sha256("|".join(normalized).encode("utf-8")).digest()
+        # The 24-bit suffix is intentionally collision-prone; this is not an observed IP.
+        return f"10.{digest[0]}.{digest[1]}.{digest[2]}"
 
     @staticmethod
     def has_observed_source_ip(flow: dict[str, Any]) -> bool:
@@ -74,7 +88,7 @@ class TemporalCorrelationAgent:
         return False
     @staticmethod
     def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:
-        """Extract literal observed endpoints; missing endpoint identities remain unknown."""
+        """Extract source identity (observed or synthetic) and literal observed destination endpoint."""
         src_ip = TemporalCorrelationAgent.derive_source_identity(flow)
 
         dst_ip = ""
