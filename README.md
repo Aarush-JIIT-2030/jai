@@ -118,7 +118,7 @@ python scripts/validate_submissions.py \
   --output-dir outputs/submission
 ```
 
-The three files are `classification.csv`, `replay.csv`, and `policy.csv`. The independent validator checks exact headers, all 200 IDs and their order, the anomaly-score range, evidence taxonomy, observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, `active_policy_id=NONE` on ALLOW, and the lexicographically smallest matching policy for every BLOCK. A limited run is only a smoke test. A local validator pass is not proof of organizer acceptance.
+The three files are `classification.csv`, `replay.csv`, and `policy.csv`. The independent validator checks exact headers, all 200 IDs and their order, the anomaly-score range, evidence taxonomy, observed endpoint scopes, activation-exclusive/expiry-inclusive policy windows, an empty `active_policy_id` on ALLOW, and the lexicographically smallest matching policy for every BLOCK. A limited run is only a smoke test. A local validator pass is not proof of organizer acceptance.
 
 ---
 
