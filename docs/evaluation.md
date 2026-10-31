@@ -29,11 +29,11 @@ python scripts/train_models.py \
   --train data/raw/training/flows.parquet
 ```
 
-This trains A1 on the five labelled classes and A2 on BENIGN training rows only. It reloads both saved artifacts and writes per-agent reports plus `reports/generated/training_manifest.json`. The hidden input is not read by the training command.
+This creates a deterministic stratified 15% calibration holdout from the authorized training partition by default. A1 is fitted on the remaining training rows and temperature-calibrated on the holdout; A2 is fitted on BENIGN rows from the fit subset only and selects its operating threshold on the same holdout. Both saved artifacts are reloaded and per-agent reports plus `reports/generated/training_manifest.json` are written. The hidden input and held-out evaluation partition are not read by the training command.
 
-A separate labelled validation partition is optional. If and only if organizers provide one, pass it with `--validation path/to/labelled_validation.parquet`. A1 uses it for temperature calibration and validation metrics; A2 uses it for threshold selection under the configured benign-FPR ceiling. Do not pass the hidden input. Do not use the held-out evaluation partition as a calibration/tuning set.
+If organizers provide a separate labelled validation partition, pass it with `--validation path/to/labelled_validation.parquet`; the full training partition is then used for fitting and the external file is used for calibration/threshold selection. Set `--calibration-fraction 0` only when you intentionally want no calibration. Never pass the hidden input. Never use the held-out evaluation partition as a calibration/tuning set.
 
-When no separate labelled validation file is supplied, A1 confidence remains uncalibrated and A2 uses its training-only benign baseline threshold. This is explicitly recorded in the training manifest.
+The training manifest records the exact fit/holdout row counts, class counts, split seed, data hashes, calibration provenance, and artifact hashes. The holdout is drawn only from the authorized training partition; it is not the official evaluation split.
 
 ## 3. Evaluate on the untouched labelled evaluation partition
 
