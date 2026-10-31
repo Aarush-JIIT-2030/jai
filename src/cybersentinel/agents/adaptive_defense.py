@@ -105,7 +105,7 @@ class AdaptiveDefenseAgent:
 
     @staticmethod
     def _is_valid_ip_scope(value: str) -> bool:
-        """Accept observed IPs or IP-shaped synthetic fingerprint identities for simulated scope."""
+        """Accept only a literal observed IP address for simulated scope."""
         try:
             ipaddress.ip_address(str(value).strip())
             return True
