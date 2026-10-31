@@ -775,8 +775,8 @@ def test_policy_prefilter(payload: dict[str, Any]):
         raise HTTPException(status_code=422, detail="Provide a source_ip and a positive 1-based current_step.")
 
     candidates = (
-        BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet",
         BASE_DIR / "data" / "processed" / "hidden_replay_input.csv",
+        BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet",
     )
     input_file = next((path for path in candidates if path.is_file()), None)
     if input_file is None:
