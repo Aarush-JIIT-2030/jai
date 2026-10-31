@@ -103,6 +103,7 @@ python scripts/prepare_challenge_data.py \
 pip install -e ".[dev,ml]"
 
 # Train A1 and A2 from the authorized training partition only.
+# By default, 15% of that partition is held out for A1 calibration and A2 threshold selection.
 python scripts/train_models.py --train data/raw/training/flows.parquet
 
 # Optional: pass --validation only when organizers provide a separate labelled
