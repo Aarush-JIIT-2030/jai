@@ -28,7 +28,7 @@ def _ip(value: object) -> str:
     except (ValueError, TypeError):
         return ""
 
-def _observed_scope(source: pd.DataFrame, position: int, scope_type: str) -> str:
+def _input_scope(source: pd.DataFrame, position: int, scope_type: str) -> str:
     row = source.iloc[position]
     aliases = {
         "SOURCE_IP": ("source_ip", "Source IP", "Source_IP", "src_ip", "src"),
@@ -115,15 +115,15 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
             if not (start < pos <= end):
                 errors.append(f"Record {rid}: policy {active_id} is outside its activation-exclusive/expiry-inclusive window.")
             scope_type = policy["scope_type"]
-            observed = _observed_scope(source, pos, scope_type)
+            input_scope = _input_scope(source, pos, scope_type)
             expected_scope = policy["scope_value"]
             if scope_type in {"SOURCE_IP", "DESTINATION_IP"}:
                 expected_scope = _ip(expected_scope)
             elif scope_type == "SRC_DST_PAIR":
                 a, b = expected_scope.split("|") if "|" in expected_scope else ("", "")
                 expected_scope = f"{_ip(a)}|{_ip(b)}"
-            if not observed or observed != expected_scope:
-                errors.append(f"Record {rid}: active policy {active_id} does not match the observed {scope_type}.")
+            if not input_scope or input_scope != expected_scope:
+                errors.append(f"Record {rid}: active policy {active_id} does not match the input-derived {scope_type} identity.")
 
     return errors
 
