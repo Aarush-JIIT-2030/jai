@@ -265,7 +265,7 @@ class SubmissionValidator:
         all_valid = class_result["valid"] and policy_result["valid"] and replay_result["valid"]
         report = {
             "all_valid": all_valid,
-            "status": "READY_FOR_SUBMISSION" if all_valid else "VALIDATION_FAILED",
+            "status": "LOCAL_VALIDATION_PASSED" if all_valid else "VALIDATION_FAILED",
             "classification": class_result,
             "policies": policy_result,
             "replay": replay_result,
