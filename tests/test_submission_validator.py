@@ -142,3 +142,25 @@ def test_independent_official_csv_validator_rejects_block_before_activation(tmp_
     replay.loc[0, ["action", "applied_policy_id"]] = ["BLOCK", "POL-00001"]
     replay.to_csv(tmp_path / "replay.csv", index=False)
     assert any("not active" in error for error in validate_official_csvs(input_path, tmp_path))
+
+
+def test_bundle_validator_rejects_blocked_record_with_different_observed_source_ip(tmp_path):
+    sub_dir = tmp_path / "source_mismatch"
+    sub_dir.mkdir()
+    pd.DataFrame([
+        ["rec-1", "DOS", -0.1, "AGREE"],
+        ["rec-2", "DOS", -0.2, "AGREE"],
+    ], columns=["record_id", "predicted_class", "anomaly score", "evidence status"]).to_csv(sub_dir / "classification.csv", index=False)
+    pd.DataFrame([
+        ["POL-00001", "rec-1", "SOURCE_IP", "192.0.2.10", "rec-2", "BLOCK"],
+    ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]).to_csv(sub_dir / "policy.csv", index=False)
+    pd.DataFrame([
+        ["rec-1", "ALLOW", ""],
+        ["rec-2", "BLOCK", "POL-00001"],
+    ], columns=["record_id", "action", "applied_policy_id"]).to_csv(sub_dir / "replay.csv", index=False)
+    source = pd.DataFrame({"record_id": ["rec-1", "rec-2"], "source_ip": ["192.0.2.10", "192.0.2.11"]})
+
+    report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2"], source_frame=source)
+
+    assert report["all_valid"] is False
+    assert any("does not match the input's observed source IP" in error for error in report["replay"]["errors"])
