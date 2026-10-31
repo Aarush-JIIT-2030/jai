@@ -11,7 +11,7 @@ Exact columns:
 - Exactly one row for every hidden input record, in the same order.
 - predicted_class must be one of BENIGN, BRUTE_FORCE, DOS, DDOS, PORT_SCAN.
 - anomaly_score must be finite and within [0,1]; higher means more anomalous. It is a bounded index, not a probability.
-- evidence_status must be AGREE, DISAGREE, or INCOMPLETE.
+- evidence_status must be AGREE, CONFLICT, or UNCERTAIN.
 - Do not include hidden ground-truth labels.
 
 ## 2. policies.csv
