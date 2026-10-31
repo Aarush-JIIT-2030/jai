@@ -159,26 +159,25 @@ def test_submission_validation_uses_original_input_not_output_ids(monkeypatch, t
 
     data_dir = tmp_path / "data" / "processed"
     data_dir.mkdir(parents=True)
-    (data_dir / "hidden_replay_input.parquet").write_bytes(b"fixture")
+    pd.DataFrame([
+        {"record_id": 1, "seq": 1, "source_ip": "192.0.2.1", "destination_ip": "198.51.100.1"},
+        {"record_id": 2, "seq": 2, "source_ip": "192.0.2.2", "destination_ip": "198.51.100.2"},
+    ]).to_csv(data_dir / "hidden_replay_input.csv", index=False)
     output_dir = tmp_path / "outputs" / "submission"
     output_dir.mkdir(parents=True)
     (output_dir / "classification.csv").write_text(
-        "record_id,predicted_class,anomaly score,evidence status\n1,BENIGN,0.1,AGREE\n",
+        "record_id,predicted_class,anomaly_score,evidence_status\\n1,BENIGN,0.1,AGREE\\n",
         encoding="utf-8",
     )
-    (output_dir / "policy.csv").write_text(
-        "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action\n",
+    (output_dir / "policies.csv").write_text(
+        "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id\\n",
         encoding="utf-8",
     )
     (output_dir / "replay.csv").write_text(
-        "record_id,action,applied_policy_id\n1,ALLOW,\n",
+        "record_id,action,active_policy_id\\n1,ALLOW,NONE\\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(index, "BASE_DIR", tmp_path)
-    monkeypatch.setattr(
-        index.pd, "read_parquet",
-        lambda _path: pd.DataFrame({"record_id": [1, 2]}),
-    )
 
     response = TestClient(index.app).get("/api/replay/validate")
 
@@ -186,7 +185,7 @@ def test_submission_validation_uses_original_input_not_output_ids(monkeypatch, t
     payload = response.json()
     assert payload["all_valid"] is False
     assert payload["classification"]["row_count"] == 1
-    assert any("expected 2, got 1" in error for error in payload["classification"]["errors"])
+    assert any("original seq order" in error for error in payload["classification"]["errors"])
     assert payload["replay"]["row_count"] == 1
 
 
@@ -194,7 +193,7 @@ def test_submission_validation_refuses_to_claim_valid_without_source_dataset(mon
     output_dir = tmp_path / "outputs" / "submission"
     output_dir.mkdir(parents=True)
     (output_dir / "classification.csv").write_text(
-        "record_id,predicted_class,anomaly score,evidence status\n1,BENIGN,0.1,AGREE\n",
+        "record_id,predicted_class,anomaly_score,evidence_status\n1,BENIGN,0.1,AGREE\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(index, "BASE_DIR", tmp_path)
