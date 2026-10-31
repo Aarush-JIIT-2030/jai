@@ -157,3 +157,36 @@ def test_ddos_destination_convergence_requires_attack_classifier_evidence():
     )
     assert result.correlated is True
     assert result.attack_type == "DDOS"
+
+def test_invalid_destination_ip_is_not_used_as_correlation_endpoint():
+    agent = TemporalCorrelationAgent()
+    result = agent.correlate(
+        "bad-destination",
+        {"source_ip": "192.0.2.10", "destination_ip": "not-an-ip", "Destination Port": "443"},
+        threat_class="BENIGN",
+    )
+    assert result.status == "success"
+    assert result.correlated is False
+    assert agent.dest_source_map == {}
+
+
+def test_invalid_destination_port_is_safely_ignored():
+    src, dst, port = TemporalCorrelationAgent.extract_endpoints({
+        "source_ip": "192.0.2.10",
+        "destination_ip": "198.51.100.20",
+        "Destination Port": "not-a-port",
+    })
+    assert src == "192.0.2.10"
+    assert dst == "198.51.100.20"
+    assert port == 0
+
+
+def test_non_ip_source_or_destination_cannot_create_endpoint_group():
+    agent = TemporalCorrelationAgent()
+    result = agent.correlate(
+        "bad-source",
+        {"source_ip": "client-fingerprint-123", "destination_ip": "198.51.100.20", "Destination Port": 443},
+        threat_class="DOS",
+    )
+    assert result.status == "not_ready"
+    assert result.correlated is False
