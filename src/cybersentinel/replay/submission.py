@@ -95,7 +95,7 @@ class SubmissionValidator:
             reader = csv.DictReader(f)
             required_cols = [
                 "policy_id", "activated_after_record_id", "scope_type",
-                "scope_value", "expires_after_record_id", "policy_action"
+                "scope_value", "expires_after_record_id"
             ]
             if reader.fieldnames != required_cols:
                 issues.append(f"Header mismatch. Expected {required_cols}, found {reader.fieldnames}")
@@ -104,7 +104,6 @@ class SubmissionValidator:
                 row_count += 1
                 pol_id = row.get("policy_id")
                 scope_type = row.get("scope_type")
-                action = row.get("policy_action", "")
 
                 if pol_id in policies:
                     issues.append(f"Row {idx}: Duplicate policy_id '{pol_id}'")
@@ -112,9 +111,6 @@ class SubmissionValidator:
 
                 if scope_type not in {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}:
                     issues.append(f"Row {idx}: Unsupported scope_type '{scope_type}'")
-
-                if action != "BLOCK":
-                    issues.append(f"Row {idx}: Policy action must be BLOCK, got '{action}'")
 
                 scope_value = str(row.get("scope_value", "")).strip()
                 try:
