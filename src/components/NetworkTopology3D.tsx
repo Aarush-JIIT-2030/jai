@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useId } from "react";
 import * as THREE from "three";
 import { Shield, ZoomIn, ZoomOut, RotateCcw, X } from "lucide-react";
 
-export type ThreatLevel = "LOW" | "ELEVATED" | "CRITICAL";
+export type VisualTone = "COOL" | "AMBER" | "ROSE";
 
 interface NodeData {
   id: string;
@@ -24,8 +24,8 @@ const NODES_METADATA: Record<string, NodeData> = {
     role: "Stateful Replay & Ingress Decision Bus",
     category: "core",
     status: "SCHEMATIC",
-    latency: "Measured per replay",
-    flows: "Chronological flow stream",
+    latency: "Not measured in schematic",
+    flows: "No live telemetry",
     color: 0x38bdf8,
     description: "Checks policies activated by earlier records before allowing a flow into the decision pipeline. Classification outputs are still retained for every record.",
     contract: "Input: Organizer flow record -> Output: Causal replay gate (ALLOW / BLOCK)",
@@ -36,8 +36,8 @@ const NODES_METADATA: Record<string, NodeData> = {
     role: "Supervised Multiclass Classifier (Random Forest)",
     category: "agent",
     status: "MODEL-DEPENDENT",
-    latency: "Measured per inference",
-    flows: "Awaiting measured replay",
+    latency: "Not measured in schematic",
+    flows: "No live telemetry",
     color: 0x06b6d4, // Cyan
     description: "Evaluates 78 numeric network flow features to classify known attack families (DoS, DDoS, PortScan, BruteForce) with model confidence (not probability-calibrated).",
     contract: "Input: 78 numeric flow features -> Output: Class + Confidence",
@@ -87,7 +87,7 @@ const NODES_METADATA: Record<string, NodeData> = {
     latency: "Not independently measured",
     flows: "Temporary simulated policies",
     color: 0xf43f5e, // Rose / Red
-    description: "Synthesizes temporary simulated firewall rules (POL-XXXXX) for malicious source endpoints with exact expiration TTLs. Operates strictly in memory.",
+    description: "Creates temporary simulated policy records for observed source endpoints. No operating-system or network firewall is modified.",
     contract: "Input: Consensus evidence -> Output: Policy ID + Expiry boundary",
   },
   ingress: {
@@ -104,8 +104,8 @@ const NODES_METADATA: Record<string, NodeData> = {
   },
   target: {
     id: "target",
-    name: "Protected Corporate Datacenter",
-    role: "Internal Enterprise Assets & Services",
+    name: "Illustrative downstream service",
+    role: "Diagram-only target node",
     category: "target",
     status: "ILLUSTRATIVE",
     latency: "Not measured",
@@ -116,7 +116,7 @@ const NODES_METADATA: Record<string, NodeData> = {
   },
 };
 
-export function NetworkTopology3D({ threatLevel = "LOW" }: { threatLevel?: ThreatLevel }) {
+export function NetworkTopology3D({ visualTone = "COOL" }: { visualTone?: VisualTone }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [hasWebGL, setHasWebGL] = useState(true);
   const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
@@ -181,7 +181,7 @@ export function NetworkTopology3D({ threatLevel = "LOW" }: { threatLevel?: Threa
     scene.add(mainLight);
 
     const threatColorHex =
-      threatLevel === "CRITICAL" ? 0xef4444 : threatLevel === "ELEVATED" ? 0xf59e0b : 0x0284c7;
+      visualTone === "ROSE" ? 0xef4444 : visualTone === "AMBER" ? 0xf59e0b : 0x0284c7;
     const threatLight = new THREE.PointLight(threatColorHex, 45, 20);
     threatLight.position.set(-5, -3, 3);
     scene.add(threatLight);
@@ -310,49 +310,7 @@ export function NetworkTopology3D({ threatLevel = "LOW" }: { threatLevel?: Threa
     });
     rootGroup.add(new THREE.Mesh(targetTubeGeo, targetTubeMat));
 
-    // 5. Flow Packet Pulse Sprites along Curves
-    const packetSprites: { curve: THREE.CatmullRomCurve3; mesh: THREE.Mesh; speed: number; progress: number }[] = [];
-    const packetGeo = new THREE.SphereGeometry(0.065, 8, 8);
-    const packetMat = new THREE.MeshBasicMaterial({
-      color: threatLevel === "CRITICAL" ? 0xef4444 : 0x38bdf8,
-    });
-
-    const curvesToPulse = [ingressCurve, targetCurve];
-    curvesToPulse.forEach((c) => {
-      for (let p = 0; p < 4; p++) {
-        const pMesh = new THREE.Mesh(packetGeo, packetMat);
-        rootGroup.add(pMesh);
-        packetSprites.push({
-          curve: c,
-          mesh: pMesh,
-          speed: 0.12 + Math.random() * 0.08,
-          progress: p * 0.25,
-        });
-      }
-    });
-
-    // 6. Ambient Orbiting Particle Dust
-    const particleCount = 280;
-    const particlePositions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount; i++) {
-      const r = 2.8 + Math.random() * 3.5;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = (Math.random() - 0.5) * Math.PI;
-      particlePositions[i * 3] = r * Math.cos(theta) * Math.cos(phi);
-      particlePositions[i * 3 + 1] = r * Math.sin(phi);
-      particlePositions[i * 3 + 2] = r * Math.sin(theta) * Math.cos(phi);
-    }
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute("position", new THREE.BufferAttribute(particlePositions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      size: 0.038,
-      color: threatLevel === "CRITICAL" ? 0xf87171 : 0x38bdf8,
-      transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending,
-    });
-    const particles = new THREE.Points(particleGeo, particleMat);
-    rootGroup.add(particles);
+    // No synthetic flow packets, random particles, or live-traffic animation are rendered.
 
     // Mouse Interaction: Pointer Tilt and Raycasting
     const pointer = new THREE.Vector2();
@@ -458,18 +416,9 @@ export function NetworkTopology3D({ threatLevel = "LOW" }: { threatLevel?: Threa
         rootGroup.rotation.y += delta * 0.06;
       }
 
-      // Animate packet pulses along paths
-      packetSprites.forEach((p) => {
-        p.progress = (p.progress + delta * p.speed) % 1.0;
-        const pt = p.curve.getPoint(p.progress);
-        p.mesh.position.copy(pt);
-      });
-
       // Subtle pulse on Core
       const coreScale = 1.0 + Math.sin(elapsed * 2.5) * 0.04;
       coreMesh.scale.set(coreScale, coreScale, coreScale);
-
-      particles.rotation.y += delta * 0.03;
 
       renderer.render(scene, camera);
     };
@@ -489,7 +438,7 @@ export function NetworkTopology3D({ threatLevel = "LOW" }: { threatLevel?: Threa
       }
       renderer.dispose();
     };
-  }, [threatLevel]);
+  }, [visualTone]);
 
   // 2D Fallback for environments without WebGL
   if (!hasWebGL) {
