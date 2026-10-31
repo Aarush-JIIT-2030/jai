@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import {
   Activity, Check, Database, Download, FileSpreadsheet, Fingerprint,
   Gauge, Layers, LockKeyhole, Play, RefreshCw,
-  ShieldAlert, ShieldCheck, Copy, FileCode2, Terminal
+  ShieldAlert, ShieldCheck
 } from "lucide-react";
 const NetworkTopology3D = lazy(() => import("./components/NetworkTopology3D").then(module => ({ default: module.NetworkTopology3D })));
 
@@ -12,7 +12,6 @@ type Policy = {
   scope_type: string;
   scope_value: string;
   expires_after_record_id: string | number;
-  policy_action: string;
 };
 
 type CorrelationGroupItem = {
@@ -29,39 +28,39 @@ type CorrelationGroupItem = {
 };
 
 // ============================================================================
-// 1. TOPOLOGY & OVERVIEW COMMAND CENTRE (3D WebGL + Live SOC Telemetry)
+// 1. ILLUSTRATIVE 3D REPLAY ARCHITECTURE (not live SOC telemetry)
 // ============================================================================
 export function TopologyCommandCentre() {
-  const [threatLevel, setThreatLevel] = useState<"LOW" | "ELEVATED" | "CRITICAL">("LOW");
+  const [visualTone, setVisualTone] = useState<"COOL" | "AMBER" | "ROSE">("COOL");
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22, overflow: "hidden" }}>
       <div className="panel-head">
         <div>
-          <div className="panel-kicker">WEBGL 3D · MULTI-AGENT TOPOLOGY COMMAND</div>
-          <h3>Autonomous Agent Neural Topology</h3>
+          <div className="panel-kicker">WEBGL 3D · ILLUSTRATIVE REPLAY ARCHITECTURE</div>
+          <h3>Five-Agent Replay Architecture</h3>
           <p>
-            Interactive 3D schematic of the five-agent offline detection and simulated-defense pipeline.
+            Illustrative 3D schematic of the offline five-agent pipeline. It is not a live network map or traffic feed; the visual-tone selector changes colors only; no traffic telemetry is represented.
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {(["LOW", "ELEVATED", "CRITICAL"] as const).map((lvl) => (
+          {(["COOL", "AMBER", "ROSE"] as const).map((tone) => (
             <button
-              key={lvl}
-              onClick={() => setThreatLevel(lvl)}
+              key={tone}
+              onClick={() => setVisualTone(tone)}
               className="text-btn"
               style={{
                 fontSize: 11,
                 padding: "3px 8px",
-                background: threatLevel === lvl ? (lvl === "CRITICAL" ? "#ef4444" : lvl === "ELEVATED" ? "#f59e0b" : "#2563eb") : "var(--panel2)",
-                color: threatLevel === lvl ? "#fff" : "var(--text)",
+                background: visualTone === tone ? (tone === "ROSE" ? "#ef4444" : tone === "AMBER" ? "#f59e0b" : "#2563eb") : "var(--panel2)",
+                color: visualTone === tone ? "#fff" : "var(--text)",
                 borderRadius: 4,
                 border: "1px solid var(--line)",
                 cursor: "pointer",
-                fontWeight: threatLevel === lvl ? 600 : 400,
+                fontWeight: visualTone === tone ? 600 : 400,
               }}
             >
-              {lvl} THREAT
+              {tone} TONE
             </button>
           ))}
         </div>
@@ -69,16 +68,16 @@ export function TopologyCommandCentre() {
 
       <div style={{ height: 480, position: "relative", background: "radial-gradient(circle at center, rgba(15, 30, 58, 0.45) 0%, rgba(3, 7, 18, 0.95) 100%)", borderRadius: 12, margin: "12px 0 16px 0", border: "1px solid rgba(56, 189, 248, 0.22)", overflow: "hidden", boxShadow: "inset 0 0 50px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.1)" }}>
         <Suspense fallback={<div className="topology-loading" role="status">Loading 3D topology…</div>}>
-      <NetworkTopology3D threatLevel={threatLevel} />
+      <NetworkTopology3D visualTone={visualTone} />
     </Suspense>
         <div style={{ position: "absolute", bottom: 12, left: 14, fontSize: 11, color: "var(--muted)", pointerEvents: "none" }}>
-          <b>ACTIVE NODES:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
+          <b>COMPONENTS:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
         </div>
       </div>
 
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Hardware-accelerated WebGL 3D scene with 2D canvas fallback</span>
-        <span>SCHEMATIC VIEW · LOCAL REPLAY DATA WHEN AVAILABLE</span>
+        <span>ILLUSTRATIVE SYSTEM DIAGRAM · NO LIVE TRAFFIC OR PACKET PULSES</span>
       </div>
     </section>
   );
@@ -95,22 +94,22 @@ export function FiveAgentArchitectureView() {
       id: 1,
       name: "Agent 1: Threat Detection",
       role: "Supervised Multiclass Classifier",
-      model: "Random Forest (artifact-defined configuration; confidence is not calibrated)",
-      input: "71 preprocessed network flow metrics",
-      output: "Predicted class + model confidence (not calibrated)",
+      model: "Random Forest (artifact-defined; calibration provenance is artifact-dependent)",
+      input: "78 numeric network flow features",
+      output: "Predicted class + model confidence; calibration depends on the saved artifact",
       latency: "See measured benchmark report",
       throughput: "See measured benchmark report",
       accuracy: "See generated evaluation report",
       classes: "BENIGN, BRUTE_FORCE, DOS, DDOS, PORT_SCAN",
-      description: "Extracts flow-level features and runs high-speed tree ensemble inference with canonical label encoding. Resolves unambiguous signatures within microsecond windows.",
+      description: "Extracts flow-level features and runs high-speed tree ensemble inference with canonical label encoding. Produces a class prediction and artifact-defined confidence; request latency is measured separately.",
     },
     {
       id: 2,
       name: "Agent 2: Anomaly Detection",
       role: "Unsupervised Statistical Outlier Isolation",
       model: "Isolation Forest (parameters loaded from model artifact)",
-      input: "71 continuous flow distribution metrics",
-      output: "Anomaly score on model output scale + outlier flag",
+      input: "78 numeric flow features",
+      output: "Bounded 0–1 anomaly index (not a probability) + outlier flag",
       latency: "See measured benchmark report",
       throughput: "See measured benchmark report",
       accuracy: "See generated evaluation report",
@@ -127,7 +126,7 @@ export function FiveAgentArchitectureView() {
       latency: "Not separately benchmarked",
       throughput: "Not independently measured",
       accuracy: "Deterministic decision rules; not a predictive accuracy metric",
-      classes: "ALLOW, BLOCK, REVIEW (Status: AGREE, DISAGREE, INCOMPLETE)",
+      classes: "ALLOW, BLOCK, REVIEW (Status: AGREE, CONFLICT, UNCERTAIN)",
       description: "Combines supervised classification and anomaly signals. Disagreements between agents are never hidden; they are routed to REVIEW with human-readable rationale.",
     },
     {
@@ -141,7 +140,7 @@ export function FiveAgentArchitectureView() {
       throughput: "Not independently measured",
       accuracy: "Pattern heuristics; evaluate against labelled validation data",
       classes: "PORT_SCAN, DDOS, BRUTE_FORCE, DOS_SURGE",
-      description: "Maintains a 150-flow chronological sliding window. Correlates individual packets across time and destination ports to uncover coordinated multi-stage campaigns.",
+      description: "Maintains a fixed 150-flow cap and configured 300-second age window when timestamps exist. Uses only literal observed source/destination endpoints from the hidden input; missing or invalid endpoints remain unknown.",
     },
     {
       id: 5,
@@ -153,8 +152,8 @@ export function FiveAgentArchitectureView() {
       latency: "See measured replay report",
       throughput: "Not independently measured",
       accuracy: "Causality assertions are tested; see current replay validation",
-      classes: "ALLOW, BLOCK (with applied_policy_id POL-XXXXX)",
-      description: "Evaluates incoming flows against unexpired active block rules before analysis. When confirmed attacks pass through, forward-looking policies are generated with explicit expiration ticks.",
+      classes: "ALLOW (active_policy_id=NONE), BLOCK (smallest matching active policy ID)",
+      description: "Checks earlier active policies before downstream correlation. Confirmed attacks can create a forward-only simulated SOURCE_IP block with a fixed default 150-position lifetime; it never blocks its own trigger row.",
     },
   ];
 
@@ -243,7 +242,7 @@ export function FiveAgentArchitectureView() {
 
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Strict separation of concerns · Independent signal contribution</span>
-        <span>VERIFIED LATENCY: ALL 5 AGENTS &lt; 0.15ms COMBINED</span>
+        <span>LATENCY: REPORT ONLY MEASURED REQUEST/REPLAY VALUES</span>
       </div>
     </section>
   );
@@ -253,10 +252,10 @@ export function FiveAgentArchitectureView() {
 // 3. EVIDENCE FUSION STUDIO (Agent 3 Matrix & Interactive Simulator)
 // ============================================================================
 export function EvidenceFusionStudio() {
-  const [threatClass, setThreatClass] = useState("PORT_SCAN");
-  const [confidence, setConfidence] = useState(0.88);
-  const [anomalyScore, setAnomalyScore] = useState(-0.18);
-  const [isAnomaly, setIsAnomaly] = useState(true);
+  const [threatClass, setThreatClass] = useState("BENIGN");
+  const [confidence, setConfidence] = useState(0.5);
+  const [anomalyScore, setAnomalyScore] = useState(0);
+  const [isAnomaly, setIsAnomaly] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -291,8 +290,8 @@ export function EvidenceFusionStudio() {
       <div className="panel-head">
         <div>
           <div className="panel-kicker">AGENT 03 · EVIDENCE FUSION & DECISION MATRIX</div>
-          <h3>Production Fusion Workbench</h3>
-          <p>Submits explicit A1 and A2 evidence to the same Python fusion agent used by the replay engine.</p>
+          <h3>Evidence Fusion Rule Simulator</h3>
+          <p>Evaluates manually entered what-if evidence using the same Python fusion rules as replay. Inputs are not model predictions or observed traffic.</p>
         </div>
         <span className="panel-icon"><Fingerprint size={18} /></span>
       </div>
@@ -305,26 +304,26 @@ export function EvidenceFusionStudio() {
             {["BENIGN", "PORT_SCAN", "DOS", "DDOS", "BRUTE_FORCE"].map(value => <option key={value}>{value}</option>)}
           </select>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
-            <span style={{ color: "var(--muted)" }}>A1 confidence (model output)</span><b>{confidence.toFixed(2)}</b>
+            <span style={{ color: "var(--muted)" }}>A1 confidence input (manual)</span><b>{confidence.toFixed(2)}</b>
           </div>
           <input aria-label="A1 confidence" type="range" min="0" max="1" step="0.01" value={confidence} onChange={e => setConfidence(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
-            <span style={{ color: "var(--muted)" }}>A2 anomaly score (raw model scale)</span><b>{anomalyScore.toFixed(3)}</b>
+            <span style={{ color: "var(--muted)" }}>A2 anomaly index (0–1; higher = more anomalous)</span><b>{anomalyScore.toFixed(3)}</b>
           </div>
-          <input aria-label="A2 anomaly score" type="range" min="-0.5" max="0.5" step="0.005" value={anomalyScore} onChange={e => setAnomalyScore(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
+          <input aria-label="A2 anomaly score" type="range" min="0" max="1" step="0.01" value={anomalyScore} onChange={e => setAnomalyScore(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
           <label style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--muted)", fontSize: 11 }}>
             <input type="checkbox" checked={isAnomaly} onChange={e => setIsAnomaly(e.target.checked)} />
-            A2 independently flagged this flow as anomalous
+            Manual A2 anomaly flag input
           </label>
           <button className="primary-btn" type="button" onClick={runFusion} disabled={busy} style={{ marginTop: 16, width: "100%" }}>
-            {busy ? "Evaluating with Agent 3…" : "Run production fusion"} <Fingerprint size={15}/>
+            {busy ? "Evaluating with Agent 3…" : "Evaluate manual scenario"} <Fingerprint size={15}/>
           </button>
         </div>
 
         <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Agent 3 decision output</div>
           {error && <div className="parse-warning" role="alert">{error}</div>}
-          {!result && !error && <div className="empty-inline">Run the workbench to request a decision from the backend fusion agent. No result is assumed.</div>}
+          {!result && !error && <div className="empty-inline">Set the what-if inputs and evaluate them. This panel does not create a flow record or change replay artifacts.</div>}
           {result && <>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
               <span className={"tag " + (result.action === "BLOCK" ? "tag-red" : result.action === "ALLOW" ? "tag-green" : "tag-amber")}>{result.action}</span>
@@ -344,7 +343,7 @@ export function EvidenceFusionStudio() {
       </div>
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Backend-authoritative Agent 3 · simulated action only</span>
-        <span>Confidence threshold and anomaly flag come from Python implementation</span>
+        <span>Manual inputs only · no flow is analyzed by this simulator</span>
       </div>
     </section>
   );
@@ -440,13 +439,11 @@ export function AdaptiveDefenseConsole() {
   const [totalPolicies, setTotalPolicies] = useState<number | null>(null);
   const [overview, setOverview] = useState<any>(null);
   const [testIdentity, setTestIdentity] = useState("");
-  const [testStep, setTestStep] = useState(0);
+  const [testStep, setTestStep] = useState(1);
   const [matchResult, setMatchResult] = useState<any>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [vendorFormat, setVendorFormat] = useState<"IPTABLES" | "AWS_WAF" | "PALO_ALTO" | "CISCO">("IPTABLES");
-  const [copiedRule, setCopiedRule] = useState(false);
 
   async function loadPolicies() {
     setLoading(true);
@@ -498,57 +495,7 @@ export function AdaptiveDefenseConsole() {
   }
 
   const metric = overview?.metrics;
-
-  const activeSources = policies.length > 0
-    ? policies.slice(0, 6).map(p => ({ id: p.policy_id, src: p.scope_value, ttl: p.expires_after_record_id }))
-    : [
-        { id: "POL-0001", src: "192.168.10.50", ttl: 150 },
-        { id: "POL-0002", src: "192.168.10.51", ttl: 200 }
-      ];
-
-  function getVendorRuleString(format: "IPTABLES" | "AWS_WAF" | "PALO_ALTO" | "CISCO"): string {
-    switch (format) {
-      case "IPTABLES":
-        return [
-          "# CyberSentinel Agent 5 — Dynamic Adaptive Mitigation Rules",
-          "# Linux Netfilter / iptables Layer 3/4 enforcement",
-          "iptables -N CS_AGENT5_FILTER",
-          "iptables -I INPUT 1 -j CS_AGENT5_FILTER",
-          ...activeSources.map(s => `iptables -A CS_AGENT5_FILTER -s ${s.src}/32 -m comment --comment "Policy:${s.id} TTL:${s.ttl}" -j DROP`)
-        ].join("\n");
-      case "AWS_WAF":
-        return JSON.stringify({
-          Name: "CyberSentinel-Dynamic-Containment-IPSet",
-          Description: "Auto-generated by CyberSentinel Agent 5 Adaptive Defense",
-          Scope: "REGIONAL",
-          IPAddressVersion: "IPV4",
-          Addresses: activeSources.map(s => `${s.src}/32`),
-          RuleAction: "BLOCK"
-        }, null, 2);
-      case "PALO_ALTO":
-        return [
-          "# Palo Alto PAN-OS CLI Security Policy Configuration",
-          "configure",
-          ...activeSources.map(s => `set address host-${s.src.replaceAll('.', '_')} ip-netmask ${s.src}/32\nset rulebase security rules CS-DROP-${s.id} from untrust to trust source host-${s.src.replaceAll('.', '_')} destination any service any application any action drop log-end yes`),
-          "commit"
-        ].join("\n");
-      case "CISCO":
-        return [
-          "! Cisco IOS / ASA Extended Access Control List (ACL)",
-          "! Generated dynamically by CyberSentinel A5",
-          "ip access-list extended CS_PERIMETER_DROP",
-          ...activeSources.map(s => ` deny ip host ${s.src} any log (Policy ${s.id})`),
-          " permit ip any any"
-        ].join("\n");
-    }
-  }
-
-  function copyVendorRule() {
-    const code = getVendorRuleString(vendorFormat);
-    navigator.clipboard.writeText(code);
-    setCopiedRule(true);
-    setTimeout(() => setCopiedRule(false), 2200);
-  }
+  const hasGroundTruthMetrics = typeof metric?.attack_containment_rate === "number" && typeof metric?.benign_preservation_rate === "number";
 
   return (
     <section className="panel dataset-panel" style={{ marginBottom: 22 }}>
@@ -563,10 +510,10 @@ export function AdaptiveDefenseConsole() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, margin: "14px 0" }}>
         {[
-          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policy.csv"],
-          ["ATTACKS CONTAINED", metric ? metric.attacks_contained.toLocaleString() : "—", metric ? metric.attack_containment_rate.toFixed(2) + "% of attack records" : "Requires labelled evaluation data"],
-          ["BENIGN PRESERVED", metric ? metric.benign_preserved.toLocaleString() : "—", metric ? metric.benign_preservation_rate.toFixed(2) + "% of benign records" : "Requires labelled evaluation data"],
-          ["FALSE BLOCKS", metric ? metric.false_blocks.toLocaleString() : "—", metric ? (100 - metric.benign_preservation_rate).toFixed(2) + "% of benign records" : "Requires labelled evaluation data"],
+          ["POLICIES CREATED", totalPolicies === null ? "—" : totalPolicies.toLocaleString(), "From generated policies.csv"],
+          ["ATTACKS CONTAINED", hasGroundTruthMetrics ? metric.attacks_contained.toLocaleString() : "—", hasGroundTruthMetrics ? metric.attack_containment_rate.toFixed(2) + "% of attack records" : "Not measurable on unlabelled replay input"],
+          ["BENIGN PRESERVED", hasGroundTruthMetrics ? metric.benign_preserved.toLocaleString() : "—", hasGroundTruthMetrics ? metric.benign_preservation_rate.toFixed(2) + "% of benign records" : "Not measurable on unlabelled replay input"],
+          ["FALSE BLOCKS", hasGroundTruthMetrics && typeof metric.false_blocks === "number" ? metric.false_blocks.toLocaleString() : "—", hasGroundTruthMetrics ? (100 - metric.benign_preservation_rate).toFixed(2) + "% of benign records" : "Not measurable on unlabelled replay input"],
         ].map(([label, value, detail]) => <div key={label} style={{ background: "var(--panel2)", padding: 12, borderRadius: 7, border: "1px solid var(--line)" }}><small style={{ color: "var(--muted)", fontSize: 9 }}>{label}</small><div style={{ fontSize: 19, fontWeight: 700, margin: "5px 0" }}>{value}</div><small style={{ color: "var(--muted)", fontSize: 10 }}>{detail}</small></div>)}
       </div>
 
@@ -577,7 +524,7 @@ export function AdaptiveDefenseConsole() {
       {policies.length > 0 && <div style={{ overflowX: "auto", marginBottom: 16 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
           <thead><tr style={{ borderBottom: "1px solid var(--line)", textAlign: "left", color: "var(--muted)" }}>
-            <th style={{ padding: "7px 8px" }}>POLICY ID</th><th style={{ padding: "7px 8px" }}>SCOPE</th><th style={{ padding: "7px 8px" }}>SOURCE IDENTITY</th><th style={{ padding: "7px 8px" }}>ACTIVATED AFTER</th><th style={{ padding: "7px 8px" }}>EXPIRES AFTER</th><th style={{ padding: "7px 8px" }}>ACTION</th>
+            <th style={{ padding: "7px 8px" }}>POLICY ID</th><th style={{ padding: "7px 8px" }}>SCOPE</th><th style={{ padding: "7px 8px" }}>OBSERVED SOURCE IP</th><th style={{ padding: "7px 8px" }}>ACTIVATED AFTER</th><th style={{ padding: "7px 8px" }}>EXPIRES AFTER</th><th style={{ padding: "7px 8px" }}>ACTION</th>
           </tr></thead>
           <tbody>{policies.map(policy => <tr key={policy.policy_id} style={{ borderBottom: "1px solid var(--line)" }}>
             <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 600 }}>{policy.policy_id}</td>
@@ -585,7 +532,7 @@ export function AdaptiveDefenseConsole() {
             <td style={{ padding: 8, fontFamily: "monospace" }}>{policy.scope_value}</td>
             <td style={{ padding: 8 }}>{policy.activated_after_record_id}</td>
             <td style={{ padding: 8 }}>{policy.expires_after_record_id}</td>
-            <td style={{ padding: 8 }}><span className="tag tag-red">{policy.policy_action}</span></td>
+            <td style={{ padding: 8 }}><span className="tag tag-red">{"BLOCK"}</span></td>
           </tr>)}</tbody>
         </table>
         <div style={{ color: "var(--muted)", fontSize: 10, marginTop: 7 }}>Showing {policies.length} of {totalPolicies?.toLocaleString() ?? policies.length} policies.</div>
@@ -595,8 +542,8 @@ export function AdaptiveDefenseConsole() {
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Test the real backend pre-filter matcher</div>
         <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 10px" }}>Enter a policy scope value and the record position to check activation and expiry. The matcher does not create or alter policies.</p>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input type="text" value={testIdentity} onChange={event => setTestIdentity(event.target.value)} placeholder="SOURCE_IP scope value from policy.csv" style={{ flex: "1 1 220px", minWidth: 0, padding: "8px 10px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", fontSize: 11, fontFamily: "monospace" }} />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--muted)" }}>Record step <input type="number" min="0" value={testStep} onChange={event => setTestStep(Math.max(0, Number.parseInt(event.target.value, 10) || 0))} style={{ width: 86, padding: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)" }}/></label>
+          <input type="text" value={testIdentity} onChange={event => setTestIdentity(event.target.value)} placeholder="Observed SOURCE_IP from policies.csv" style={{ flex: "1 1 220px", minWidth: 0, padding: "8px 10px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)", fontSize: 11, fontFamily: "monospace" }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--muted)" }}>Record step <input type="number" min="1" value={testStep} onChange={event => setTestStep(Math.max(1, Number.parseInt(event.target.value, 10) || 1))} style={{ width: 86, padding: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6, color: "var(--text)" }}/></label>
           <button className="primary-btn" onClick={testFilter} disabled={isTesting}>{isTesting ? "Checking…" : "Test matcher"}</button>
         </div>
         {matchResult && <div role={matchResult.error ? "alert" : "status"} style={{ marginTop: 10, fontSize: 11, padding: 10, borderRadius: 6, background: matchResult.error ? "#35221f" : matchResult.matched ? "#351f25" : "#112a27", color: matchResult.error ? "#ffb4a4" : matchResult.matched ? "#ff9ba7" : "#9de6c6" }}>
@@ -605,59 +552,13 @@ export function AdaptiveDefenseConsole() {
       </div>
 
       <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)", marginTop: 14 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <FileCode2 size={16} color="#38bdf8" />
-            <b style={{ fontSize: 12 }}>Multi-Vendor Firewall Policy Exporter</b>
-            <span style={{ fontSize: 10, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4 }}>
-              <Terminal size={12} /> Production Control Syntax
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["IPTABLES", "AWS_WAF", "PALO_ALTO", "CISCO"] as const).map(fmt => (
-              <button
-                key={fmt}
-                type="button"
-                onClick={() => setVendorFormat(fmt)}
-                className="secondary-btn"
-                style={{
-                  padding: "4px 8px",
-                  fontSize: 10,
-                  borderColor: vendorFormat === fmt ? "#38bdf8" : undefined,
-                  color: vendorFormat === fmt ? "#38bdf8" : undefined,
-                }}
-              >
-                {fmt === "AWS_WAF" ? "AWS WAF" : fmt === "PALO_ALTO" ? "Palo Alto" : fmt === "CISCO" ? "Cisco ACL" : "iptables"}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={copyVendorRule}
-              className="primary-btn"
-              style={{ padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}
-            >
-              {copiedRule ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy Rules</>}
-            </button>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
+          <LockKeyhole size={15} color="#38bdf8" />
+          <b style={{ fontSize: 12 }}>Enforcement boundary</b>
         </div>
-        <p style={{ fontSize: 10, color: "var(--muted)", margin: "0 0 8px" }}>
-          Export active Agent 5 simulated containment policies as enterprise firewall commands. Ready for network deployment.
+        <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>
+          Policy records are offline simulation results for analyst review. This product has no firewall adapter, deployment credentials, approval workflow, rollback controller, or live enforcement path. Download the CSV ledger for review; do not paste these records into a firewall.
         </p>
-        <pre style={{
-          margin: 0,
-          background: "rgba(8, 14, 26, 0.8)",
-          padding: 12,
-          borderRadius: 6,
-          border: "1px solid var(--line)",
-          color: "#38bdf8",
-          fontFamily: "'DM Mono', monospace",
-          fontSize: 10.5,
-          lineHeight: 1.5,
-          overflowX: "auto",
-          maxHeight: 180
-        }}>
-          {getVendorRuleString(vendorFormat)}
-        </pre>
       </div>
 
       <div className="panel-foot" style={{ marginTop: 14 }}>
@@ -673,8 +574,40 @@ export function AdaptiveDefenseConsole() {
 // ============================================================================
 export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
   const [running, setRunning] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [summary, setSummary] = useState<any>(null);
   const [error, setError] = useState("");
+  const [inputStatus, setInputStatus] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/system/diagnostics")
+      .then(response => response.ok ? response.json() : Promise.reject(new Error("Local API unavailable")))
+      .then(data => setInputStatus(data.hidden_replay_input ?? null))
+      .catch(() => setInputStatus(null));
+  }, []);
+
+  async function installReplayInput(file?: File) {
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    setSummary(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/replay/input/upload", { method: "POST", body });
+      const payload = await response.json();
+      if (!response.ok) {
+        const detail = payload.detail;
+        const message = typeof detail === "string" ? detail : detail?.message ?? detail?.report?.errors?.join(" ") ?? "Replay input could not be installed.";
+        throw new Error(message);
+      }
+      setInputStatus({ present: true, validation: payload.input_validation, path: payload.path });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Replay input upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function runOfficialReplay() {
     setRunning(true);
@@ -701,7 +634,7 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
         <div>
           <div className="panel-kicker">LEVEL 02 · CAUSAL CHRONOLOGICAL REPLAY ENGINE</div>
           <h3>Official Offline Replay</h3>
-          <p>Runs the installed evaluation dataset through the backend replay engine and generates the three official CSV artifacts.</p>
+          <p>Runs the installed unlabelled hidden replay input through the backend replay engine and generates the three official CSV artifacts.</p>
         </div>
         <span className="panel-icon"><FileSpreadsheet size={18} /></span>
       </div>
@@ -709,20 +642,30 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
       <div style={{ background: "var(--panel2)", padding: 17, borderRadius: 9, border: "1px solid var(--line)", margin: "16px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div>
-            <b>Evaluation dataset · local server only</b>
+            <b>Organizer replay input · local server only</b>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 5 }}>
-              Expected path: <code>data/processed/eval_prepared.parquet</code>
+              Expected path: <code>data/processed/hidden_replay_input.csv</code>
             </div>
             <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 5 }}>
-              Records remain on the backend. The interface does not upload or fabricate a replay stream.
+              Install the organizer CSV or cyber-hidden.zip. The backend validates original IDs, sequence, timestamps, numeric features and observed endpoints; it never creates missing endpoint values.
             </div>
           </div>
-          <button className="primary-btn" disabled={!modelReady || running} onClick={runOfficialReplay}>
-            {running ? <><RefreshCw size={14} className="spin-icon"/> Running official replay…</> : <><Play size={14}/> Run official chronological replay</>}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <label className="secondary-btn" style={{ cursor: uploading ? "wait" : "pointer" }}>
+              {uploading ? "Installing input…" : "Choose CSV / ZIP"}
+              <input type="file" accept=".csv,.zip,text/csv,application/zip" hidden disabled={uploading} onChange={event => { void installReplayInput(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+            </label>
+            <button className="primary-btn" disabled={!modelReady || running || !inputStatus?.present || !inputStatus?.validation?.valid} onClick={runOfficialReplay}>
+              {running ? <><RefreshCw size={14} className="spin-icon"/> Running official replay…</> : <><Play size={14}/> Run chronological replay</>}
+            </button>
+          </div>
         </div>
 
-        {!modelReady && <div className="parse-warning" style={{ marginTop: 14 }}>Models are not ready. Install and verify both model artifacts before replay.</div>}
+        {!inputStatus?.present && <div className="empty-inline" style={{ marginTop: 14 }}>No organizer replay input is installed. Choose the original CSV or cyber-hidden.zip.</div>}
+        {inputStatus?.present && <div className="empty-inline" style={{ marginTop: 14 }}>Input check: {inputStatus.validation?.rows ?? "—"} records · {inputStatus.validation?.feature_count ?? "—"} numeric flow features · {inputStatus.validation?.rows_with_both_observed_endpoints ?? "—"} rows with both observed endpoints. {inputStatus.validation?.valid ? "Schema and chronology valid." : "Input needs correction before replay."}</div>}
+        {!modelReady && <div className="parse-warning" style={{ marginTop: 14 }}>Model artifacts are not ready. Install the authorized labelled training pack, train both agents, and verify the saved artifacts.</div>}
+        {inputStatus?.validation?.warnings?.length > 0 && <div className="parse-warning" style={{ marginTop: 10 }}>{inputStatus.validation.warnings.join(" ")}</div>}
+        {inputStatus?.validation?.errors?.length > 0 && <div className="parse-warning" style={{ marginTop: 10 }}>{inputStatus.validation.errors.join(" ")}</div>}
         {running && <div style={{ marginTop: 16, padding: 12, border: "1px solid var(--line)", borderRadius: 7, color: "var(--muted)", fontSize: 11 }} role="status" aria-live="polite">The backend is processing the actual dataset in chronological order. This operation may take several seconds; do not refresh this page.</div>}
         {error && <div className="parse-warning" role="alert" style={{ marginTop: 14 }}>{error}</div>}
 
@@ -754,7 +697,7 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
       </div>
 
       <div className="panel-foot">
-        <span><LockKeyhole size={13} /> Offline only · Simulated policies · No host firewall changes</span>
+        <span><LockKeyhole size={13} /> Local execution only · Simulated policies · No host firewall changes</span>
         <span>Backend-authoritative replay · No synthetic progress</span>
       </div>
     </section>
@@ -809,9 +752,9 @@ export function SubmissionStudio() {
   }
 
   const fileCards = [
-    { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly score,evidence status" },
-    { filename: "policy.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policy?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action" },
-    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record with policy references.", rows: validationReport?.replay?.row_count, header: "record_id,action,applied_policy_id" },
+    { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly_score,evidence_status" },
+    { filename: "policies.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id" },
+    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record; ALLOW uses NONE and BLOCK references the smallest matching active policy ID.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
   ];
 
   return (
@@ -852,7 +795,7 @@ export function SubmissionStudio() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 10, fontSize: 10, color: "var(--muted)" }}>
             <div>classification.csv · {validationReport.classification?.row_count ?? "—"} rows · {validationReport.classification?.total_errors ?? "—"} errors</div>
-            <div>policy.csv · {validationReport.policy?.policy_count ?? "—"} policies · {validationReport.policy?.total_errors ?? "—"} errors</div>
+            <div>policies.csv · {validationReport.policies?.policy_count ?? "—"} policies · {validationReport.policies?.total_errors ?? "—"} errors</div>
             <div>replay.csv · {validationReport.replay?.row_count ?? "—"} rows · {validationReport.replay?.total_errors ?? "—"} errors</div>
           </div>
           {!validationReport.all_valid && <div style={{ marginTop: 9, fontSize: 10, color: "#ffb4a4" }}>Do not submit until every mandatory validator error is resolved.</div>}
@@ -899,7 +842,7 @@ export function ModelIntelligenceView() {
         <div>
           <div className="panel-kicker">MODEL EVALUATION · GENERATED BENCHMARK REPORT</div>
           <h3>Model Intelligence & Diagnostics</h3>
-          <p>Displays metrics only when a benchmark report is available. Confidence is model-derived and not probability-calibrated.</p>
+          <p>Displays metrics only when a benchmark report is available. A1 confidence calibration depends on the loaded artifact; A2 exports a bounded anomaly index, not an attack probability.</p>
         </div>
         <span className="panel-icon"><Gauge size={18} /></span>
       </div>
@@ -952,7 +895,7 @@ export function ModelIntelligenceView() {
       </>}
       <div className="panel-foot" style={{ marginTop: 14 }}>
         <span><LockKeyhole size={13} /> No fallback metrics or confusion matrix are fabricated</span>
-        <span>MODEL CONFIDENCE IS NOT CALIBRATED</span>
+        <span>CONFIDENCE CALIBRATION IS ARTIFACT-DEPENDENT</span>
       </div>
     </section>
   );
@@ -1027,7 +970,7 @@ export function AuditHistoryView() {
                   <td style={{ padding: 8, fontFamily: "monospace", color: "#ef4444" }}>{r.blocked_records.toLocaleString()}</td>
                   <td style={{ padding: 8, fontFamily: "monospace", color: "#22c55e" }}>{r.allowed_records.toLocaleString()}</td>
                   <td style={{ padding: 8, fontFamily: "monospace" }}>{r.policies_created.toLocaleString()}</td>
-                  <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 700 }}>{r.containment_rate}%</td>
+                  <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 700 }}>{typeof r.containment_rate === "number" ? `${r.containment_rate.toFixed(2)}%` : "—"}</td>
                   <td style={{ padding: 8, fontFamily: "monospace" }}>{r.throughput_fps} fps</td>
                   <td style={{ padding: 8, color: "var(--muted)" }}>{new Date(r.timestamp).toLocaleTimeString()}</td>
                 </tr>
@@ -1117,6 +1060,17 @@ export function SystemHealthView({ health }: { health: any }) {
         <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)", marginBottom: 5 }}>SOURCE IDENTITY DISCLOSURE</div>
           <p style={{ fontSize: 10, color: "var(--muted)", margin: 0, lineHeight: 1.6 }}>{diagnostics.source_identity}</p>
+        </div>
+
+        <div style={{ background: "var(--panel2)", padding: 14, borderRadius: 8, border: "1px solid var(--line)" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)", marginBottom: 7 }}>KNOWN LIMITATIONS · JUDGE DISCLOSURE</div>
+          <ul style={{ margin: 0, paddingLeft: 17, fontSize: 10, color: "var(--muted)", lineHeight: 1.65 }}>
+            <li>When native Layer-3 source IP is absent, the source identity is synthesized from three TCP-stack fingerprint fields. It is not observed; identical fingerprints share an identity and the 24-bit hash can collide, potentially causing false blocks.</li>
+            <li>8.58% of the audited evaluation rows share exact feature vectors with training data; repeated-flow results can therefore be optimistic.</li>
+            <li>A1 confidence is calibrated only when a separate held-out temperature-calibration run is recorded in the model artifact. A2's 0–1 anomaly index is not a probability.</li>
+            <li>The 150-flow correlation cap, 300-second timestamp window, and 150-position default policy lifetime are fixed parameters, not adaptive learned values.</li>
+            <li>Evaluation is CICIDS2017-only and offline. Cross-dataset generalization and live-network operation are untested; all defense actions are simulated.</li>
+          </ul>
         </div>
       </>}
 
