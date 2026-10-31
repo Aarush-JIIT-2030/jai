@@ -102,7 +102,7 @@ def system_diagnostics():
         "agent_5_defense_code": True,
     }
     files = {}
-    for filename in ("classification.csv", "policy.csv", "replay.csv"):
+    for filename in ("classification.csv", "policies.csv", "replay.csv"):
         path = submission / filename
         files[filename] = {
             "present": path.is_file(),
@@ -250,7 +250,7 @@ def analyze(payload: dict[str, Any]):
     }
     analysis["adaptive_defense"] = {
         "action": defense.action,
-        "applied_policy_id": defense.applied_policy_id,
+        "active_policy_id": defense.applied_policy_id,
         "new_policy": {
             "policy_id": defense.new_policy_created.policy_id,
             "scope_type": defense.new_policy_created.scope_type,
@@ -389,15 +389,15 @@ def run_official_replay():
         files = {
             "classification.csv": engine.export_csv(
                 results["classification_rows"],
-                ["record_id", "predicted_class", "anomaly score", "evidence status"],
+                ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
             ),
-            "policy.csv": engine.export_csv(
+            "policies.csv": engine.export_csv(
                 results["policy_rows"],
-                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
+                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"],
             ),
             "replay.csv": engine.export_csv(
                 results["replay_rows"],
-                ["record_id", "action", "applied_policy_id"],
+                ["record_id", "action", "active_policy_id"],
             ),
         }
         for filename, csv_text in files.items():
@@ -446,7 +446,7 @@ def run_official_replay():
             "validation": validation,
             "files": {name: {"path": f"outputs/submission/{name}", "rows": len(results[key])}
                       for name, key in (("classification.csv", "classification_rows"),
-                                        ("policy.csv", "policy_rows"),
+                                        ("policies.csv", "policy_rows"),
                                         ("replay.csv", "replay_rows"))},
             "correlation_groups": len(_LAST_CORRELATION_GROUPS),
             "source": "installed_official_evaluation_dataset",
@@ -509,7 +509,7 @@ def get_overview():
     sub_dir = BASE_DIR / "outputs" / "submission"
     class_file = sub_dir / "classification.csv"
     replay_file = sub_dir / "replay.csv"
-    policy_file = sub_dir / "policy.csv"
+    policy_file = sub_dir / "policies.csv"
     required = (eval_file, class_file, replay_file, policy_file)
     missing = [str(path.relative_to(BASE_DIR)) for path in required if not path.is_file()]
     if missing:
@@ -521,7 +521,7 @@ def get_overview():
     try:
         flows = pd.read_parquet(eval_file)
         classifications = pd.read_csv(class_file, dtype={"record_id": str})
-        replay = pd.read_csv(replay_file, dtype={"record_id": str, "applied_policy_id": str})
+        replay = pd.read_csv(replay_file, dtype={"record_id": str, "active_policy_id": str})
         policies = pd.read_csv(policy_file)
     except Exception as exc:
         raise HTTPException(status_code=503, detail={"code": "OVERVIEW_READ_FAILED", "type": type(exc).__name__}) from exc
@@ -607,7 +607,7 @@ def get_benchmarks():
 @app.get("/api/submissions/download/{filename}")
 def download_submission_file(filename: str):
     """Download an official submission CSV or report."""
-    allowed = {"classification.csv", "policy.csv", "replay.csv", "summary.json", "validation_report.json"}
+    allowed = {"classification.csv", "policies.csv", "replay.csv", "summary.json", "validation_report.json"}
     if filename not in allowed:
         raise HTTPException(status_code=400, detail=f"Invalid file requested: {filename}")
 
@@ -640,15 +640,15 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
     try:
         df = pd.read_parquet(eval_file)
         classifications = pd.read_csv(class_file, dtype={"record_id": str})
-        replay = pd.read_csv(replay_file, dtype={"record_id": str, "applied_policy_id": str})
+        replay = pd.read_csv(replay_file, dtype={"record_id": str, "active_policy_id": str})
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Flow inspection data could not be loaded: {type(exc).__name__}") from exc
 
     has_class_cols = (
-        {"record_id", "predicted_class", "anomaly score", "evidence status"}.issubset(classifications.columns) or
+        {"record_id", "predicted_class", "anomaly_score", "evidence_status"}.issubset(classifications.columns) or
         {"record_id", "predicted_class", "anomaly_score", "evidence_status"}.issubset(classifications.columns)
     )
-    required_replay = {"record_id", "action", "applied_policy_id"}
+    required_replay = {"record_id", "action", "active_policy_id"}
     if not has_class_cols or not required_replay.issubset(replay.columns):
         raise HTTPException(status_code=503, detail="Generated submission files do not match the official schema.")
 
@@ -669,16 +669,16 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         predicted_class = str(prediction.get("predicted_class", ""))
         if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
             continue
-        applied = decision.get("applied_policy_id", "")
-        raw_score = prediction.get("anomaly score") if "anomaly score" in prediction else prediction.get("anomaly_score")
-        raw_evidence = prediction.get("evidence status") if "evidence status" in prediction else prediction.get("evidence_status", "INCOMPLETE")
+        applied = decision.get("active_policy_id", "")
+        raw_score = prediction.get("anomaly_score") if "anomaly_score" in prediction else prediction.get("anomaly_score")
+        raw_evidence = prediction.get("evidence_status") if "evidence_status" in prediction else prediction.get("evidence_status", "INCOMPLETE")
         rows.append({
             "record_id": record_id,
             "predicted_class": predicted_class,
             "anomaly_score": numeric_from_value(raw_score),
             "evidence_status": str(raw_evidence),
             "action": str(decision.get("action", "")),
-            "applied_policy_id": "" if pd.isna(applied) else str(applied),
+            "active_policy_id": "" if pd.isna(applied) else str(applied),
             "destination_port": int(numeric_from_value(flow.get("Destination Port", 0))),
             "flow_duration": numeric_from_value(flow.get("Flow Duration", 0)),
             "total_fwd_packets": numeric_from_value(flow.get("Total Fwd Packets", 0)),
@@ -697,7 +697,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
 @app.get("/api/policies")
 def get_policies(limit: int = 50, offset: int = 0):
     """Retrieve policies generated during replay from outputs/submission/policy.csv."""
-    pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
+    pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
     if not pol_file.is_file():
         return {"policies": [], "total": 0}
     try:
@@ -718,7 +718,7 @@ def test_policy_prefilter(payload: dict[str, Any]):
     if not source_ip:
         raise HTTPException(status_code=422, detail="Provide a non-empty source_ip string.")
 
-    pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
+    pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
     matched_policy = None
     if pol_file.is_file():
         try:
