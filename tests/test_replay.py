@@ -112,3 +112,28 @@ def test_replay_never_uses_fingerprint_identity_as_source_ip_policy():
     }])
     result = engine.run_replay(df)
     assert result["policy_rows"] == []
+
+
+def test_replay_uses_day_and_minute_second_offsets_for_temporal_correlation():
+    engine = ReplayEngine(DummyThreatAgent(), DummyAnomalyAgent())
+    df = pd.DataFrame([
+        {"record_id": "F000001", "seq": 1, "source_ip": "192.0.2.1", "destination_ip": "198.51.100.1",
+         "Destination Port": 80, "day": "2017-07-04", "time_offset": "00:49.8"},
+        {"record_id": "F000002", "seq": 2, "source_ip": "192.0.2.1", "destination_ip": "198.51.100.1",
+         "Destination Port": 443, "day": "2017-07-04", "time_offset": "02:14.1"},
+    ])
+    engine.run_replay(df)
+    timestamps = [item["timestamp"] for item in engine.correlation_agent.history]
+    assert timestamps[0] is not None
+    assert timestamps[1] is not None
+    assert (timestamps[1] - timestamps[0]).total_seconds() == pytest.approx(84.3)
+
+
+def test_replay_rejects_non_monotonic_organizer_seq():
+    engine = ReplayEngine(DummyThreatAgent(), DummyAnomalyAgent())
+    df = pd.DataFrame([
+        {"record_id": "F000002", "seq": 2, "source_ip": "192.0.2.1", "Destination Port": 80},
+        {"record_id": "F000001", "seq": 1, "source_ip": "192.0.2.1", "Destination Port": 443},
+    ])
+    with pytest.raises(ValueError, match="Organizer seq"):
+        engine.run_replay(df)
