@@ -234,6 +234,20 @@ def models_status():
     }
 
 
+def get_anomaly_agent() -> AnomalyDetectionAgent | None:
+    """Load Agent 2 independently of Agent 1 and the combined pipeline."""
+    global _anomaly_agent
+    if _anomaly_agent is not None:
+        return _anomaly_agent
+    if not ANOMALY_MODEL.is_file():
+        return None
+    try:
+        _anomaly_agent = AnomalyDetectionAgent.load(ANOMALY_MODEL)
+    except Exception:
+        _anomaly_agent = None
+    return _anomaly_agent
+
+
 def _supabase_public_key() -> str | None:
     return (os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY") or "").strip() or None
 
@@ -347,6 +361,48 @@ def _persist_flow_events(results: list[dict[str, Any]], request: Request, source
     return {"stored": bool(flow_status.get("stored")), "flow_events": flow_status, "agent2_rows": len(agent2_records)}
 
 
+def _persist_replay_artifacts(results: dict[str, Any], run_id: str, request: Request) -> dict[str, Any]:
+    """Persist derived decisions and defensive policies, never the raw flow feature rows."""
+    classification = results.get("classification_rows") or []
+    replay = results.get("replay_rows") or []
+    if len(classification) != len(replay):
+        return {"stored": False, "reason": "replay_output_row_mismatch"}
+    decisions = []
+    for index, (classified, decision) in enumerate(zip(classification, replay), start=1):
+        try:
+            decisions.append({
+                "run_id": run_id,
+                "record_id": str(classified["record_id"]),
+                "seq": index,
+                "predicted_class": str(classified["predicted_class"]),
+                "anomaly_score": float(classified["anomaly_score"]),
+                "evidence_status": str(classified["evidence_status"]),
+                "action": str(decision["action"]),
+                "active_policy_id": str(decision["active_policy_id"]),
+            })
+        except (KeyError, TypeError, ValueError):
+            return {"stored": False, "reason": "invalid_replay_output"}
+    policies = []
+    for policy in results.get("policy_rows") or []:
+        policies.append({
+            "run_id": run_id,
+            "policy_id": str(policy["policy_id"]),
+            "activated_after_record_id": str(policy["activated_after_record_id"]),
+            "scope_type": str(policy["scope_type"]),
+            "scope_value": str(policy["scope_value"]),
+            "expires_after_record_id": str(policy["expires_after_record_id"]),
+        })
+    for offset in range(0, len(decisions), 250):
+        outcome = _supabase_insert_rows("replay_decisions", decisions[offset:offset + 250], request)
+        if not outcome.get("stored"):
+            return {"stored": False, "decisions": outcome, "policies_saved": 0}
+    if policies:
+        outcome = _supabase_insert_rows("replay_policies", policies, request)
+        if not outcome.get("stored"):
+            return {"stored": False, "decisions_saved": len(decisions), "policies": outcome}
+    return {"stored": True, "decisions_saved": len(decisions), "policies_saved": len(policies)}
+
+
 def _persist_replay_run(run_id: str, dataset_name: str, metrics: dict[str, Any], status: str, request: Request, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     record = {
         "run_id": run_id, "dataset_name": dataset_name,
@@ -437,7 +493,7 @@ def analyze_batch(payload: BatchAnalyzeRequest, request: Request):
 
 
 @app.post("/api/fusion/simulate")
-def simulate_fusion(payload: dict[str, Any]):
+def simulate_fusion(payload: dict[str, Any], request: Request):
     """Run the production Agent 3 fusion contract against explicit A1/A2 evidence."""
     predicted = str(payload.get("predicted_class", "")).upper()
     confidence = payload.get("confidence")
@@ -454,7 +510,14 @@ def simulate_fusion(payload: dict[str, Any]):
     threat = ThreatDetectionResult(predicted_class=predicted, confidence=float(confidence))
     anomaly = AnomalyDetectionResult(anomaly_score=float(anomaly_score), is_anomaly=is_anomaly)
     result = EvidenceFusionAgent().fuse(threat, anomaly)
-    return result.to_dict()
+    response = result.to_dict()
+    response["supabase_persistence"] = _supabase_insert_rows("flow_analysis_events", [{
+        "source": "fusion_simulation", "predicted_class": predicted,
+        "anomaly_score": float(anomaly_score), "is_anomaly": is_anomaly,
+        "final_class": response.get("final_class"), "evidence_status": response.get("evidence_status"),
+        "action": response.get("action"), "rationale": response.get("rationale") or [],
+    }], request)
+    return response
 
 
 @app.post("/api/replay/simulate")
@@ -519,6 +582,8 @@ def simulate_replay(payload: ReplaySimulationRequest, request: Request):
         status="COMPLETED",
     )
     cloud_persistence = _persist_replay_run(run_id, payload.dataset_name, metrics, "COMPLETED", request, {"mode": "supplied_batch_replay"})
+    artifact_persistence = _persist_replay_artifacts(results, run_id, request)
+    cloud_persistence["artifacts"] = artifact_persistence
 
     return {
         "run_id": run_id,
@@ -606,8 +671,10 @@ def run_official_replay(request: Request):
             run_id, eval_file.name, metrics,
             "COMPLETED" if validation.get("all_valid") else "VALIDATION_FAILED",
             request,
-            {"mode": "official_hidden_replay", "validation_passed": bool(validation.get("all_valid"))},
+            {"mode": "official_hidden_replay", "validation_passed": bool(validation.get("all_valid")), "correlation_groups": len(_LAST_CORRELATION_GROUPS)},
         )
+        artifact_persistence = _persist_replay_artifacts(results, run_id, request)
+        cloud_persistence["artifacts"] = artifact_persistence
         summary = {
             "run_id": run_id,
             "supabase_persistence": cloud_persistence,
@@ -936,7 +1003,7 @@ def get_policies(limit: int = 50, offset: int = 0):
 
 
 @app.post("/api/policies/test")
-def test_policy_prefilter(payload: dict[str, Any]):
+def test_policy_prefilter(payload: dict[str, Any], request: Request):
     """Test a policy against organizer record positions, not numeric record-ID arithmetic."""
     source_ip = str(payload.get("source_ip", "")).strip()
     current_step = payload.get("current_step", 1)
@@ -982,7 +1049,7 @@ def test_policy_prefilter(payload: dict[str, Any]):
             raise HTTPException(status_code=503, detail={"code": "POLICY_FILE_INVALID", "type": type(exc).__name__}) from exc
 
     if matched_policy:
-        return {
+        response = {
             "matched": True, "action": "BLOCK", "policy_id": matched_policy["policy_id"],
             "scope_value": matched_policy["scope_value"],
             "activated_after": matched_policy["activated_after_record_id"],
@@ -990,11 +1057,17 @@ def test_policy_prefilter(payload: dict[str, Any]):
             "status": "ACTIVE_POLICY_MATCH",
             "message": f"Pre-filter rule {matched_policy['policy_id']} matches source IP {source_ip} at seq {current_step}.",
         }
-    return {
-        "matched": False, "action": "ALLOW", "policy_id": "",
-        "status": "NO_MATCHING_POLICY",
-        "message": f"No active policy matches source IP {source_ip} at seq {current_step}.",
-    }
+    else:
+        response = {
+            "matched": False, "action": "ALLOW", "policy_id": "",
+            "status": "NO_MATCHING_POLICY",
+            "message": f"No active policy matches source IP {source_ip} at seq {current_step}.",
+        }
+    response["supabase_persistence"] = _supabase_insert_rows("flow_analysis_events", [{
+        "source": "policy_simulation", "record_id": str(current_step),
+        "action": response["action"], "rationale": [response["status"], response["message"]],
+    }], request)
+    return response
 
 
 
