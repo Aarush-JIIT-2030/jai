@@ -31,7 +31,7 @@ A1/A2 predictions are generated for all records because the organizer requires o
 
 - Exactly 200 rows, one per hidden record, in exact `seq` order.
 - `action` is `ALLOW` or `BLOCK`.
-- `ALLOW` must use `active_policy_id=NONE` and is invalid if any active policy matches the flow.
+- `ALLOW` must leave `active_policy_id` empty and is invalid if any active policy matches the flow.
 - `BLOCK` must reference the lexicographically smallest matching active `policy_id`.
 
 ### policies.csv
