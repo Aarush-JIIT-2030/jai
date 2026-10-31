@@ -103,7 +103,7 @@ def test_replay_does_not_fabricate_benign_when_agents_fail():
     assert result["policy_rows"] == []
 
 
-def test_replay_uses_synthetic_fingerprint_identity_for_forward_policy():
+def test_replay_never_creates_policy_from_fingerprint_metadata():
     engine = ReplayEngine(DummyThreatAgent(), DummyAnomalyAgent())
     fingerprint = {
         "Init_Win_bytes_forward": 64240,
@@ -115,13 +115,10 @@ def test_replay_uses_synthetic_fingerprint_identity_for_forward_policy():
         {"record_id": 2, "Destination Port": 80, **fingerprint},
     ])
     result = engine.run_replay(df)
-    expected_identity = TemporalCorrelationAgent.derive_source_identity(fingerprint)
-    assert len(result["policy_rows"]) == 1
-    assert result["policy_rows"][0]["scope_value"] == expected_identity
-    assert result["replay_rows"][0]["action"] == "ALLOW"
-    assert result["replay_rows"][1]["action"] == "BLOCK"
-    assert result["replay_rows"][1]["active_policy_id"] == result["policy_rows"][0]["policy_id"]
-
+    assert TemporalCorrelationAgent.derive_source_identity(fingerprint) == ""
+    assert result["policy_rows"] == []
+    assert [row["action"] for row in result["replay_rows"]] == ["ALLOW", "ALLOW"]
+    assert [row["active_policy_id"] for row in result["replay_rows"]] == ["NONE", "NONE"]
 
 
 def test_replay_uses_day_and_minute_second_offsets_for_temporal_correlation():
