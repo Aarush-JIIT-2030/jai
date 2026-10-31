@@ -8,6 +8,10 @@
 - **Threshold Calibration:** Operating threshold is calibrated to the 1st percentile of benign training decision function scores ($\theta \approx 0.0332$).
 - **Evidence Extraction:** For flows whose raw decision-function score falls below the threshold, individual features deviating beyond $Q_{01}$ or $Q_{99}$ relative to benign training interquartile ranges are mapped to human-readable evidence tags (e.g., `unusual_packet_rate`, `abnormal_flow_duration`).
 
+## Exported score semantics
+
+The CSV/API exports a bounded 0–1 anomaly index derived from the Isolation Forest decision function; higher values mean more anomalous. It is **not** a calibrated probability of attack. The operating threshold is applied to the underlying decision function, not interpreted as a probability cutoff.
+
 ## Training Command
 
 ```bash
