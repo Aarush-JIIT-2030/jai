@@ -87,8 +87,8 @@ class ReplayEngine:
             classification_rows.append({
                 "record_id": record_id,
                 "predicted_class": fusion.final_class or (t_class if t_class else ""),
-                "anomaly score": round(float(a_score), 5) if isinstance(a_score, (int, float)) else "",
-                "evidence status": fusion.evidence_status,
+                "anomaly_score": round(float(a_score), 5) if isinstance(a_score, (int, float)) else "",
+                "evidence_status": fusion.evidence_status,
             })
 
             if pre_filter is not None:
@@ -125,7 +125,7 @@ class ReplayEngine:
                         attack_type=correlation.attack_type or t_class or "ATTACK",
                         confidence=t_conf, duration=duration,
                     )
-            replay_rows.append({"record_id": record_id, "action": action, "applied_policy_id": applied_id})
+            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id})
             if progress_callback and (step % 25000 == 0 or step == total_rows - 1):
                 progress_callback(step + 1, total_rows)
 
@@ -140,8 +140,7 @@ class ReplayEngine:
                 "activated_after_record_id": policy.activated_after_record_id,
                 "scope_type": policy.scope_type, "scope_value": policy.scope_value,
                 "expires_after_record_id": record_ids[expiry_step],
-                "policy_action": policy.policy_action,
-            })
+                            })
         attack_count = sum(label != "BENIGN" for label in labels) if has_label else None
         benign_count = sum(label == "BENIGN" for label in labels) if has_label else None
         metrics = {
@@ -173,7 +172,7 @@ class ReplayEngine:
         out_path.mkdir(parents=True, exist_ok=True)
         results = self.run_replay(df)
         files = {
-            "classification": (["record_id", "predicted_class", "anomaly score", "evidence status"], results["classification_rows"]),
+            "classification": (["record_id", "predicted_class", "anomaly_score", "evidence_status"], results["classification_rows"]),
             "policy": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"], results["policy_rows"]),
             "replay": (["record_id", "action", "applied_policy_id"], results["replay_rows"]),
         }
