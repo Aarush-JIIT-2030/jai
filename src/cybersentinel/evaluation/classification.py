@@ -102,5 +102,16 @@ def evaluate_classifier(
         "per_class": per_class,
         "confusion_matrix": cm.tolist(),
     }
-    res["metrics"] = res
+    res["metrics"] = {
+        "accuracy": res["accuracy"],
+        "balanced_accuracy": res["balanced_accuracy"],
+        "macro_precision": res["macro_precision"],
+        "macro_recall": res["macro_recall"],
+        "macro_f1": res["macro_f1"],
+        "weighted_precision": res["weighted_precision"],
+        "weighted_recall": res["weighted_recall"],
+        "weighted_f1": res["weighted_f1"],
+        "benign_false_positive_rate": res["benign_false_positive_rate"],
+        "attack_detection_rate": res["attack_detection_rate"],
+    }
     return res
