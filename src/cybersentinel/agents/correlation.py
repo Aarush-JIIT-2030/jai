@@ -1,7 +1,8 @@
 """Temporal Correlation Agent (Agent 4).
 
-Groups related suspicious flows using observed endpoints and time windows.
-Emits group IDs, member records, and explicit supporting evidence.
+Groups suspicious flows using observed endpoints where available and an explicitly
+synthetic TCP-fingerprint source identity only when native source IP metadata is absent.
+Destination endpoints are never synthesized.
 """
 from __future__ import annotations
 
