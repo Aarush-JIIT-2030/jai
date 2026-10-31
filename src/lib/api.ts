@@ -6,7 +6,12 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
   }
-  return fetch(input, { ...init, headers });
+  const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\\/+$/, "");
+  if (import.meta.env.PROD && !apiBase) {
+    throw new Error("Backend URL is not configured. Set VITE_API_BASE_URL to the deployed CyberSentinel API URL in Vercel.");
+  }
+  const target = typeof input === "string" && input.startsWith("/") ? `${apiBase}${input}` : input;
+  return fetch(target, { ...init, headers });
 }
 
 export async function downloadAuthenticatedFile(path: string, filename: string): Promise<void> {
