@@ -30,10 +30,10 @@ Exact required columns, in order:
 Requirements:
 
 - Use organiser-provided record IDs.
-- `scope_type` must be one of `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`, and `scope_value` must contain the matching literal observed endpoint(s). A policy row includes `policy_action=BLOCK`; the applied action and policy reference are recorded in `replay.csv`.
+- `scope_type` must be one of `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`, and `scope_value` must contain the matching source identity or observed destination endpoint. A source identity is the observed source IP when present, otherwise the deterministic synthetic TCP-fingerprint identity documented in the [scope audit](source-ip-scope-audit.md). A policy row includes `policy_action=BLOCK`; the applied action and policy reference are recorded in `replay.csv`.
 - A policy is activated only after its triggering record.
 - Expiry must follow the implementation's documented record-boundary convention.
-- Only literal observed endpoint metadata is eligible for a policy scope. Missing or invalid endpoint values fail closed; feature-derived fingerprints are never treated as IP addresses.
+- Observed source IPs are preferred. When absent, the validator recomputes the synthetic fingerprint-derived SOURCE_IP value; identical fingerprints and 24-bit hash collisions can cause false grouping or blocking. Destination IP and destination-pair components still require literal observed destination metadata.
 
 ## 3. replay.csv
 
