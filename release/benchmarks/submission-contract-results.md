@@ -30,10 +30,10 @@ Exact required columns, in order:
 Requirements:
 
 - Use organiser-provided record IDs.
-- Scored interface requires `scope_type` must be a supported observed endpoint scope; BLOCK is implicit in a policy row and replay action.
+- `scope_type` must be one of `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`, and `scope_value` must contain the matching literal observed endpoint(s). A policy row represents a simulated BLOCK rule; the action is recorded in `replay.csv`.
 - A policy is activated only after its triggering record.
 - Expiry must follow the implementation's documented record-boundary convention.
-- Policy scope values derived from anonymised features must be disclosed as derived identities, never represented as native IP observations.
+- Only literal observed endpoint metadata is eligible for a policy scope. Missing or invalid endpoint values fail closed; feature-derived fingerprints are never treated as IP addresses.
 
 ## 3. replay.csv
 
@@ -71,4 +71,4 @@ A local validator result is not proof that the organiser API accepted the files.
 
 An earlier version of this dossier described a different schema (`flow_id`, `predicted_label`, `confidence`, `is_anomaly`; and alternate policy/replay columns). Those columns do **not** match the Day 2 briefing and must not be used for the official submission.
 
-The current generator in `src/cybersentinel/replay/engine.py` writes the four-column classification schema, six-column policy schema, and three-column replay schema above. Re-run `python scripts/generate_submissions.py` and the current validator after any replay/model changes.
+The current generator in `src/cybersentinel/replay/engine.py` writes the four-column classification schema, five-column policies schema, and three-column replay schema above. Re-run `python scripts/generate_submissions.py` and the current validator after any replay/model changes.
