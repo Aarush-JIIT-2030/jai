@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from cybersentinel.evaluation.anomaly import evaluate_anomaly_detector
-from cybersentinel.evaluation.calibration import calculate_expected_calibration_error, calculate_multiclass_brier_score
+from cybersentinel.evaluation.calibration import calculate_expected_calibration_error, calculate_multiclass_brier_score, evaluate_probability_calibration
 from cybersentinel.evaluation.classification import evaluate_classifier
 from cybersentinel.evaluation.generalization import build_training_feature_registry, canonicalize_feature_vector
 from cybersentinel.evaluation.report import compute_file_sha256
@@ -61,3 +61,17 @@ def test_temporal_evaluation_returns_explicit_summary():
 
 def test_report_hash_is_empty_for_missing_files(tmp_path: Path):
     assert compute_file_sha256(tmp_path / "missing.json") == ""
+
+def test_probability_calibration_uses_group_isolated_training_holdout():
+    rng = np.random.default_rng(11)
+    classes = ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"]
+    train = pd.DataFrame(rng.normal(size=(150, 6)), columns=[f"feature_{i}" for i in range(6)])
+    train["label"] = np.repeat(classes, 30)
+    evaluation = pd.DataFrame(rng.normal(size=(25, 6)), columns=[f"feature_{i}" for i in range(6)])
+    evaluation["label"] = np.repeat(classes, 5)
+
+    report = evaluate_probability_calibration(train, evaluation, cal_fraction=0.2, n_estimators=10)
+    assert report["training_samples"] + report["calibration_samples"] == len(train)
+    assert report["evaluation_samples"] == len(evaluation)
+    assert "group-isolated" in report["calibration_provenance"]
+    assert np.isfinite(report["calibrated"]["ece"])
