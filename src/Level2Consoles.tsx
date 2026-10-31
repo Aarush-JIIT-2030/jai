@@ -28,7 +28,7 @@ type CorrelationGroupItem = {
 };
 
 // ============================================================================
-// 1. TOPOLOGY & OVERVIEW COMMAND CENTRE (3D WebGL + Live SOC Telemetry)
+// 1. ILLUSTRATIVE 3D REPLAY ARCHITECTURE (not live SOC telemetry)
 // ============================================================================
 export function TopologyCommandCentre() {
   const [threatLevel, setThreatLevel] = useState<"LOW" | "ELEVATED" | "CRITICAL">("LOW");
@@ -37,10 +37,10 @@ export function TopologyCommandCentre() {
     <section className="panel dataset-panel" style={{ marginBottom: 22, overflow: "hidden" }}>
       <div className="panel-head">
         <div>
-          <div className="panel-kicker">WEBGL 3D · MULTI-AGENT TOPOLOGY COMMAND</div>
-          <h3>Autonomous Agent Neural Topology</h3>
+          <div className="panel-kicker">WEBGL 3D · ILLUSTRATIVE REPLAY ARCHITECTURE</div>
+          <h3>Five-Agent Replay Architecture</h3>
           <p>
-            Interactive 3D schematic of the five-agent offline detection and simulated-defense pipeline.
+            Illustrative 3D schematic of the offline five-agent pipeline. It is not a live network map or traffic feed.
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -71,13 +71,13 @@ export function TopologyCommandCentre() {
       <NetworkTopology3D threatLevel={threatLevel} />
     </Suspense>
         <div style={{ position: "absolute", bottom: 12, left: 14, fontSize: 11, color: "var(--muted)", pointerEvents: "none" }}>
-          <b>ACTIVE NODES:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
+          <b>COMPONENTS:</b> A1 Threat Classifier · A2 Anomaly Isolation · A3 Fusion Matrix · A4 Temporal Window · A5 Adaptive Defense
         </div>
       </div>
 
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Hardware-accelerated WebGL 3D scene with 2D canvas fallback</span>
-        <span>SCHEMATIC VIEW · LOCAL REPLAY DATA WHEN AVAILABLE</span>
+        <span>ILLUSTRATIVE ANIMATION · NOT LIVE TRAFFIC</span>
       </div>
     </section>
   );
@@ -95,7 +95,7 @@ export function FiveAgentArchitectureView() {
       name: "Agent 1: Threat Detection",
       role: "Supervised Multiclass Classifier",
       model: "Random Forest (artifact-defined; calibration provenance is artifact-dependent)",
-      input: "71 preprocessed network flow metrics",
+      input: "78 numeric network flow features",
       output: "Predicted class + model confidence; calibration depends on the saved artifact",
       latency: "See measured benchmark report",
       throughput: "See measured benchmark report",
@@ -108,7 +108,7 @@ export function FiveAgentArchitectureView() {
       name: "Agent 2: Anomaly Detection",
       role: "Unsupervised Statistical Outlier Isolation",
       model: "Isolation Forest (parameters loaded from model artifact)",
-      input: "71 continuous flow distribution metrics",
+      input: "78 numeric flow features",
       output: "Bounded 0–1 anomaly index (not a probability) + outlier flag",
       latency: "See measured benchmark report",
       throughput: "See measured benchmark report",
@@ -152,7 +152,7 @@ export function FiveAgentArchitectureView() {
       latency: "See measured replay report",
       throughput: "Not independently measured",
       accuracy: "Causality assertions are tested; see current replay validation",
-      classes: "ALLOW (empty active_policy_id), BLOCK (smallest matching active policy ID)",
+      classes: "ALLOW (active_policy_id=NONE), BLOCK (smallest matching active policy ID)",
       description: "Checks earlier active policies before downstream correlation. Confirmed attacks can create a forward-only simulated SOURCE_IP block with a fixed default 150-position lifetime; it never blocks its own trigger row.",
     },
   ];
@@ -242,7 +242,7 @@ export function FiveAgentArchitectureView() {
 
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Strict separation of concerns · Independent signal contribution</span>
-        <span>VERIFIED LATENCY: ALL 5 AGENTS &lt; 0.15ms COMBINED</span>
+        <span>LATENCY: REPORT ONLY MEASURED REQUEST/REPLAY VALUES</span>
       </div>
     </section>
   );
