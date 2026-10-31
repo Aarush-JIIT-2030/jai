@@ -144,7 +144,7 @@ def train_models(
     # Reload both artifacts so a successful training exit is not mistaken for a loadable model.
     threat = ThreatDetectionModel.load(a1_path)
     anomaly = AnomalyDetectionAgent.load(a2_path)
-    if set(threat.classes_) != set(BENCHMARK_CLASSES):
+    if set(threat.label_encoder.classes_) != set(BENCHMARK_CLASSES):
         raise RuntimeError("Reloaded A1 artifact does not contain all five benchmark classes.")
     if int(threat.metadata.get("training_rows") or 0) <= 0:
         raise RuntimeError("Reloaded A1 artifact has no training-row provenance.")
