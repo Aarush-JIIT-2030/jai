@@ -33,7 +33,7 @@ FEATURE_EVIDENCE_MAP = {
     "PSH Flag Count": "abnormal_psh_flag_rate",
     "Destination Port": "anomalous_service_port",
 }
-ARTIFACT_FORMAT_VERSION = 1
+ARTIFACT_FORMAT_VERSION = 2
 
 
 def _numeric_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -60,13 +60,14 @@ class AnomalyDetectionAgent:
     def __init__(self, estimator: Any = None, feature_columns: list[str] | None = None,
                  imputer: SimpleImputer | None = None,
                  profiles: dict[str, dict[str, float]] | None = None,
-                 threshold: float | None = None, metadata: dict[str, Any] | None = None):
+                 threshold: float | None = None, metadata: dict[str, Any] | None = None, score_scale: float | None = None):
         self.estimator = estimator
         self.feature_columns = list(feature_columns or [])
         self.imputer = imputer
         self.profiles = profiles or {}
         self.threshold = threshold
         self.metadata = metadata or {}
+        self.score_scale = score_scale
 
     def fit(self, benign_training_features: pd.DataFrame) -> "AnomalyDetectionAgent":
         x = _numeric_frame(benign_training_features)
@@ -88,6 +89,7 @@ class AnomalyDetectionAgent:
         training_scores = self.estimator.decision_function(matrix)
         # The 1st percentile of benign training scores defines the operating point.
         self.threshold = float(np.percentile(training_scores, 1.0))
+        self.score_scale = float(max(np.std(training_scores), 1e-6))
         self.profiles = {}
         for index, col in enumerate(self.feature_columns):
             values = matrix[:, index]
@@ -105,7 +107,7 @@ class AnomalyDetectionAgent:
             "feature_count": len(self.feature_columns),
             "feature_columns": self.feature_columns,
             "threshold_method": "1st percentile of benign training decision_function scores",
-            "score_definition": "raw sklearn IsolationForest.decision_function; larger is more normal, lower is more anomalous",
+            "score_definition": "bounded logistic anomaly index from raw decision_function margin to threshold, scaled by benign-training score standard deviation; range [0,1], larger is more anomalous",
             "score_is_probability": False,
             "training_scope": "benign rows from training partition only",
         }
@@ -170,6 +172,12 @@ class AnomalyDetectionAgent:
         return {"threshold": float(self.threshold), "benign_false_positive_rate": fpr,
                 "attack_recall": recall, "validation_rows": float(len(labels))}
 
+    def _anomaly_index(self, raw_score: float) -> float:
+        if self.threshold is None or self.score_scale is None or not np.isfinite(self.score_scale) or self.score_scale <= 0:
+            raise RuntimeError("Anomaly score calibration is unavailable.")
+        margin = float(np.clip((self.threshold - raw_score) / self.score_scale, -30.0, 30.0))
+        return float(1.0 / (1.0 + np.exp(-margin)))
+
     def _aligned(self, flow: dict[str, Any]) -> pd.DataFrame:
         raw = _numeric_frame(pd.DataFrame([flow]))
         return raw.reindex(columns=self.feature_columns)
@@ -218,7 +226,7 @@ class AnomalyDetectionAgent:
             score = float(self.estimator.decision_function(matrix)[0])
             flagged = bool(score < self.threshold)
             return AnomalyDetectionResult(
-                anomaly_score=score,
+                anomaly_score=self._anomaly_index(score),
                 is_anomaly=flagged,
                 evidence=self._evidence(flow) if flagged else [],
                 status="success",
@@ -247,10 +255,10 @@ class AnomalyDetectionAgent:
 
             results = []
             for idx, score_val in enumerate(scores):
-                s = float(score_val)
+                raw_score = float(score_val)
                 flagged = idx in flagged_set
                 results.append(AnomalyDetectionResult(
-                    anomaly_score=s,
+                    anomaly_score=self._anomaly_index(raw_score),
                     is_anomaly=flagged,
                     evidence=evidence_dict.get(idx, []) if flagged else [],
                     status="success",
@@ -261,7 +269,7 @@ class AnomalyDetectionAgent:
                                            message=f"Anomaly scoring failed: {type(exc).__name__}")] * len(features)
 
     def save(self, path: str | Path) -> Path:
-        if self.estimator is None or self.imputer is None or self.threshold is None:
+        if self.estimator is None or self.imputer is None or self.threshold is None or self.score_scale is None:
             raise RuntimeError("Cannot save an untrained anomaly detector.")
         destination = Path(path)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -275,6 +283,7 @@ class AnomalyDetectionAgent:
                 "feature_columns": self.feature_columns,
                 "profiles": self.profiles,
                 "threshold": self.threshold,
+                "score_scale": self.score_scale,
                 "metadata": self.metadata,
             }, temporary, compress=3)
             os.replace(temporary, destination)
@@ -295,4 +304,5 @@ class AnomalyDetectionAgent:
             profiles=payload.get("profiles", {}),
             threshold=float(payload["threshold"]),
             metadata=payload.get("metadata", {}),
+            score_scale=float(payload["score_scale"]),
         )
