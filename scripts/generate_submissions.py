@@ -22,8 +22,8 @@ def main() -> int:
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("data/processed/eval_prepared.parquet"),
-        help="Path to input test/eval dataset (parquet or csv)",
+        default=Path("data/processed/hidden_replay_input.csv"),
+        help="Path to unlabelled organizer hidden replay input (parquet or csv)",
     )
     parser.add_argument(
         "--threat-model",
