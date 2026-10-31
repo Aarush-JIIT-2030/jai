@@ -234,6 +234,20 @@ def models_status():
     }
 
 
+def get_anomaly_agent() -> AnomalyDetectionAgent | None:
+    """Load Agent 2 independently of Agent 1 and the combined pipeline."""
+    global _anomaly_agent
+    if _anomaly_agent is not None:
+        return _anomaly_agent
+    if not ANOMALY_MODEL.is_file():
+        return None
+    try:
+        _anomaly_agent = AnomalyDetectionAgent.load(ANOMALY_MODEL)
+    except Exception:
+        _anomaly_agent = None
+    return _anomaly_agent
+
+
 def _supabase_public_key() -> str | None:
     return (os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY") or "").strip() or None
 
