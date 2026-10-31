@@ -47,6 +47,10 @@ class ReplayEngine:
         self.correlation_agent.reset()
         self.defense_agent.reset()
         total_rows = len(df)
+        if "seq" in df.columns:
+            sequence = pd.to_numeric(df["seq"], errors="coerce")
+            if sequence.isna().any() or sequence.duplicated().any() or not sequence.is_monotonic_increasing:
+                raise ValueError("Organizer seq must be present, unique, numeric, and strictly increasing in input order.")
         record_ids = df["record_id"].tolist() if "record_id" in df.columns else list(range(total_rows))
         has_label = "label" in df.columns
         labels = df["label"].astype(str).str.strip().str.upper().tolist() if has_label else [""] * total_rows
@@ -66,6 +70,11 @@ class ReplayEngine:
         corr_src = [native_src[i] or TemporalCorrelationAgent.derive_source_identity(row) for i, row in enumerate(flow_records)]
         dst_col = next((c for c in ("destination_ip", "Destination IP", "dst_ip", "dst", "Destination_IP") if c in df.columns), None)
         time_col = next((c for c in ("Timestamp", "timestamp", "Flow Start", "flow_start", "start_time") if c in df.columns), None)
+        derived_timestamps = None
+        if time_col is None and {"day", "time_offset"}.issubset(df.columns):
+            dates = pd.to_datetime(df["day"], errors="coerce", utc=True)
+            offsets = pd.to_timedelta(df["time_offset"].astype(str), errors="coerce")
+            derived_timestamps = dates + offsets
 
         classification_rows, replay_rows = [], []
         blocked = allowed = contained = benign_preserved = false_blocks = 0
@@ -108,6 +117,8 @@ class ReplayEngine:
                     flow_summary["destination_ip"] = str(flow_records[step][dst_col]).strip()
                 if time_col and pd.notna(flow_records[step].get(time_col)):
                     flow_summary["Timestamp"] = flow_records[step][time_col]
+                elif derived_timestamps is not None and pd.notna(derived_timestamps.iloc[step]):
+                    flow_summary["Timestamp"] = derived_timestamps.iloc[step]
                 correlation = self.correlation_agent.correlate(
                     record_id, flow_summary, threat_class=t_class, confidence=t_conf,
                 )
