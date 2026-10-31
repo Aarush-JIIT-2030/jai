@@ -12,7 +12,7 @@ from cybersentinel.agents.correlation import TemporalCorrelationAgent
 CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE = {"AGREE", "DISAGREE", "INCOMPLETE"}
 CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
-POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]
+POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"]
 REPLAY_COLUMNS = ["record_id", "action", "active_policy_id"]
 SCOPES = {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}
 
@@ -82,8 +82,6 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
         pid, scope_type, scope_value = row["policy_id"], row["scope_type"], row["scope_value"]
         if scope_type not in SCOPES:
             errors.append(f"Policy {pid}: unsupported scope_type {scope_type!r}.")
-        if row["policy_action"] != "BLOCK":
-            errors.append("Policy " + pid + ": policy_action must be BLOCK.")
         if scope_type in {"SOURCE_IP", "DESTINATION_IP"} and not _ip(scope_value):
             errors.append(f"Policy {pid}: {scope_type} scope_value must be a literal IP.")
         if scope_type == "SRC_DST_PAIR":
