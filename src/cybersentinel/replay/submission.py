@@ -2,7 +2,7 @@
 
 Produces and verifies the three required competition files:
 1. classification.csv
-2. policy.csv
+2. policies.csv
 3. replay.csv
 """
 from __future__ import annotations
@@ -95,7 +95,7 @@ class SubmissionValidator:
             reader = csv.DictReader(f)
             required_cols = [
                 "policy_id", "activated_after_record_id", "scope_type",
-                "scope_value", "expires_after_record_id", "policy_action"
+                "scope_value", "expires_after_record_id"
             ]
             if reader.fieldnames != required_cols:
                 issues.append(f"Header mismatch. Expected {required_cols}, found {reader.fieldnames}")
@@ -151,7 +151,7 @@ class SubmissionValidator:
 
         with file_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            required_cols = ["record_id", "action", "applied_policy_id"]
+            required_cols = ["record_id", "action", "active_policy_id"]
             if reader.fieldnames != required_cols:
                 issues.append(f"Header mismatch. Expected {required_cols}, found {reader.fieldnames}")
 
@@ -159,7 +159,7 @@ class SubmissionValidator:
                 row_count += 1
                 rec_id = row.get("record_id")
                 action = row.get("action")
-                applied_pol = row.get("applied_policy_id", "").strip()
+                applied_pol = row.get("active_policy_id", "").strip()
 
                 if rec_id in seen_records:
                     issues.append(f"Row {idx}: Duplicate record_id '{rec_id}'")
@@ -170,8 +170,8 @@ class SubmissionValidator:
 
                 if action == "ALLOW":
                     allow_count += 1
-                    if applied_pol != "":
-                        issues.append(f"Row {idx}: ALLOW action must have empty applied_policy_id, got '{applied_pol}'")
+                    if applied_pol != "NONE":
+                        issues.append(f"Row {idx}: ALLOW action must use active_policy_id=NONE, got '{applied_pol}'")
                 elif action == "BLOCK":
                     block_count += 1
                     if not applied_pol:
@@ -199,104 +199,125 @@ class SubmissionValidator:
         expected_records: list[str | int],
         source_frame: Any | None = None,
     ) -> dict[str, Any]:
-        """Validate the CSV bundle against input IDs and, when supplied, observed source IPs."""
+        """Validate exact templates, endpoint scope, causal windows and policy tie-breaks."""
         class_res = cls.validate_classification(output_dir / "classification.csv", expected_records)
-        policy_res = cls.validate_policy(output_dir / "policy.csv")
+        policy_res = cls.validate_policy(output_dir / "policies.csv")
         replay_res = cls.validate_replay(output_dir / "replay.csv", expected_records, policy_res.get("policies", {}))
-
-        # Cross-file causal validation uses organizer record order, never numeric ID arithmetic.
         expected = [str(value) for value in expected_records]
         positions = {record_id: index for index, record_id in enumerate(expected)}
-        for filename in ("classification.csv", "replay.csv"):
-            path = output_dir / filename
-            if path.is_file():
-                with path.open("r", encoding="utf-8", newline="") as handle:
-                    rows = list(csv.DictReader(handle))
-                actual = [str(row.get("record_id", "")) for row in rows]
-                if actual != expected:
-                    target = class_res if filename == "classification.csv" else replay_res
-                    target["valid"] = False
-                    target["errors"].append("Record IDs must exactly match the organizer input order.")
-                    target["total_errors"] = target.get("total_errors", 0) + 1
-
         policy_map = policy_res.get("policies", {})
         replay_path = output_dir / "replay.csv"
+
         if source_frame is not None:
             if len(source_frame) != len(expected):
-                policy_res["valid"] = False
-                policy_res["errors"].append("Source frame row count does not match expected organizer input IDs.")
-                policy_res["total_errors"] = policy_res.get("total_errors", 0) + 1
-            endpoint_columns = {
-                "SOURCE_IP": ("source_ip", "Source IP", "Source_IP", "src_ip", "src"),
-                "DESTINATION_IP": ("destination_ip", "Destination IP", "Destination_IP", "dst_ip", "dst"),
-            }
-            if policy_map and replay_path.is_file():
-                with replay_path.open("r", encoding="utf-8", newline="") as handle:
-                    for row in csv.DictReader(handle):
-                        if row.get("action") != "BLOCK":
+                replay_res["valid"] = False
+                replay_res["errors"].append("Original hidden input row count does not match expected record IDs.")
+                replay_res["total_errors"] += 1
+            elif "record_id" not in source_frame.columns or source_frame["record_id"].astype(str).tolist() != expected:
+                replay_res["valid"] = False
+                replay_res["errors"].append("Original hidden input IDs/order do not match the expected organizer records.")
+                replay_res["total_errors"] += 1
+
+        def observed_scope(row: Any, scope_type: str) -> str:
+            def endpoint(columns: tuple[str, ...]) -> str:
+                for column in columns:
+                    if column in row:
+                        try:
+                            return str(ipaddress.ip_address(str(row.get(column)).strip()))
+                        except (ValueError, TypeError):
                             continue
-                        rid = str(row.get("record_id", ""))
-                        policy_id = (row.get("applied_policy_id") or "").strip()
-                        policy = policy_map.get(policy_id)
-                        if policy is None or rid not in positions:
-                            continue
-                        scope_type = str(policy.get("scope_type", ""))
-                        source_row = source_frame.iloc[positions[rid]]
-                        def observed_ip(kind: str) -> str:
-                            for column in endpoint_columns[kind]:
-                                if column in source_frame.columns:
-                                    try:
-                                        return str(ipaddress.ip_address(str(source_row.get(column)).strip()))
-                                    except (ValueError, TypeError):
-                                        continue
-                            return ""
-                        if scope_type == "SOURCE_IP":
-                            observed_scope = TemporalCorrelationAgent.derive_source_identity(source_row.to_dict())
-                        elif scope_type == "DESTINATION_IP":
-                            observed_scope = observed_ip("DESTINATION_IP")
-                        elif scope_type == "SRC_DST_PAIR":
-                            src = TemporalCorrelationAgent.derive_source_identity(source_row.to_dict())
-                            dst = observed_ip("DESTINATION_IP")
-                            observed_scope = f"{src}|{dst}" if src and dst else ""
-                        else:
-                            observed_scope = ""
-                        if not observed_scope or observed_scope != str(policy.get("scope_value", "")).strip():
-                            replay_res["valid"] = False
-                            replay_res["errors"].append(f"Record {rid}: BLOCK policy {policy_id} does not match the input-derived {scope_type} identity.")
-                            replay_res["total_errors"] = replay_res.get("total_errors", 0) + 1
+                return ""
+            source = endpoint(("source_ip", "Source IP", "Source_IP", "src_ip", "src"))
+            destination = endpoint(("destination_ip", "Destination IP", "Destination_IP", "dst_ip", "dst"))
+            if scope_type == "SOURCE_IP":
+                return source
+            if scope_type == "DESTINATION_IP":
+                return destination
+            if scope_type == "SRC_DST_PAIR":
+                return f"{source}|{destination}" if source and destination else ""
+            return ""
+
+        valid_policy_windows = []
         for policy_id, policy in policy_map.items():
             activation = str(policy.get("activated_after_record_id", ""))
             expiry = str(policy.get("expires_after_record_id", ""))
             if activation not in positions or expiry not in positions:
                 policy_res["valid"] = False
                 policy_res["errors"].append(f"Policy {policy_id}: activation/expiry record ID is absent from input.")
-            elif positions[activation] >= positions[expiry]:
+                policy_res["total_errors"] += 1
+                continue
+            start_pos, end_pos = positions[activation], positions[expiry]
+            if start_pos >= end_pos:
                 policy_res["valid"] = False
                 policy_res["errors"].append(f"Policy {policy_id}: expiry must follow activation.")
-        replay_path = output_dir / "replay.csv"
+                policy_res["total_errors"] += 1
+                continue
+            if source_frame is not None:
+                trigger_scope = observed_scope(source_frame.iloc[start_pos], str(policy.get("scope_type", "")))
+                if not trigger_scope or trigger_scope != str(policy.get("scope_value", "")).strip():
+                    policy_res["valid"] = False
+                    policy_res["errors"].append(f"Policy {policy_id}: scope_value does not match observed endpoints on its activation record.")
+                    policy_res["total_errors"] += 1
+                    continue
+            valid_policy_windows.append({
+                "policy_id": policy_id,
+                "scope_type": str(policy.get("scope_type", "")),
+                "scope_value": str(policy.get("scope_value", "")).strip(),
+                "start": start_pos,
+                "end": end_pos,
+            })
+
         if replay_path.is_file():
             with replay_path.open("r", encoding="utf-8", newline="") as handle:
-                for row in csv.DictReader(handle):
-                    if row.get("action") != "BLOCK":
+                replay_rows = list(csv.DictReader(handle))
+            for position, row in enumerate(replay_rows):
+                rid = str(row.get("record_id", ""))
+                action = row.get("action", "")
+                active_id = str(row.get("active_policy_id", "")).strip()
+                matches = []
+                if source_frame is not None and position < len(source_frame):
+                    flow = source_frame.iloc[position]
+                    for policy in valid_policy_windows:
+                        if policy["start"] < position <= policy["end"]:
+                            scope = observed_scope(flow, policy["scope_type"])
+                            if scope and scope == policy["scope_value"]:
+                                matches.append(policy["policy_id"])
+                expected_id = min(matches) if matches else "NONE"
+                if action == "ALLOW":
+                    if active_id != "NONE":
+                        replay_res["valid"] = False
+                        replay_res["errors"].append(f"Record {rid}: ALLOW must use active_policy_id=NONE.")
+                        replay_res["total_errors"] += 1
+                    if source_frame is not None and matches:
+                        replay_res["valid"] = False
+                        replay_res["errors"].append(f"Record {rid}: ALLOW is invalid because active policy {expected_id} matches.")
+                        replay_res["total_errors"] += 1
+                elif action == "BLOCK":
+                    if active_id not in policy_map:
                         continue
-                    policy_id = (row.get("applied_policy_id") or "").strip()
-                    policy = policy_map.get(policy_id)
-                    rid = str(row.get("record_id", ""))
-                    if policy is None:
-                        continue
+                    policy = policy_map[active_id]
                     activation = str(policy.get("activated_after_record_id", ""))
                     expiry = str(policy.get("expires_after_record_id", ""))
-                    if rid not in positions or activation not in positions or expiry not in positions:
-                        continue
-                    if not (positions[activation] < positions[rid] <= positions[expiry]):
+                    if activation in positions and expiry in positions and not (positions[activation] < positions.get(rid, -1) <= positions[expiry]):
                         replay_res["valid"] = False
-                        replay_res["errors"].append(f"Record {rid}: policy {policy_id} is not active at this replay position.")
+                        replay_res["errors"].append(f"Record {rid}: policy {active_id} is not active at this replay position.")
+                        replay_res["total_errors"] += 1
+                    if source_frame is not None:
+                        if not matches:
+                            replay_res["valid"] = False
+                            replay_res["errors"].append(f"Record {rid}: BLOCK has no matching active observed-endpoint policy.")
+                            replay_res["total_errors"] += 1
+                        elif active_id != expected_id:
+                            replay_res["valid"] = False
+                            replay_res["errors"].append(f"Record {rid}: BLOCK must use lexicographically smallest matching policy {expected_id}.")
+                            replay_res["total_errors"] += 1
+
         all_valid = class_res["valid"] and policy_res["valid"] and replay_res["valid"]
         report = {
             "all_valid": all_valid,
             "status": "READY_FOR_SUBMISSION" if all_valid else "VALIDATION_FAILED",
             "classification": class_res,
-            "policy": policy_res,
+            "policies": policy_res,
             "replay": replay_res,
         }
         report_file = output_dir / "validation_report.json"
