@@ -3,7 +3,7 @@
 ## Architecture & Algorithm
 
 - **Model:** Isolation Forest (200 trees, 50,000 max samples per tree, `n_jobs=-1`).
-- **Baseline Training Data:** 240,000 `BENIGN` rows from the training partition only.
+- **Baseline Training Data:** `BENIGN` rows from the model-fit subset of the authorized training partition. The exact count and data hash are recorded in `reports/generated/training_manifest.json`.
 - **Independence:** Never ingests or depends on Agent 1 predictions or ground truth labels during inference.
 - **Threshold Calibration:** Operating threshold is calibrated to the 1st percentile of benign training decision function scores ($\theta \approx 0.0332$).
 - **Evidence Extraction:** For flows whose raw decision-function score falls below the threshold, individual features deviating beyond $Q_{01}$ or $Q_{99}$ relative to benign training interquartile ranges are mapped to human-readable evidence tags (e.g., `unusual_packet_rate`, `abnormal_flow_duration`).
@@ -25,4 +25,4 @@ python scripts/train_anomaly.py \
 
 No current official-evaluation FPR, attack recall, or latency result is reproducible from this repository alone because the evaluation data and trained model artifact are not committed. Older release reports contain different values; treat them as historical and do not cite them as current.
 
-To produce current metrics, train from the authorized benign training rows, evaluate against the untouched evaluation split, and retain the report with the code revision and dataset hashes. See [`docs/evaluation.md`](evaluation.md).
+The standalone `train_anomaly.py` command is a lower-level training entry point. For the supported combined workflow (including the training-only calibration holdout), use `scripts/train_models.py`. Evaluate the saved artifacts against the untouched evaluation split and retain the report with the code revision and dataset hashes. See [`docs/evaluation.md`](evaluation.md).
