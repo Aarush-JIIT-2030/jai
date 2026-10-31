@@ -115,10 +115,13 @@ def train_models(
         fit_path = temporary_dir / "training_fit.parquet"
         validation_fit_path = temporary_dir / "training_calibration.parquet"
         _write_frame(fit_frame, fit_path)
+        fit_data_sha256 = _sha256(fit_path)
         if calibration_frame is not None:
             _write_frame(calibration_frame, validation_fit_path)
+            calibration_data_sha256 = _sha256(validation_fit_path)
             validation_arg = validation_fit_path
         else:
+            calibration_data_sha256 = None
             validation_arg = None
 
         threat_report = train_from_csv(
@@ -156,6 +159,8 @@ def train_models(
         "training_sha256": _sha256(training_path),
         "training_rows": int(len(training_frame)),
         "model_training_rows": int(len(fit_frame)),
+        "model_fit_data_sha256": fit_data_sha256,
+        "calibration_data_sha256": calibration_data_sha256,
         "label_column": label_column,
         "label_mapping": mapping,
         "class_counts_training_partition": training_frame[label_column].value_counts().sort_index().to_dict(),
