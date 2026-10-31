@@ -78,7 +78,7 @@ def test_brute_force_correlation():
     assert result is not None
     assert result.correlated is True
     assert result.attack_type == "BRUTE_FORCE"
-    assert "rapid auth" in result.evidence[0]
+    assert "authentication flows" in result.evidence[0]
 
 
 
