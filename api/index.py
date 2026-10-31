@@ -640,7 +640,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
             "anomaly_score": numeric_from_value(raw_score),
             "evidence_status": str(raw_evidence),
             "action": str(decision.get("action", "")),
-            "active_policy_id": "NONE" if pd.isna(applied) or not str(applied).strip() else str(applied),
+            "active_policy_id": "" if pd.isna(applied) or not str(applied).strip() else str(applied),
             "destination_port": int(numeric_from_value(flow.get("Destination Port", 0))),
             "flow_duration": numeric_from_value(flow.get("Flow Duration", 0)),
             "total_fwd_packets": numeric_from_value(flow.get("Total Fwd Packets", 0)),
