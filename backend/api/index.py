@@ -12,6 +12,7 @@ import tempfile
 import time
 import zipfile
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -170,7 +171,7 @@ def get_history(request: Request, limit: int = 15):
     user_id, auth_error = _supabase_user_id(request)
     key = _supabase_public_key()
     if user_id and key:
-        connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=5)
+        connection = http.client.HTTPSConnection(_supabase_host(), timeout=5)
         try:
             query = f"/rest/v1/replay_runs?select=run_id,dataset_name,total_records,blocked_records,allowed_records,policies_created,containment_rate,throughput_fps,status,created_at&order=created_at.desc&limit={max(1, min(limit, 50))}"
             connection.request("GET", query, headers={"apikey": key, "Authorization": request.headers.get("authorization", "")})
@@ -265,8 +266,27 @@ def get_anomaly_agent() -> AnomalyDetectionAgent | None:
     return _anomaly_agent
 
 
+def _supabase_url() -> str:
+    """Return the configured Supabase project URL, without a trailing slash."""
+    return (os.environ.get("SUPABASE_URL") or "https://egwguyexqixmqytydesc.supabase.co").strip().rstrip("/")
+
+
+def _supabase_host() -> str:
+    """Validate and return the HTTPS host used by Supabase REST/Auth requests."""
+    parsed = urlsplit(_supabase_url())
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise RuntimeError("SUPABASE_URL must be a valid HTTPS URL.")
+    return parsed.hostname
+
+
 def _supabase_public_key() -> str | None:
-    return (os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY") or "").strip() or None
+    # SUPABASE_KEY supports the publishable/anon key supplied in deployment env.
+    return (
+        os.environ.get("SUPABASE_KEY")
+        or os.environ.get("SUPABASE_ANON_KEY")
+        or os.environ.get("VITE_SUPABASE_ANON_KEY")
+        or ""
+    ).strip() or None
 
 
 def _require_authenticated_user(request: Request) -> str | None:
@@ -290,7 +310,7 @@ def _supabase_user_id(request: Request) -> tuple[str | None, str | None]:
     key = _supabase_public_key()
     if not key:
         return None, "supabase_public_key_not_configured"
-    connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=5)
+    connection = http.client.HTTPSConnection(_supabase_host(), timeout=5)
     try:
         connection.request("GET", "/auth/v1/user", headers={"apikey": key, "Authorization": token})
         response = connection.getresponse()
@@ -320,7 +340,7 @@ def _supabase_insert_rows(table: str, rows: list[dict[str, Any]], request: Reque
     key = _supabase_public_key()
     token = request.headers.get("authorization", "")
     safe_rows = [{**row, "user_id": user_id} for row in rows]
-    connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=8)
+    connection = http.client.HTTPSConnection(_supabase_host(), timeout=8)
     try:
         connection.request(
             "POST", f"/rest/v1/{table}",
@@ -349,7 +369,7 @@ def _supabase_select_rows(table: str, query: str, request: Request) -> dict[str,
     key = _supabase_public_key()
     if not user_id or not key:
         return {"stored": False, "reason": auth_error or "not_authenticated", "rows": []}
-    connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=8)
+    connection = http.client.HTTPSConnection(_supabase_host(), timeout=8)
     try:
         connection.request("GET", f"/rest/v1/{table}?{query}", headers={
             "apikey": key, "Authorization": request.headers.get("authorization", ""),
