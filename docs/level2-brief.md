@@ -73,7 +73,7 @@ python scripts/generate_submissions.py \
    `record_id,predicted_class,anomaly_score,evidence_status`
    * Contains one row per input flow regardless of whether it was later blocked.
 2. **`policy.csv`**:
-   `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
+   `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action,policy_action`
    * Logs every defensive policy generated after an analyzed attack flow.
 3. **`replay.csv`**:
    `record_id,action,applied_policy_id`
