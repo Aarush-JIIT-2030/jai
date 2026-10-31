@@ -16,6 +16,8 @@ from typing import Any
 
 logger = logging.getLogger("cybersentinel.replay.submission")
 
+from cybersentinel.agents.correlation import TemporalCorrelationAgent
+
 BENCHMARK_CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE_STATUSES = {"AGREE", "DISAGREE", "INCOMPLETE"}
 ACTIONS = {"ALLOW", "BLOCK"}
@@ -253,11 +255,12 @@ class SubmissionValidator:
                                         continue
                             return ""
                         if scope_type == "SOURCE_IP":
-                            observed_scope = observed_ip("SOURCE_IP")
+                            observed_scope = TemporalCorrelationAgent.derive_source_identity(source_row.to_dict())
                         elif scope_type == "DESTINATION_IP":
                             observed_scope = observed_ip("DESTINATION_IP")
                         elif scope_type == "SRC_DST_PAIR":
-                            src, dst = observed_ip("SOURCE_IP"), observed_ip("DESTINATION_IP")
+                            src = TemporalCorrelationAgent.derive_source_identity(source_row.to_dict())
+                            dst = observed_ip("DESTINATION_IP")
                             observed_scope = f"{src}|{dst}" if src and dst else ""
                         else:
                             observed_scope = ""
