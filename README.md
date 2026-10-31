@@ -184,18 +184,3 @@ The prepared feature dataset may not contain native Layer 3 source IP fields. In
 * **Architecture reference:** [Vaibhav-Patidar/cybersentinel](https://github.com/Vaibhav-Patidar/cybersentinel) was reviewed for high-level data-pipeline and evidence-presentation ideas. The team reports that no source files were copied.
 
 Historical release and QA documents are indexed in [`release/README.md`](release/README.md); their old pass statuses are not current verification.
-
-
-## Independent official submission validation
-
-After generating `classification.csv`, `policy.csv`, and `replay.csv`, validate them against the exact organizer input before upload:
-
-```bash
-python scripts/validate_submissions.py \
-  --input data/processed/eval_prepared.parquet \
-  --output-dir submissions/
-```
-
-The validator checks exact CSV headers, one row per input record in original order, allowed classes and evidence states, finite anomaly scores, unique policy IDs, literal IP policy scopes, activation/expiry ordering, valid BLOCK references, and observed source-IP matching. It is intentionally strict: if the official hidden input omits source IPs, no synthetic identity can pass this validation as a SOURCE_IP policy scope.
-
-The replay engine stores policy expiry internally as a zero-based replay position. The exported `expires_after_record_id` is translated back to the corresponding organizer record ID. Expiry is inclusive through that record position; subsequent records are not covered.

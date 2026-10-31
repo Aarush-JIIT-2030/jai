@@ -159,6 +159,15 @@ class ReplayEngine:
             a_flag = _extract_field(a_result, "is_anomaly")
             a_status = _extract_field(a_result, "status", "success")
 
+            # Policy lookup is the first per-record decision operation. Model outputs
+            # were batch-scored independently to preserve a classification for every
+            # record, including flows that an earlier policy will block.
+            pre_filter = self.defense_agent.evaluate_pre_filter(
+                record_id=record_id,
+                source_ip=native_src_ip,
+                current_step=step,
+            )
+
             threat_obj = ThreatDetectionResult(
                 predicted_class=t_class, confidence=t_conf, status=t_status
             )
@@ -169,20 +178,13 @@ class ReplayEngine:
             )
             fusion = self.fusion_agent.fuse(threat_obj, anomaly_obj)
 
-            # Record classification prediction for classification.csv (applies to ALL records)
+            # Classification is independent of the replay action and includes every row.
             classification_rows.append({
                 "record_id": record_id,
                 "predicted_class": fusion.final_class or (t_class if t_class else ""),
                 "anomaly score": round(float(a_score), 5) if isinstance(a_score, (int, float)) else "",
                 "evidence status": fusion.evidence_status,
             })
-
-            # Check pre-filter against active policies
-            pre_filter = self.defense_agent.evaluate_pre_filter(
-                record_id=record_id,
-                source_ip=native_src_ip,
-                current_step=step,
-            )
 
             if pre_filter is not None:
                 # Pre-filtered by an active policy
