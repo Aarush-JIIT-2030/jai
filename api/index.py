@@ -368,14 +368,12 @@ def run_official_replay():
             status_code=503,
             detail={"code": "MODEL_NOT_READY", "message": "Install and verify both model artifacts before running replay."},
         )
-    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
-    if not eval_file.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail={"code": "EVALUATION_DATASET_NOT_FOUND", "message": "Install the organiser-provided evaluation parquet at data/processed/eval_prepared.parquet."},
-        )
+    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    eval_file = next((path for path in candidates if path.is_file()), None)
+    if eval_file is None:
+        raise HTTPException(status_code=404, detail={"code": "HIDDEN_REPLAY_INPUT_NOT_FOUND", "message": "Install the unlabelled organizer input as hidden_replay_input.parquet or .csv."})
     try:
-        frame = pd.read_parquet(eval_file)
+        frame = pd.read_parquet(eval_file) if eval_file.suffix == ".parquet" else pd.read_csv(eval_file)
         if frame.empty:
             raise HTTPException(status_code=422, detail="The evaluation dataset is empty.")
         engine = ReplayEngine(
@@ -449,7 +447,7 @@ def run_official_replay():
                                         ("policies.csv", "policy_rows"),
                                         ("replay.csv", "replay_rows"))},
             "correlation_groups": len(_LAST_CORRELATION_GROUPS),
-            "source": "installed_official_evaluation_dataset",
+            "source": "installed_unlabelled_hidden_replay_input",
         }
     except HTTPException:
         raise
@@ -474,15 +472,12 @@ def validate_submissions():
     # The source dataset is the authority for coverage and ordering. Never infer
     # expected IDs from classification.csv, because a truncated file could then
     # incorrectly validate against its own contents.
-    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
-    if not eval_file.is_file():
-        return {
-            "valid": False,
-            "status": "INPUT_DATASET_NOT_AVAILABLE",
-            "message": "Cannot verify submission coverage without the original evaluation dataset.",
-        }
+    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    eval_file = next((path for path in candidates if path.is_file()), None)
+    if eval_file is None:
+        return {"valid": False, "status": "INPUT_DATASET_NOT_AVAILABLE", "message": "Cannot verify submission coverage without the original unlabelled hidden replay input."}
     try:
-        source = pd.read_parquet(eval_file)
+        source = pd.read_parquet(eval_file) if eval_file.suffix == ".parquet" else pd.read_csv(eval_file)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -626,11 +621,12 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         raise HTTPException(status_code=422, detail="limit must be 1..200 and offset must be non-negative.")
 
     sub_dir = BASE_DIR / "outputs" / "submission"
-    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    candidates = (BASE_DIR / "data" / "processed" / "hidden_replay_input.parquet", BASE_DIR / "data" / "processed" / "hidden_replay_input.csv")
+    eval_file = next((path for path in candidates if path.is_file()), None)
     class_file = sub_dir / "classification.csv"
     replay_file = sub_dir / "replay.csv"
-    if not eval_file.is_file():
-        raise HTTPException(status_code=404, detail="Evaluation dataset is not installed.")
+    if eval_file is None:
+        raise HTTPException(status_code=404, detail="Unlabelled hidden replay input is not installed.")
     if not class_file.is_file() or not replay_file.is_file():
         raise HTTPException(
             status_code=409,
@@ -638,7 +634,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         )
 
     try:
-        df = pd.read_parquet(eval_file)
+        df = pd.read_parquet(eval_file) if eval_file.suffix == ".parquet" else pd.read_csv(eval_file)
         classifications = pd.read_csv(class_file, dtype={"record_id": str})
         replay = pd.read_csv(replay_file, dtype={"record_id": str, "active_policy_id": str})
     except Exception as exc:
