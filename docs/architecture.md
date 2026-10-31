@@ -6,34 +6,20 @@ CyberSentinel is an offline, five-agent network intrusion detection and adaptive
 
 ```mermaid
 flowchart TD
-    subgraph Ingress ["1. Ingress & Pre-Filter"]
-        A[Offline Flow Stream N] --> PF{Agent 5: Active Policy Pre-Filter}
-        PF -->|Active Match| BLK[Action: BLOCK<br/>Applied Policy ID]
-        PF -->|No Match| ALW[Action: ALLOW<br/>Forwarded for Analysis]
-    end
-
-    subgraph Detection ["2. Independent Detection (A1 + A2)"]
-        ALW --> D1[Agent 1: Threat Detection<br/>Random Forest default; optional XGBoost<br/>Class + Uncalibrated Confidence]
-        ALW --> D2[Agent 2: Anomaly Detection<br/>Unsupervised Isolation Forest<br/>Score + Feature Evidence]
-    end
-
-    subgraph FusionAndCorrelation ["3. Correlation & Fusion (A3 + A4)"]
-        D1 --> F3[Agent 3: Evidence Fusion<br/>Consensus Arbitration Matrix<br/>Status: AGREE / DISAGREE / INCOMPLETE]
-        D2 --> F3
-        ALW --> C4[Agent 4: Temporal Correlation<br/>150-Flow Sliding Window<br/>Multi-Stage Campaign Tracking]
-        F3 --> C4
-    end
-
-    subgraph DefenseResponse ["4. Adaptive Defense (A5)"]
-        C4 --> R5[Agent 5: Adaptive Policy Engine<br/>Generate Temporary SOURCE_IP Policies<br/>Finite Step TTL Expiration]
-        R5 -.->|Activate for Later Flows > N| PF
-    end
-
-    subgraph Submission ["5. Competition Outputs"]
-        D1 & D2 & F3 --> CSV1[(classification.csv<br/>All 114,185 Records)]
-        R5 --> CSV2[(policy.csv<br/>Generated Policies)]
-        PF & ALW --> CSV3[(replay.csv<br/>ALLOW / BLOCK Decisions)]
-    end
+    A[Chronological Offline Flow Stream] --> D1[Agent 1: Five-class classifier]
+    A --> D2[Agent 2: BENIGN-only anomaly detector]
+    D1 --> PF{Agent 5: Active policy check for this row}
+    D2 --> PF
+    PF -->|Existing policy matches| B[Record BLOCK + applied policy ID]
+    PF -->|No active policy| F3[Agent 3: Evidence fusion]
+    B --> C1[(classification.csv still records row evidence)]
+    F3 --> C1
+    F3 --> C4[Agent 4: Temporal correlation]
+    C4 --> R5[Agent 5: Create forward-only temporary policy]
+    R5 --> P[(policy.csv)]
+    B --> R[(replay.csv)]
+    F3 --> R
+    R5 -.->|Only later rows can match| PF
 ```
 
 ## Five-Agent Responsibilities
@@ -41,18 +27,18 @@ flowchart TD
 1. **Agent 1 (Threat Detection Agent):**
    - Implements supervised five-class classification (`BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, `PORT_SCAN`).
    - Uses the current `RandomForestClassifier` backend by default (400 estimators, `balanced_subsample` class weights); XGBoost is an optional backend. Missing and infinite numeric values are median-imputed from training data.
-   - Outputs the predicted class and the maximum `predict_proba` value. This model-derived confidence is not probability-calibrated.
+   - Outputs the predicted class and maximum `predict_proba` confidence. It remains uncalibrated unless the optional scalar temperature-calibration workflow is run on a separate labelled held-out validation set.
 
 2. **Agent 2 (Anomaly Detection Agent):**
    - Independent baseline trained strictly on benign baseline network traffic.
-   - Uses a 200-tree Isolation Forest trained on benign training rows; its threshold is the first percentile of training decision scores. The score is not a probability.
+   - Uses a 200-tree Isolation Forest trained on benign training rows. The baseline threshold is the first percentile of benign training decision scores; an optional separate labelled validation workflow can select a threshold under a configured benign false-positive ceiling. The exported 0–1 anomaly index is not a probability.
    - Flags deviations without consuming Agent 1 outputs or labels.
    - Extracts feature-level evidence tags (e.g., `unusual_packet_rate`, `abnormal_flow_duration`).
 
 3. **Agent 3 (Evidence Fusion Agent):**
    - Orchestrates deterministic consensus between Agent 1 and Agent 2.
-   - Evaluates agreement (`AGREE`), disagreement (`DISAGREE`), and incomplete evidence (`INCOMPLETE`).
-   - Routes conflicting or ambiguous predictions safely to fail-closed `REVIEW`.
+   - Emits the organizer evidence states `AGREE`, `CONFLICT`, and `UNCERTAIN`.
+   - Routes conflicting or incomplete evidence to analyst review rather than fabricating certainty.
 
 4. **Agent 4 (Temporal Correlation Agent):**
    - Maintains a stateful 150-flow sliding window across arrival order.
@@ -69,6 +55,6 @@ flowchart TD
 
 The chronological replay engine enforces strict causality guarantees:
 - **Arrival-Order Processing:** Flows are evaluated strictly sequentially.
-- **Pre-Filter First:** Only policies activated prior to record $N$ can drop flow $N$.
+- **Causal Pre-Filter:** The active-policy check is evaluated in chronological order; only policies activated before record $N$ can block record $N$. A1/A2 classification and A3 evidence status are still emitted for every row, including rows later blocked. A blocked row is excluded from Agent 4 correlation and Agent 5 policy updates.
 - **Universal Forensics:** Every flow, including those blocked by earlier policies, is classified in `classification.csv`.
 - **Zero Label Leakage:** Ground-truth labels are never accessed during replay decision making.
