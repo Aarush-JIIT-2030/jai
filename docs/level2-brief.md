@@ -63,7 +63,7 @@ Run the 5-agent chronological replay engine to produce the three official compet
 
 ```bash
 python scripts/generate_submissions.py \
-  --input data/processed/eval_prepared.parquet \
+  --input data/processed/hidden_replay_input.csv \
   --output-dir submissions/
 ```
 
