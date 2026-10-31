@@ -970,7 +970,7 @@ export function AuditHistoryView() {
                   <td style={{ padding: 8, fontFamily: "monospace", color: "#ef4444" }}>{r.blocked_records.toLocaleString()}</td>
                   <td style={{ padding: 8, fontFamily: "monospace", color: "#22c55e" }}>{r.allowed_records.toLocaleString()}</td>
                   <td style={{ padding: 8, fontFamily: "monospace" }}>{r.policies_created.toLocaleString()}</td>
-                  <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 700 }}>{r.containment_rate}%</td>
+                  <td style={{ padding: 8, fontFamily: "monospace", fontWeight: 700 }}>{typeof r.containment_rate === "number" ? `${r.containment_rate.toFixed(2)}%` : "—"}</td>
                   <td style={{ padding: 8, fontFamily: "monospace" }}>{r.throughput_fps} fps</td>
                   <td style={{ padding: 8, color: "var(--muted)" }}>{new Date(r.timestamp).toLocaleTimeString()}</td>
                 </tr>
