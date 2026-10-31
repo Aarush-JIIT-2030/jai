@@ -397,7 +397,7 @@ def run_official_replay():
         results = engine.run_replay(frame)
         output_dir = BASE_DIR / "outputs" / "submission"
         output_dir.mkdir(parents=True, exist_ok=True)
-        generated_files = engine.generate_submission_files(frame, output_dir)
+        generated_files = engine.write_submission_files(results, output_dir)
         # Validate against the original organiser input, never against the output
         # being validated (which could be truncated and otherwise validate itself).
         if "record_id" not in frame.columns:
