@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/api/evaluation", tags=["Evaluation"])
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 EVAL_DIR = BASE_DIR / "outputs" / "evaluation"
 PLOTS_DIR = EVAL_DIR / "plots"
 REPORT_NAMES = ("summary", "classification", "fusion", "anomaly", "generalization", "calibration", "loao", "temporal", "defense")

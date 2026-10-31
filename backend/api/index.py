@@ -14,10 +14,11 @@ import zipfile
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 SOURCE_DIR = BASE_DIR / "src"
 if str(SOURCE_DIR) not in sys.path:
     sys.path.insert(0, str(SOURCE_DIR))
@@ -33,7 +34,7 @@ from cybersentinel.replay.submission import SubmissionValidator
 from cybersentinel.replay.input_validation import validate_replay_input
 from cybersentinel.storage.history_db import list_runs, record_run
 import pandas as pd
-from api.evaluation import router as evaluation_router
+from backend.api.evaluation import router as evaluation_router
 
 app = FastAPI(
     title="CyberSentinel API",
@@ -41,6 +42,14 @@ app = FastAPI(
     description="Offline 5-agent network-flow intrusion detection and adaptive defense replay system.",
 )
 app.include_router(evaluation_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if origin.strip()],
+    allow_origin_regex=r"https://[a-zA-Z0-9-]+\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 THREAT_MODEL = BASE_DIR / "models" / "threat_detection" / "model.joblib"
 ANOMALY_MODEL = BASE_DIR / "models" / "anomaly_detection" / "model.joblib"

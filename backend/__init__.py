@@ -1,0 +1,1 @@
+"""Standalone CyberSentinel backend service."""
