@@ -12,17 +12,18 @@ def load_frame(path: str) -> pd.DataFrame:
     return pd.read_parquet(path) if path.lower().endswith((".parquet", ".pq")) else pd.read_csv(path, low_memory=False)
 
 def train_anomaly(train_path: str, model_out: str, report_out: str,
-                  validation_path: str | None = None, max_benign_fpr: float = 0.02) -> dict:
+                  validation_path: str | None = None, max_benign_fpr: float = 0.02,
+                  label_column: str = "label") -> dict:
     frame = load_frame(train_path)
-    if "label" not in frame.columns:
+    if label_column not in frame.columns:
         raise ValueError("Prepared training file must contain the canonical 'label' column.")
-    labels = frame["label"].astype("string").str.strip().str.upper()
+    labels = frame[label_column].astype("string").str.strip().str.upper()
     if labels.isna().any() or (labels == "").any():
         raise ValueError("Training labels contain missing or empty values.")
     unexpected = sorted(set(labels.unique()) - BENCHMARK_CLASSES)
     if unexpected:
         raise ValueError(f"Unexpected benchmark labels: {unexpected}")
-    benign = frame.loc[labels == "BENIGN"].drop(columns=["label"], errors="ignore")
+    benign = frame.loc[labels == "BENIGN"].drop(columns=[label_column], errors="ignore")
     if benign.empty:
         raise ValueError("No BENIGN training rows available for anomaly baseline.")
     agent = AnomalyDetectionAgent().fit(benign)
@@ -31,16 +32,16 @@ def train_anomaly(train_path: str, model_out: str, report_out: str,
         if Path(validation_path).resolve() == Path(train_path).resolve():
             raise ValueError("Anomaly threshold calibration requires a separate held-out validation file.")
         valid = load_frame(validation_path)
-        if "label" not in valid.columns:
+        if label_column not in valid.columns:
             raise ValueError("Calibration file must contain the canonical 'label' column.")
-        valid_labels = valid["label"].astype("string").str.strip().str.upper()
+        valid_labels = valid[label_column].astype("string").str.strip().str.upper()
         if valid_labels.isna().any() or (valid_labels == "").any():
             raise ValueError("Calibration labels contain missing or empty values.")
         unknown = sorted(set(valid_labels.unique()) - BENCHMARK_CLASSES)
         if unknown:
             raise ValueError(f"Unexpected calibration labels: {unknown}")
         calibration = agent.calibrate_threshold(
-            valid.drop(columns=["label"], errors="ignore"), valid_labels,
+            valid.drop(columns=[label_column], errors="ignore"), valid_labels,
             max_benign_fpr=max_benign_fpr,
         )
         calibration["source"] = str(validation_path)
