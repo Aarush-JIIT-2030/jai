@@ -91,7 +91,7 @@ def health():
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
     """Expose actual local artifact presence without inventing readiness."""
-    dataset = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    dataset = BASE_DIR / "data" / "processed" / "hidden_replay_input.csv"
     history_db = BASE_DIR / "data" / "cybersentinel_history.db"
     submission = BASE_DIR / "outputs" / "submission"
     model_status = {
@@ -116,7 +116,7 @@ def system_diagnostics():
             "agent_2_bytes": ANOMALY_MODEL.stat().st_size if ANOMALY_MODEL.is_file() else None,
         },
         "models_ready": get_pipeline() is not None,
-        "evaluation_dataset": {
+        "hidden_replay_input": {
             "present": dataset.is_file(),
             "bytes": dataset.stat().st_size if dataset.is_file() else None,
             "path": "data/processed/hidden_replay_input.csv",
