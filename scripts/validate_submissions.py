@@ -10,7 +10,7 @@ import pandas as pd
 from cybersentinel.agents.correlation import TemporalCorrelationAgent
 
 CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
-EVIDENCE = {"AGREE", "DISAGREE", "INCOMPLETE"}
+EVIDENCE = {"AGREE", "CONFLICT", "UNCERTAIN"}
 CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
 POLICY_COLUMNS = ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]
 REPLAY_COLUMNS = ["record_id", "action", "applied_policy_id"]
