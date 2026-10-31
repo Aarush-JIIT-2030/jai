@@ -382,7 +382,7 @@ def run_official_replay():
     try:
         frame = pd.read_parquet(eval_file) if eval_file.suffix == ".parquet" else pd.read_csv(eval_file)
         if frame.empty:
-            raise HTTPException(status_code=422, detail="The evaluation dataset is empty.")
+            raise HTTPException(status_code=422, detail="The unlabelled hidden replay input is empty.")
         engine = ReplayEngine(
             threat_agent=pipeline.threat_agent,
             anomaly_agent=pipeline.anomaly_agent,
@@ -397,26 +397,11 @@ def run_official_replay():
         results = engine.run_replay(frame)
         output_dir = BASE_DIR / "outputs" / "submission"
         output_dir.mkdir(parents=True, exist_ok=True)
-        files = {
-            "classification.csv": engine.export_csv(
-                [{**row, "anomaly score": row["anomaly_score"], "evidence status": row["evidence_status"]} for row in results["classification_rows"]],
-                ["record_id", "predicted_class", "anomaly score", "evidence status"],
-            ),
-            "policy.csv": engine.export_csv(
-                results["policy_rows"],
-                ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
-            ),
-            "replay.csv": engine.export_csv(
-                results["replay_rows"],
-                ["record_id", "action", "active_policy_id"],
-            ),
-        }
-        for filename, csv_text in files.items():
-            (output_dir / filename).write_text(csv_text, encoding="utf-8", newline="")
+        generated_files = engine.generate_submission_files(frame, output_dir)
         # Validate against the original organiser input, never against the output
         # being validated (which could be truncated and otherwise validate itself).
         if "record_id" not in frame.columns:
-            raise HTTPException(status_code=422, detail="The evaluation dataset must contain organiser-provided record_id values.")
+            raise HTTPException(status_code=422, detail="The hidden replay input must contain organizer-provided record_id values.")
         record_ids = frame["record_id"].astype(str).tolist()
         validation = SubmissionValidator.validate_submission_bundle(output_dir, record_ids, source_frame=frame)
 
