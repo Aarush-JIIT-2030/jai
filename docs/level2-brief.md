@@ -18,12 +18,12 @@ A1/A2 predictions are generated for all records because the organizer requires o
 
 ### classification.csv
 
-`record_id,predicted_class,anomaly_score,evidence_status`
+`record_id,predicted_class,anomaly score,evidence status`
 
 - Exactly 200 rows, one per hidden record, in exact `seq` order.
 - `predicted_class`: `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, or `PORT_SCAN`.
-- `anomaly_score`: finite numeric value in [0,1], higher means more anomalous; not a probability.
-- `evidence_status`: `AGREE`, `CONFLICT`, or `UNCERTAIN`.
+- `anomaly score`: finite numeric value in [0,1], higher means more anomalous; not a probability.
+- `evidence status`: `AGREE`, `CONFLICT`, or `UNCERTAIN`.
 
 ### replay.csv
 
@@ -34,7 +34,7 @@ A1/A2 predictions are generated for all records because the organizer requires o
 - `ALLOW` must leave `active_policy_id` empty and is invalid if any active policy matches the flow.
 - `BLOCK` must reference the lexicographically smallest matching active `policy_id`.
 
-### policies.csv
+### policy.csv
 
 `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
 
@@ -43,7 +43,7 @@ A1/A2 predictions are generated for all records because the organizer requires o
 - `scope_type` is `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`.
 - Scope values must be exact literal observed endpoint values. Pair format is `source_ip|destination_ip`. No wildcards, CIDR ranges, hashes, or synthetic identities.
 - A policy activates on the record after `activated_after_record_id` and remains active through `expires_after_record_id`, inclusive.
-- The organizer schema has no `policy_action` column; each ledger row represents a simulated BLOCK policy.
+- The organizer requires `policy_action=BLOCK` on every policy row.
 
 ## Local workflow
 
