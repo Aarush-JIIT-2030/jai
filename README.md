@@ -66,7 +66,7 @@ The repository does not include organizer data, prepared Parquet files, trained 
 
 Read [`docs/judge-disclosures.md`](docs/judge-disclosures.md) before the live demo. In brief:
 
-- The CICIDS2017 feature-only split does not provide native Layer-3 source/destination addresses. **The current hardened branch does not turn TCP-stack fingerprints into IP addresses**; without a literal observed source IP, endpoint correlation and SOURCE_IP policy creation fail closed. If a compatibility build uses a fingerprint-derived pseudo-IP, it is synthetic, can collide for identical TCP-stack fingerprints, and must never be described as an observed address.
+- The CICIDS2017 feature-only split does not provide native Layer-3 source/destination addresses. When a native source IP is absent, the current implementation derives an IP-shaped `SOURCE_IP` identity from `Init_Win_bytes_forward`, `min_seg_size_forward`, and `Fwd Header Length`. **That identity is synthetic, not observed; identical fingerprints map to the same identity and the truncated 24-bit hash can collide across different clients, potentially causing false blocks.** Destination IPs are never synthesized.
 - The documented train/eval feature overlap is 8.58% of evaluation rows and can make repeated-flow results optimistic.
 - Agent 1 confidence is uncalibrated unless the separate held-out calibration workflow was run. Agent 2 exports a bounded 0–1 anomaly index (higher means more anomalous), not a probability; its operating threshold is applied to the underlying Isolation Forest decision function.
 - The temporal correlator has a fixed 150-record cap and a configured 300-second time window when timestamps are available. Adaptive-defense policy duration defaults to 150 replay positions; these are fixed configuration values, not learned/adaptive parameters.
@@ -182,7 +182,7 @@ If the dataset or models are missing, the API returns an explicit unavailable re
 
 ### SOURCE_IP identity limitation
 
-The prepared feature dataset may not contain native Layer 3 source IP fields. Fingerprint-derived identities are not observed endpoints and are therefore not used for temporal endpoint correlation or SOURCE_IP defense policies. If the native source IP is missing or invalid, endpoint correlation and policy creation fail closed. This can reduce correlation/policy coverage on feature-only data, but avoids inventing host identities or falsely blocking unrelated clients. See `release/benchmarks/source-ip-scope-audit.md`.
+The prepared CICIDS2017 feature dataset does not contain native Layer-3 endpoints. The replay engine prefers a literal observed source IP; otherwise it derives a deterministic IP-shaped identity from the TCP-stack fingerprint tuple (`Init_Win_bytes_forward`, `min_seg_size_forward`, `Fwd Header Length`). This synthetic identity enables source grouping and simulated SOURCE_IP policies but is not an observed address. Identical tuples share an identity and the 24-bit suffix can collide, so unrelated clients can be grouped or blocked together. Destination IP remains unknown unless it is explicitly present. Replay metrics report how many rows used synthetic identities. See `release/benchmarks/source-ip-scope-audit.md`.
 
 ## 8. Third-Party, Reference & AI Disclosures
 
