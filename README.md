@@ -184,3 +184,7 @@ The prepared feature dataset may not contain native Layer 3 source IP fields. Fi
 * **Architecture reference:** [Vaibhav-Patidar/cybersentinel](https://github.com/Vaibhav-Patidar/cybersentinel) was reviewed for high-level data-pipeline and evidence-presentation ideas. The team reports that no source files were copied.
 
 Historical release and QA documents are indexed in [`release/README.md`](release/README.md); their old pass statuses are not current verification.
+
+### Deployment boundary
+
+The authoritative full-data workflow is local/offline. The Vercel-connected frontend/API bundle can build, but Git deployments do not include the ignored organiser dataset or fitted model artifacts; model-backed API routes therefore remain unavailable until authorised artifacts are provisioned. The Vercel function timeout is currently 30 seconds, and run history uses local SQLite rather than durable shared storage. Do not treat a READY Vercel deployment as proof of a production-ready replay service. See [`docs/deployment.md`](docs/deployment.md) for the exact runtime boundaries and local run instructions.
