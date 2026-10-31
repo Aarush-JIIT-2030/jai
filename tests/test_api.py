@@ -48,9 +48,9 @@ def test_health_does_not_claim_models_ready_without_artifacts(monkeypatch, tmp_p
     assert response.status_code == 200
     payload = response.json()
     assert payload["model_ready"] is False
-    assert payload["agents"]["agent_3_evidence_fusion"] is True
-    assert payload["agents"]["agent_4_temporal_correlation"] is True
-    assert payload["agents"]["agent_5_adaptive_defense"] is True
+    assert payload["agents"]["agent_3_evidence_fusion"] is False
+    assert payload["agents"]["agent_4_temporal_correlation"] is False
+    assert payload["agents"]["agent_5_adaptive_defense"] is False
 
 
 def test_single_flow_endpoint_fails_closed_without_models(monkeypatch, tmp_path):
