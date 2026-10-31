@@ -700,7 +700,7 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
         <div>
           <div className="panel-kicker">LEVEL 02 · CAUSAL CHRONOLOGICAL REPLAY ENGINE</div>
           <h3>Official Offline Replay</h3>
-          <p>Runs the installed evaluation dataset through the backend replay engine and generates the three official CSV artifacts.</p>
+          <p>Runs the installed unlabelled hidden replay input through the backend replay engine and generates the three official CSV artifacts.</p>
         </div>
         <span className="panel-icon"><FileSpreadsheet size={18} /></span>
       </div>
@@ -708,9 +708,9 @@ export function ReplayStudio({ modelReady }: { modelReady: boolean }) {
       <div style={{ background: "var(--panel2)", padding: 17, borderRadius: 9, border: "1px solid var(--line)", margin: "16px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div>
-            <b>Evaluation dataset · local server only</b>
+            <b>Hidden replay input · local server only</b>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 5 }}>
-              Expected path: <code>data/processed/eval_prepared.parquet</code>
+              Expected path: <code>data/processed/hidden_replay_input.csv</code>
             </div>
             <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 5 }}>
               Records remain on the backend. The interface does not upload or fabricate a replay stream.
