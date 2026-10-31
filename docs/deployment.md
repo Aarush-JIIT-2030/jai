@@ -36,7 +36,11 @@ Do not describe the Vercel deployment as a verified production SOC service until
 
 ## Supabase
 
-Supabase is currently an optional frontend authentication integration. Guest mode is available when it is not configured. The current FastAPI replay/history implementation uses local files and SQLite; it does not persist replay runs through Supabase or enforce the documented `auth.uid()` row-level security policy. Do not claim Supabase-backed replay persistence or RLS enforcement until those backend integrations and policy tests exist.
+The Supabase project `jai-hack` currently contains one table, `public.analysis_runs`, with an owner foreign key to `auth.users`, a per-user history index, RLS enabled, and four ownership policies for SELECT, INSERT, UPDATE, and DELETE. The migration history is tracked in `supabase/migrations/`.
+
+The table is currently empty. The React application has a Supabase client factory in `src/lib/supabase.ts`, but the current `src/App.tsx` does not use it for authentication or database access. The visible session is a local-analyst placeholder, and replay history is still stored and read through local SQLite. Therefore Supabase-backed sign-in and persistent replay history are **not yet integrated**. Do not claim cloud-backed authentication or history until the UI and API workflows use this table and are verified with real authenticated sessions and cross-user isolation tests.
+
+The anonymous role has no privileges on `analysis_runs`; authenticated users have only SELECT, INSERT, UPDATE, and DELETE privileges, with RLS still enforcing row ownership. The Supabase Security Advisor currently reports that leaked-password protection is disabled. Enable it in the Supabase Auth password/security settings before production use.
 
 ## Readiness checks
 
