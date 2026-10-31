@@ -49,8 +49,8 @@ class ReplayEngine:
         total_rows = len(df)
         if "seq" in df.columns:
             sequence = pd.to_numeric(df["seq"], errors="coerce")
-            if sequence.isna().any() or sequence.duplicated().any() or not sequence.is_monotonic_increasing:
-                raise ValueError("Organizer seq must be present, unique, numeric, and strictly increasing in input order.")
+            if sequence.isna().any() or sequence.duplicated().any() or sequence.tolist() != list(range(1, total_rows + 1)):
+                raise ValueError("Organizer seq must be the exact 1-based replay order in input order.")
         record_ids = df["record_id"].tolist() if "record_id" in df.columns else list(range(total_rows))
         has_label = "label" in df.columns
         labels = df["label"].astype(str).str.strip().str.upper().tolist() if has_label else [""] * total_rows
@@ -77,6 +77,8 @@ class ReplayEngine:
             elapsed_seconds = (pd.to_numeric(parts["minutes"], errors="coerce") * 60 + pd.to_numeric(parts["seconds"], errors="coerce"))
             offsets = pd.to_timedelta(elapsed_seconds, unit="s")
             derived_timestamps = dates + offsets
+            if derived_timestamps.isna().any() or not derived_timestamps.is_monotonic_increasing:
+                raise ValueError("Organizer day/time_offset values must form valid, increasing timestamps.")
 
         classification_rows, replay_rows = [], []
         blocked = allowed = contained = benign_preserved = false_blocks = 0
