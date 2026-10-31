@@ -402,7 +402,11 @@ def run_official_replay():
         }
         for filename, csv_text in files.items():
             (output_dir / filename).write_text(csv_text, encoding="utf-8", newline="")
-        record_ids = [str(row["record_id"]) for row in results["classification_rows"]]
+        # Validate against the original organiser input, never against the output
+        # being validated (which could be truncated and otherwise validate itself).
+        if "record_id" not in frame.columns:
+            raise HTTPException(status_code=422, detail="The evaluation dataset must contain organiser-provided record_id values.")
+        record_ids = frame["record_id"].astype(str).tolist()
         validation = SubmissionValidator.validate_submission_bundle(output_dir, record_ids)
 
         global _LAST_CORRELATION_GROUPS
@@ -466,14 +470,34 @@ def validate_submissions():
             "status": "NOT_GENERATED",
             "message": "Submission files have not yet been generated in outputs/submission/.",
         }
-    # Read record ids from classification.csv
-    import csv
-    with (sub_dir / "classification.csv").open("r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        records = [r["record_id"] for r in reader]
 
-    report = SubmissionValidator.validate_submission_bundle(sub_dir, records)
-    return report
+    # The source dataset is the authority for coverage and ordering. Never infer
+    # expected IDs from classification.csv, because a truncated file could then
+    # incorrectly validate against its own contents.
+    eval_file = BASE_DIR / "data" / "processed" / "eval_prepared.parquet"
+    if not eval_file.is_file():
+        return {
+            "valid": False,
+            "status": "INPUT_DATASET_NOT_AVAILABLE",
+            "message": "Cannot verify submission coverage without the original evaluation dataset.",
+        }
+    try:
+        source = pd.read_parquet(eval_file)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "EVALUATION_DATASET_READ_FAILED", "type": type(exc).__name__},
+        ) from exc
+    if "record_id" not in source.columns:
+        raise HTTPException(
+            status_code=422,
+            detail="The evaluation dataset must contain organiser-provided record_id values.",
+        )
+    records = source["record_id"].astype(str).tolist()
+    if len(records) != len(set(records)):
+        raise HTTPException(status_code=422, detail="The evaluation dataset contains duplicate record_id values.")
+
+    return SubmissionValidator.validate_submission_bundle(sub_dir, records)
 
 
 @app.get("/api/overview")
