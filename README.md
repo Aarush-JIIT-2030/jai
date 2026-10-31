@@ -95,7 +95,7 @@ python scripts/generate_submissions.py \
   --output-dir outputs/submission
 ```
 
-This requires locally supplied evaluation data and trained model artifacts. Generated files and validation reports are ignored by Git. The current checkout alone therefore does not establish that a fresh full-data replay passed or that a submission is ready. See [`docs/level2-brief.md`](docs/level2-brief.md) for the repository’s replay output schemas.
+This requires locally supplied evaluation data and trained model artifacts. Generated files and validation reports are ignored by Git. Place the organizer's unlabelled hidden input at data/processed/hidden_replay_input.csv before running the final Level 2 replay. The current checkout alone therefore does not establish that a fresh full-data replay passed or that a submission is ready. See [`docs/level2-brief.md`](docs/level2-brief.md) for the repository’s replay output schemas.
 
 ---
 
@@ -141,7 +141,7 @@ python scripts/reproduce_benchmarks.py
 ### 3. Generate Local Replay Files
 ```bash
 # Generates local replay CSVs when data and models are available
-python scripts/generate_submissions.py --input data/processed/eval_prepared.parquet --output-dir outputs/submission
+python scripts/generate_submissions.py --input data/processed/hidden_replay_input.csv --output-dir outputs/submission
 ```
 
 ### 4. Run the Pytest Suite
