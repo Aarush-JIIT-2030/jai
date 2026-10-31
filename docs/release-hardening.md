@@ -8,7 +8,7 @@
 - Policy lookup occurs before the fusion decision for each row.
 - Classification is emitted for every row independently of the replay action.
 - Agent 4 uses only literal observed source and destination IP addresses. Invalid destination values are ignored, invalid destination ports are normalized to 0, and TCP fingerprints are never converted into endpoints.
-- Agent 5 accepts only literal IPv4/IPv6 source addresses for SOURCE_IP scope.
+- Agent 5 accepts only literal IPv4/IPv6 source addresses for observed endpoint scope.
 - Missing/invalid model evidence is not replaced with benign or normal defaults; fusion returns INCOMPLETE/REVIEW.
 
 ## Validation
@@ -19,7 +19,7 @@ Run:
 python scripts/validate_submissions.py --input PATH_TO_ORGANIZER_INPUT --output-dir submissions/
 ```
 
-The independent validator verifies record coverage and ordering, exact official headers, five-class predictions, allowed evidence states, finite anomaly scores, unique policy IDs, literal IP scopes, policy activation/expiry ordering, causal BLOCK references, and matching observed source IP.
+The independent validator verifies record coverage and ordering, exact official headers, five-class predictions, allowed evidence states, finite anomaly scores, unique policy IDs, literal IP scopes, policy activation/expiry ordering, causal BLOCK references, and matching observed endpoint or source-destination pair.
 
 The API's bundle validator checks exact record ordering, policy lifecycle boundaries, and (when validating against the installed evaluation frame) that every BLOCK policy scope matches the observed source IP for that record. The independent CLI validator performs the same source-IP-to-record check against the original input file.
 
