@@ -20,7 +20,7 @@ def test_submission_validator_valid_bundle(tmp_path):
     with (sub_dir / "policy.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"])
-        writer.writerow(["POL-00001", "rec-1", "SOURCE_IP", "10.0.0.99", "rec-2")
+        writer.writerow(["POL-00001", "rec-1", "SOURCE_IP", "10.0.0.99", "rec-2", "BLOCK"])
 
     # 3. replay.csv
     with (sub_dir / "replay.csv").open("w", newline="", encoding="utf-8") as f:
@@ -29,7 +29,7 @@ def test_submission_validator_valid_bundle(tmp_path):
         writer.writerow(["rec-1", "ALLOW", ""])
         writer.writerow(["rec-2", "BLOCK", "POL-00001"])
 
-    report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2", "BLOCK"])
+    report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2"])
     assert report["all_valid"] is True
     assert report["status"] == "READY_FOR_SUBMISSION"
     assert (sub_dir / "validation_report.json").is_file()
@@ -115,7 +115,7 @@ def _write_official_bundle(tmp_path):
         [101, "DOS", -0.1, "AGREE"], [102, "DOS", -0.2, "AGREE"], [103, "BENIGN", 0.1, "AGREE"],
     ], columns=["record_id", "predicted_class", "anomaly_score", "evidence_status"]).to_csv(tmp_path / "classification.csv", index=False)
     pd.DataFrame([
-        ["POL-00001", 101, "SOURCE_IP", "192.0.2.1", 103,
+        ["POL-00001", 101, "SOURCE_IP", "192.0.2.1", 103, "BLOCK"],
     ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]).to_csv(tmp_path / "policy.csv", index=False)
     pd.DataFrame([
         [101, "ALLOW", ""], [102, "BLOCK", "POL-00001"], [103, "ALLOW", ""],
@@ -152,7 +152,7 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
         ["rec-2", "DOS", -0.2, "AGREE"],
     ], columns=["record_id", "predicted_class", "anomaly_score", "evidence_status"]).to_csv(sub_dir / "classification.csv", index=False)
     pd.DataFrame([
-        ["POL-00001", "rec-1", "SOURCE_IP", "192.0.2.10", "rec-2",
+        ["POL-00001", "rec-1", "SOURCE_IP", "192.0.2.10", "rec-2", "BLOCK"],
     ], columns=["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"]).to_csv(sub_dir / "policy.csv", index=False)
     pd.DataFrame([
         ["rec-1", "ALLOW", ""],
