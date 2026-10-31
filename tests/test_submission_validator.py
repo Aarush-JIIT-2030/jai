@@ -112,7 +112,7 @@ from scripts.validate_submissions import validate as validate_official_csvs
 def _write_official_bundle(tmp_path):
     pd.DataFrame({"record_id": [101, 102, 103], "source_ip": ["192.0.2.1", "192.0.2.1", "192.0.2.2"]}).to_csv(tmp_path / "input.csv", index=False)
     pd.DataFrame([
-        [101, "DOS", -0.1, "AGREE"], [102, "DOS", -0.2, "AGREE"], [103, "BENIGN", 0.1, "AGREE"],
+        [101, "DOS", 0.1, "AGREE"], [102, "DOS", 0.2, "AGREE"], [103, "BENIGN", 0.1, "AGREE"],
     ], columns=["record_id", "predicted_class", "anomaly_score", "evidence_status"]).to_csv(tmp_path / "classification.csv", index=False)
     pd.DataFrame([
         ["POL-00001", 101, "SOURCE_IP", "192.0.2.1", 103, "BLOCK"],
@@ -148,8 +148,8 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
     sub_dir = tmp_path / "source_mismatch"
     sub_dir.mkdir()
     pd.DataFrame([
-        ["rec-1", "DOS", -0.1, "AGREE"],
-        ["rec-2", "DOS", -0.2, "AGREE"],
+        ["rec-1", "DOS", 0.1, "AGREE"],
+        ["rec-2", "DOS", 0.2, "AGREE"],
     ], columns=["record_id", "predicted_class", "anomaly_score", "evidence_status"]).to_csv(sub_dir / "classification.csv", index=False)
     pd.DataFrame([
         ["POL-00001", "rec-1", "SOURCE_IP", "192.0.2.10", "rec-2", "BLOCK"],
@@ -163,4 +163,4 @@ def test_bundle_validator_rejects_blocked_record_with_different_observed_source_
     report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2"], source_frame=source)
 
     assert report["all_valid"] is False
-    assert any("does not match the input's observed source IP" in error for error in report["replay"]["errors"])
+    assert any("does not match the input's observed SOURCE_IP scope" in error for error in report["replay"]["errors"])
