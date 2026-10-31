@@ -140,7 +140,7 @@ export function FiveAgentArchitectureView() {
       throughput: "Not independently measured",
       accuracy: "Pattern heuristics; evaluate against labelled validation data",
       classes: "PORT_SCAN, DDOS, BRUTE_FORCE, DOS_SURGE",
-      description: "Maintains a fixed 150-flow cap and configured 300-second age window when timestamps exist. Prefers observed endpoints; missing source IP can fall back to a collision-prone synthetic TCP fingerprint identity. Destination IP is never synthesized.",
+      description: "Maintains a fixed 150-flow cap and configured 300-second age window when timestamps exist. Uses only literal observed source/destination endpoints from the hidden input; missing or invalid endpoints remain unknown.",
     },
     {
       id: 5,
@@ -152,7 +152,7 @@ export function FiveAgentArchitectureView() {
       latency: "See measured replay report",
       throughput: "Not independently measured",
       accuracy: "Causality assertions are tested; see current replay validation",
-      classes: "ALLOW, BLOCK (with active_policy_id POL-XXXXX)",
+      classes: "ALLOW (active_policy_id=NONE), BLOCK (smallest matching active policy ID)",
       description: "Checks earlier active policies before downstream correlation. Confirmed attacks can create a forward-only simulated SOURCE_IP block with a fixed default 150-position lifetime; it never blocks its own trigger row.",
     },
   ];
@@ -810,7 +810,7 @@ export function SubmissionStudio() {
   const fileCards = [
     { filename: "classification.csv", label: "FILE 01", description: "Five-class prediction, anomaly score, and evidence status for every record.", rows: validationReport?.classification?.row_count, header: "record_id,predicted_class,anomaly_score,evidence_status" },
     { filename: "policies.csv", label: "FILE 02", description: "Temporary simulated policies with scope, activation, and expiry.", rows: validationReport?.policies?.policy_count, header: "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id" },
-    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record with policy references.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
+    { filename: "replay.csv", label: "FILE 03", description: "One chronological ALLOW/BLOCK action per record; ALLOW uses NONE and BLOCK uses the smallest matching active policy ID.", rows: validationReport?.replay?.row_count, header: "record_id,action,active_policy_id" },
   ];
 
   return (
