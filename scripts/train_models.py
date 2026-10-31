@@ -72,7 +72,7 @@ def train_models(
         raise RuntimeError("Reloaded Agent 1 artifact does not expose all five organizer classes.")
     if not threat.feature_columns or not anomaly.feature_columns:
         raise RuntimeError("Reloaded model artifact has an empty feature schema.")
-    if threat.metadata.get("training_rows") != anomaly.metadata.get("training_rows") and not anomaly.metadata.get("training_rows"):
+    if int(anomaly.metadata.get("training_rows") or 0) <= 0:
         raise RuntimeError("Agent 2 artifact training metadata is invalid.")
 
     manifest = {
