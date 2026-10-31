@@ -40,12 +40,9 @@ class SubmissionValidator:
 
         with file_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            valid_headers = [
-                ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
-                ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
-            ]
-            if reader.fieldnames not in valid_headers:
-                issues.append(f"Header mismatch. Expected one of {valid_headers}, found {reader.fieldnames}")
+            required_headers = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
+            if reader.fieldnames != required_headers:
+                issues.append(f"Header mismatch. Expected {required_headers}, found {reader.fieldnames}")
 
             for idx, row in enumerate(reader):
                 row_count += 1
@@ -170,8 +167,8 @@ class SubmissionValidator:
 
                 if action == "ALLOW":
                     allow_count += 1
-                    if applied_pol != "NONE":
-                        issues.append(f"Row {idx}: ALLOW action must use active_policy_id=NONE, got '{applied_pol}'")
+                    if applied_pol != "":
+                        issues.append(f"Row {idx}: ALLOW action must have an empty active_policy_id, got '{applied_pol}'")
                 elif action == "BLOCK":
                     block_count += 1
                     if not applied_pol:
@@ -282,11 +279,11 @@ class SubmissionValidator:
                             scope = observed_scope(flow, policy["scope_type"])
                             if scope and scope == policy["scope_value"]:
                                 matches.append(policy["policy_id"])
-                expected_id = min(matches) if matches else "NONE"
+                expected_id = min(matches) if matches else ""
                 if action == "ALLOW":
-                    if active_id != "NONE":
+                    if active_id != "":
                         replay_res["valid"] = False
-                        replay_res["errors"].append(f"Record {rid}: ALLOW must use active_policy_id=NONE.")
+                        replay_res["errors"].append(f"Record {rid}: ALLOW must have an empty active_policy_id.")
                         replay_res["total_errors"] += 1
                     if source_frame is not None and matches:
                         replay_res["valid"] = False
