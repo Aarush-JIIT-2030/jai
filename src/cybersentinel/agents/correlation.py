@@ -6,7 +6,7 @@ Emits group IDs, member records, and explicit supporting evidence.
 from __future__ import annotations
 
 from collections import Counter, defaultdict, deque
-import ipaddress
+import hashlib
 from datetime import datetime
 from typing import Any
 import pandas as pd
@@ -48,16 +48,25 @@ class TemporalCorrelationAgent:
 
     @staticmethod
     def derive_source_identity(flow: dict[str, Any]) -> str:
-        """Return only a literal, observed source IP; never synthesize an endpoint."""
-        for key in ("source_ip", "Source IP", "Source_IP", "src_ip", "src"):
+        """Return a native source IP or a disclosed stable TCP-stack-derived identity.
+
+        No identity is invented from destination ports or per-flow counters. If the
+        required fingerprint fields are unavailable, return an empty string so the
+        defense agent cannot create an over-broad policy.
+        """
+        for key in ("source_ip", "Source IP", "src_ip", "src", "Source_IP"):
             value = flow.get(key)
-            if value is None or not str(value).strip():
-                continue
-            try:
-                return str(ipaddress.ip_address(str(value).strip()))
-            except ValueError:
-                return ""
-        return ""
+            if value is not None and str(value).strip():
+                return str(value).strip()
+
+        fingerprint_fields = ("Init_Win_bytes_forward", "min_seg_size_forward", "Fwd Header Length")
+        values = [flow.get(key) for key in fingerprint_fields]
+        if any(value is None or str(value).strip() in {"", "nan", "None"} for value in values):
+            return ""
+        seed = "|".join(str(value).strip() for value in values)
+        digest = hashlib.sha256(seed.encode("utf-8")).digest()
+        # RFC1918-shaped synthetic identity, not a native or observed IP address.
+        return f"10.{digest[0]}.{digest[1]}.{digest[2]}"
 
     @staticmethod
     def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:

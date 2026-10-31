@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
+import ipaddress
 import logging
 from pathlib import Path
 from typing import Any
@@ -113,6 +114,11 @@ class SubmissionValidator:
                 if action != "BLOCK":
                     issues.append(f"Row {idx}: Policy action must be BLOCK, got '{action}'")
 
+                try:
+                    ipaddress.ip_address(str(row.get("scope_value", "")).strip())
+                except ValueError:
+                    issues.append(f"Row {idx}: SOURCE_IP scope_value must be a literal IP address.")
+
         return {
             "file": file_path.name,
             "valid": len(issues) == 0,
@@ -191,6 +197,49 @@ class SubmissionValidator:
         policy_res = cls.validate_policy(output_dir / "policy.csv")
         replay_res = cls.validate_replay(output_dir / "replay.csv", expected_records, policy_res.get("policies", {}))
 
+        # Cross-file causal validation uses organizer record order, never numeric ID arithmetic.
+        expected = [str(value) for value in expected_records]
+        positions = {record_id: index for index, record_id in enumerate(expected)}
+        for filename in ("classification.csv", "replay.csv"):
+            path = output_dir / filename
+            if path.is_file():
+                with path.open("r", encoding="utf-8", newline="") as handle:
+                    rows = list(csv.DictReader(handle))
+                actual = [str(row.get("record_id", "")) for row in rows]
+                if actual != expected:
+                    target = class_res if filename == "classification.csv" else replay_res
+                    target["valid"] = False
+                    target["errors"].append("Record IDs must exactly match the organizer input order.")
+                    target["total_errors"] = target.get("total_errors", 0) + 1
+
+        policy_map = policy_res.get("policies", {})
+        for policy_id, policy in policy_map.items():
+            activation = str(policy.get("activated_after_record_id", ""))
+            expiry = str(policy.get("expires_after_record_id", ""))
+            if activation not in positions or expiry not in positions:
+                policy_res["valid"] = False
+                policy_res["errors"].append(f"Policy {policy_id}: activation/expiry record ID is absent from input.")
+            elif positions[activation] >= positions[expiry]:
+                policy_res["valid"] = False
+                policy_res["errors"].append(f"Policy {policy_id}: expiry must follow activation.")
+        replay_path = output_dir / "replay.csv"
+        if replay_path.is_file():
+            with replay_path.open("r", encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle):
+                    if row.get("action") != "BLOCK":
+                        continue
+                    policy_id = (row.get("applied_policy_id") or "").strip()
+                    policy = policy_map.get(policy_id)
+                    rid = str(row.get("record_id", ""))
+                    if policy is None:
+                        continue
+                    activation = str(policy.get("activated_after_record_id", ""))
+                    expiry = str(policy.get("expires_after_record_id", ""))
+                    if rid not in positions or activation not in positions or expiry not in positions:
+                        continue
+                    if not (positions[activation] < positions[rid] <= positions[expiry]):
+                        replay_res["valid"] = False
+                        replay_res["errors"].append(f"Record {rid}: policy {policy_id} is not active at this replay position.")
         all_valid = class_res["valid"] and policy_res["valid"] and replay_res["valid"]
         report = {
             "all_valid": all_valid,

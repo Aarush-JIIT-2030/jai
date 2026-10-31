@@ -123,7 +123,7 @@ def system_diagnostics():
         },
         "submission_artifacts": files,
         "history_database": {"present": history_db.is_file()},
-        "source_identity": "native source IP when present; otherwise TCP-stack-derived synthetic identity; unavailable identity fails closed",
+        "source_identity": "literal observed source IP only; missing or invalid source IP disables endpoint correlation and SOURCE_IP policy creation",
         "firewall": {"mode": "simulated-only", "host_firewall_modified": False},
     }
 
