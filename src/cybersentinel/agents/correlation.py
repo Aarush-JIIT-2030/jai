@@ -1,15 +1,12 @@
 """Temporal Correlation Agent (Agent 4).
 
-Groups suspicious flows using observed endpoints where available and an explicitly
-synthetic TCP-fingerprint source identity only when native source IP metadata is absent.
+Groups suspicious flows using literal observed endpoints only. Missing endpoints remain unknown.
 Destination endpoints are never synthesized.
 """
 from __future__ import annotations
 
 from collections import Counter, defaultdict, deque
 import ipaddress
-import hashlib
-import math
 from datetime import datetime
 from typing import Any
 import pandas as pd
@@ -51,7 +48,7 @@ class TemporalCorrelationAgent:
 
     @staticmethod
     def derive_source_identity(flow: dict[str, Any]) -> str:
-        """Prefer observed source IP; otherwise derive a disclosed synthetic TCP fingerprint ID."""
+        """Return only a literal observed source IP; never synthesize an endpoint."""
         for key in ("source_ip", "Source IP", "Source_IP", "src_ip", "src"):
             value = flow.get(key)
             if value is None or not str(value).strip():
@@ -60,19 +57,7 @@ class TemporalCorrelationAgent:
                 return str(ipaddress.ip_address(str(value).strip()))
             except ValueError:
                 continue
-        fingerprint_keys = ("Init_Win_bytes_forward", "min_seg_size_forward", "Fwd Header Length")
-        normalized = []
-        for key in fingerprint_keys:
-            try:
-                numeric = float(flow.get(key))
-            except (TypeError, ValueError, OverflowError):
-                return ""
-            if not math.isfinite(numeric):
-                return ""
-            normalized.append(format(numeric, ".12g"))
-        digest = hashlib.sha256("|".join(normalized).encode("utf-8")).digest()
-        # The 24-bit suffix is intentionally collision-prone; this is not an observed IP.
-        return f"10.{digest[0]}.{digest[1]}.{digest[2]}"
+        return ""
 
     @staticmethod
     def has_observed_source_ip(flow: dict[str, Any]) -> bool:
@@ -89,7 +74,7 @@ class TemporalCorrelationAgent:
         return False
     @staticmethod
     def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:
-        """Extract source identity (observed or synthetic) and literal observed destination endpoint."""
+        """Extract literal observed endpoints; missing endpoint identities remain unknown."""
         src_ip = TemporalCorrelationAgent.derive_source_identity(flow)
 
         dst_ip = ""
@@ -156,7 +141,7 @@ class TemporalCorrelationAgent:
             return CorrelationResult(
                 correlated=False,
                 status="not_ready",
-                message="No valid observed source IP or complete TCP-stack fingerprint is available for endpoint correlation.",
+                message="No valid observed source IP is available for endpoint correlation.",
             )
 
         # Prefer an elapsed-time window when timestamps are present; retain a hard
