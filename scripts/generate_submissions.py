@@ -92,29 +92,11 @@ def main() -> int:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. classification.csv
-    class_csv = engine.export_csv(
-        results["classification_rows"],
-        ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
-    )
-    (args.output_dir / "classification.csv").write_text(class_csv, encoding="utf-8")
-    logger.info("Wrote %s", args.output_dir / "classification.csv")
-
-    # 2. policies.csv
-    policy_csv = engine.export_csv(
-        results["policy_rows"],
-        ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"],
-    )
-    (args.output_dir / "policies.csv").write_text(policy_csv, encoding="utf-8")
-    logger.info("Wrote %s", args.output_dir / "policies.csv")
-
-    # 3. replay.csv
-    replay_csv = engine.export_csv(
-        results["replay_rows"],
-        ["record_id", "action", "active_policy_id"],
-    )
-    (args.output_dir / "replay.csv").write_text(replay_csv, encoding="utf-8")
-    logger.info("Wrote %s", args.output_dir / "replay.csv")
+    # Use the engine's single canonical writer so CLI and API emit the same
+    # exact organizer templates and filenames.
+    generated_files = engine.write_submission_files(results, args.output_dir)
+    for name, path in generated_files.items():
+        logger.info("Wrote %s", path)
 
     # 4. Independently validate full submissions against the original input.
     summary = dict(results["metrics"])
