@@ -96,7 +96,13 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
                 if column in source.columns:
                     src = str(source.iloc[positions[rid]][column]).strip()
                     break
-            if not src or src != pol["scope_value"]:
+            try:
+                observed_ip = str(ipaddress.ip_address(src))
+                policy_ip = str(ipaddress.ip_address(pol["scope_value"]))
+            except ValueError:
+                observed_ip = ""
+                policy_ip = ""
+            if not observed_ip or observed_ip != policy_ip:
                 errors.append(f"Record {rid}: applied policy {applied} source IP does not match an observed input IP.")
     return errors
 
