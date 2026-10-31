@@ -102,7 +102,14 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => { void loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    if (supabase && !authSession) {
+      setHistory([]);
+      setHistoryMessage("");
+      return;
+    }
+    void loadHistory();
+  }, [loadHistory, authSession]);
 
   const loadOverview = useCallback(async () => {
     try {
@@ -123,7 +130,14 @@ export default function App() {
       setHealth({ status: "unavailable", service: "CyberSentinel API", model_ready: false });
     }
   }, []);
-  useEffect(() => { void checkHealth(); void loadOverview(); }, [checkHealth, loadOverview]);
+  useEffect(() => {
+    void checkHealth();
+    if (supabase && !authSession) {
+      setOverview(null);
+      return;
+    }
+    void loadOverview();
+  }, [checkHealth, loadOverview, authSession]);
 
   function inspectFile(file?: File) {
     if (!file) return;
