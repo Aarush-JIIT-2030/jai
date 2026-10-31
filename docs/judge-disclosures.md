@@ -26,7 +26,7 @@ Report the exact model artifact and calibration provenance used for the run.
 - Agent 4 has a 150-record sliding-window cap. When usable timestamps exist, it also applies the configured 300-second age window. These are fixed configuration parameters, not learned or adaptive window sizes.
 - Agent 5's default policy duration is 150 replay positions, capped to the number of later records remaining in the current replay. This is a fixed rule, not an adaptive learned expiry model.
 
-The replay is chronological and causal: a policy is created after its trigger and may affect only later records.
+The replay is chronological and causal: a policy is created after its trigger and may affect only later records. A1/A2 classification and A3 fusion evidence are retained for every input row to satisfy the per-record classification output; an already-active policy controls the replay action before Agent 4 correlation and Agent 5 policy updates. Do not claim that blocked rows save A1/A2 inference.
 
 ## 5. Dataset and operating scope
 
