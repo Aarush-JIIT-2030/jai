@@ -40,7 +40,7 @@ export function TopologyCommandCentre() {
           <div className="panel-kicker">WEBGL 3D · ILLUSTRATIVE REPLAY ARCHITECTURE</div>
           <h3>Five-Agent Replay Architecture</h3>
           <p>
-            Illustrative 3D schematic of the offline five-agent pipeline. It is not a live network map or traffic feed.
+            Illustrative 3D schematic of the offline five-agent pipeline. It is not a live network map or traffic feed; the state selector changes visuals only.
           </p>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -60,7 +60,7 @@ export function TopologyCommandCentre() {
                 fontWeight: threatLevel === lvl ? 600 : 400,
               }}
             >
-              {lvl} THREAT
+              {lvl} SCHEMATIC
             </button>
           ))}
         </div>
