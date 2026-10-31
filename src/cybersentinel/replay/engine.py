@@ -21,7 +21,7 @@ def _extract_field(obj: Any, name: str, default: Any = None) -> Any:
     return val if val is not None else default
 
 class ReplayEngine:
-    """Full 5-agent causal replay orchestrator with high-throughput vectorized scoring."""
+    """Five-agent chronological replay with a policy gate before each record inference."""
     def __init__(self, threat_agent: ThreatDetectionAgent, anomaly_agent: AnomalyDetectionAgent,
                  fusion_agent: EvidenceFusionAgent | None = None,
                  correlation_agent: TemporalCorrelationAgent | None = None,
@@ -137,7 +137,7 @@ class ReplayEngine:
                         attack_type=correlation.attack_type or t_class or "ATTACK",
                         confidence=t_conf, duration=duration,
                     )
-            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id if action == "BLOCK" else "NONE"})
+            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id if action == "BLOCK" else ""})
             if progress_callback and (step % 25000 == 0 or step == total_rows - 1):
                 progress_callback(step + 1, total_rows)
 
