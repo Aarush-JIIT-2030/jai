@@ -81,27 +81,29 @@ No. BENIGN is 52.55% of each split, while BRUTE_FORCE is about 1.21%. The traini
 
 `src/cybersentinel/data/cleaning.py` validates the schema and labels, marks infinities and invalid negative header lengths as missing, removes constant and exact duplicate feature columns, fills missing values using training medians, and can optionally scale features using training medians and interquartile ranges. It keeps all rows and applies the same fitted rules to eval. The command-line tool reads and writes Parquet.
 
-### 11. What work is complete in the repository?
+### 11. What work is present in the repository?
 
-- Member 1 dataset preprocessing and the aggregate data report were merged in PR #6.
-- Member 2 / Agent 1 classifier software was merged in PR #5.
-- PyArrow is included in the optional ML dependencies for Parquet support.
-- The dataset audit report is `docs/data-intelligence.md`.
+- The Member 1 preprocessing implementation and aggregate data audit are in `src/cybersentinel/data/cleaning.py` and `docs/data-intelligence.md`.
+- The production Agent 1, Agent 2, evidence fusion, temporal correlation, adaptive defense, and replay modules are present under `src/cybersentinel/`.
+- Standalone Agent 1 experiment files also remain under `agents/agent1/`; they are separate from the production Random Forest module.
+- Current GitHub Actions checks cover Python tests and the frontend build. They do not establish full-data model metrics.
+- Challenge data, model artifacts, and generated reports remain local and are git-ignored.
 
-### 12. What official model metrics are available?
+### 12. What official model metrics are current?
 
-No official classifier accuracy, macro-F1, confusion matrix, or per-class model scores have been produced in this work. The ID-only diagnostic above is only a leakage check and must not be reported as classifier performance.
+No current full official-evaluation metrics are reproducible from this repository alone. Older reports contain benchmark values from earlier runs; do not present them as current unless they are regenerated with the current code and authorized dataset. The ID-only diagnostic in this questionnaire is a leakage check, not a classifier score.
 
-### 13. What remains to finish the full team challenge?
+### 13. What remains before claiming a verified full challenge run?
 
-- Train and evaluate Agent 1 on the official files. The current Agent 1 training CLI reads CSV; the supplied files are Parquet, so Parquet input support or a conversion step is needed before using that CLI.
-- Implement the independent anomaly detector and evidence-fusion agent; both current modules are placeholders.
-- Run the complete pipeline on official eval records, report measured metrics and limitations, and complete the organizer API summary submission.
+- Train the production Agent 1 and benign-only Agent 2 from the complete authorized training split.
+- Evaluate both agents on the untouched official evaluation split and record class-level results, dataset hashes, and the repeated-feature overlap caveat.
+- Run and validate the chronological replay outputs if required by the current organizer brief.
+- Submit through the organizer’s current API or other required channel, then record the returned submission status.
 
-### 14. Has the organizer API submission been made?
+### 14. Is an organizer submission confirmed here?
 
-No. No benchmark results were submitted. The repository's `/api/analyze` endpoint remains fail-closed until the complete inference pipeline and trained model artifacts are ready.
+The repository does not contain evidence confirming an organizer API submission. A working local API or passing CI is not proof that benchmark results were submitted.
 
 ## Suggested short progress response
 
-“Member 1 inspected the organizer-provided Parquet splits and completed the data audit and train-fitted preprocessing handoff. The files contain 456,737 training rows and 114,185 eval rows across the five canonical classes. The audit found no nulls, infinities, duplicate full rows, or duplicate IDs; it flagged class imbalance, repeated feature vectors across splits, invalid negative header lengths, and `record_id` leakage risk. Preprocessing preserves all rows, excludes the ID from model inputs, and uses training-only fill/scaling values. Agent 1 software is in the repository, but official classifier metrics have not been generated. Agent 2, fusion, full-pipeline evaluation, and API submission remain pending.”
+“My assigned workstream was data engineering. The repository contains the dataset audit and train-fitted preprocessing, and the five-agent software modules are now present. The local data, model artifacts, and generated outputs are intentionally excluded from Git. The GitHub CI checks cover code tests and the frontend build; they do not verify a fresh full-data benchmark or organizer submission. I would report current model scores only after regenerating them against the authorized evaluation split and disclosing the repeated-feature overlap.”

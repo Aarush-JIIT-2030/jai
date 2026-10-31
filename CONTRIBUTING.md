@@ -15,5 +15,16 @@ Use organiser files and exact organiser label mapping. Never commit challenge da
 ## Safety
 Offline flow replay only. Do not add packet sniffing, active scanning, exploitation, or real firewall changes. ALLOW/BLOCK/REVIEW are simulated recommendations.
 
+## Repository hygiene
+
+Keep these out of Git:
+
+- Secrets, access tokens, private keys, and real `.env` files. Use `.env.example` with placeholders.
+- Organizer-provided CSV, Parquet, PCAP, or other challenge records unless the organizers explicitly authorize publication.
+- Prepared datasets, fitted model binaries, generated benchmark reports, submission CSVs, local databases, and run outputs.
+- Dependency folders, build outputs, local virtual environments, and downloaded archives such as ZIP files.
+
+The existing `.gitignore` covers these local artifacts. Before committing, check `git status --short` and confirm ignored files remain ignored. Publish an artifact separately only when it is authorized and needed for release.
+
 ## Before merge
 Run pip install -e ".[dev]" and pytest. Add tests for new behavior and update docs when contracts change.

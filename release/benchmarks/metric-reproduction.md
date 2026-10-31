@@ -1,3 +1,5 @@
+> **Historical snapshot:** This report describes an earlier local run and its generated artifacts. It is not current verification of `main`; reproduce against the current code and authorized local data before citing its status or metrics.
+
 # CyberSentinel — Metric Reproduction & Mathematical Identity Verification
 
 **Document ID:** CS-VERIFY-02  

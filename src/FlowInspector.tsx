@@ -465,7 +465,7 @@ ${result.rationale.map(r => `- ${r}`).join("\n")}
 
 export function AgentReadiness({ health }: { health: { model_ready: boolean; agents?: Record<string, boolean> } | null }) {
   const agents = [
-    ["Agent 1 · Threat Detection (LightGBM)", Boolean(health?.agents?.agent_1_threat_detection)],
+    ["Agent 1 · Threat Detection (Random Forest)", Boolean(health?.agents?.agent_1_threat_detection)],
     ["Agent 2 · Anomaly Detection (Isolation Forest)", Boolean(health?.agents?.agent_2_anomaly_detection)],
     ["Agent 3 · Evidence Fusion Matrix", Boolean(health?.agents?.agent_3_evidence_fusion)],
     ["Agent 4 · Temporal Correlation (150-Flow Window)", Boolean(health?.agents?.agent_4_temporal_correlation)],

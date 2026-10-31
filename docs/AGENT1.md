@@ -56,18 +56,14 @@ python agents/agent1/predict_agent1.py \
   --output predictions.csv
 ```
 
-## Verified Holdout Performance (114,185 Flows)
+## Available Training Evidence
 
-- **Accuracy:** 99.9956%
-- **Macro-F1:** 0.999897
-- **Macro-Precision:** 0.999983
-- **Macro-Recall:** 0.999811
-- **Per-Class F1:**
-  - `BENIGN`: 0.999958 (Support: 60,001)
-  - `BRUTE_FORCE`: 0.999639 (Support: 1,384)
-  - `DOS`: 0.999958 (Support: 24,000)
-  - `DDOS`: 1.000000 (Support: 14,400)
-  - `PORT_SCAN`: 0.999931 (Support: 14,400)
+The checked-in report at `agents/agent1/training_report.json` describes a **standalone HistGradientBoosting experiment**, not the production model in `src/cybersentinel/agents/threat_detection/`. It used an incomplete 288,750-row training export and a grouped internal holdout:
+
+- Accuracy: `0.999948`
+- Macro-F1: `0.999965`
+
+These are internal experiment results, not scores on the organizer's official evaluation set. The production module defaults to Random Forest; no current official-evaluation score should be quoted until a fresh run is made with the complete authorized data and the production model.
 
 ## Design & Hygiene Controls
 
