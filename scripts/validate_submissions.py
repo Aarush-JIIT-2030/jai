@@ -68,6 +68,8 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
     scores = pd.to_numeric(classification["anomaly_score"], errors="coerce")
     if scores.isna().any() or not np.isfinite(scores.to_numpy(dtype=float)).all():
         errors.append("classification.csv contains missing or non-finite anomaly_score values.")
+    elif ((scores < 0.0) | (scores > 1.0)).any():
+        errors.append("classification.csv anomaly_score values must be within [0,1].")
 
     policy_ids = policies["policy_id"].tolist()
     if any(not x for x in policy_ids) or len(policy_ids) != len(set(policy_ids)):
