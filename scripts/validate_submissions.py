@@ -123,8 +123,6 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
         policy_id = policy["policy_id"]
         if policy["policy_action"] != "BLOCK":
             errors.append(f"Policy {policy_id}: policy_action must be BLOCK.")
-        if policy["policy_action"] != "BLOCK":
-            errors.append(f"Policy {policy_id}: policy_action must be BLOCK.")
         scope_type = policy["scope_type"]
         activation_id = policy["activated_after_record_id"]
         expiry_id = policy["expires_after_record_id"]
