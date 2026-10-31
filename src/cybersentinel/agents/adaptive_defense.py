@@ -105,10 +105,9 @@ class AdaptiveDefenseAgent:
 
     @staticmethod
     def _is_valid_ip_scope(value: str) -> bool:
-        """Accept an IP-formatted observed or deterministic synthetic source identity.
+        """Accept only a literal observed IP address for simulated scope.
 
-        The caller must preserve and disclose the identity origin; IP syntax alone
-        does not prove that a value was observed on the network.
+        The caller supplies only a value parsed from the original flow endpoint field.
         """
         try:
             ipaddress.ip_address(str(value).strip())
