@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import Papa from "papaparse";
 import {
   Activity, ArrowRight, ArrowUpRight, Check,
-  ChevronDown, CircleHelp, CloudUpload, Cpu, Database, Download, FileSpreadsheet, Fingerprint,
+  ChevronDown, CircleHelp, CloudUpload, Cpu, Database, FileSpreadsheet, Fingerprint,
   Gauge, Layers, LockKeyhole, Menu, X, Network, Play, RefreshCw, Shield,
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles
 } from "lucide-react";
@@ -16,7 +16,6 @@ const EvidenceFusionStudio = lazy(() => import("./Level2Consoles").then(module =
 const TemporalCorrelationConsole = lazy(() => import("./Level2Consoles").then(module => ({ default: module.TemporalCorrelationConsole })));
 const AdaptiveDefenseConsole = lazy(() => import("./Level2Consoles").then(module => ({ default: module.AdaptiveDefenseConsole })));
 const ReplayStudio = lazy(() => import("./Level2Consoles").then(module => ({ default: module.ReplayStudio })));
-const SubmissionStudio = lazy(() => import("./Level2Consoles").then(module => ({ default: module.SubmissionStudio })));
 const ModelIntelligenceView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.ModelIntelligenceView })));
 const AuditHistoryView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.AuditHistoryView })));
 const SystemHealthView = lazy(() => import("./Level2Consoles").then(module => ({ default: module.SystemHealthView })));
@@ -155,7 +154,6 @@ export default function App() {
         ["Temporal Investigations", Activity],
         ["Adaptive Defense", ShieldAlert],
         ["Replay Studio", Play],
-        ["Submission Studio", Download],
         ["Model Intelligence", Cpu],
         ["Audit & Local History", Database],
         ["Settings & Health", SlidersHorizontal],
@@ -348,7 +346,6 @@ export default function App() {
         {activeNav === "Temporal Investigations" && <TemporalCorrelationConsole />}
         {activeNav === "Adaptive Defense" && <AdaptiveDefenseConsole />}
         {activeNav === "Replay Studio" && <ReplayStudio modelReady={Boolean(health?.model_ready)} />}
-        {activeNav === "Submission Studio" && <SubmissionStudio />}
         {activeNav === "Model Intelligence" && <ModelIntelligenceView />}
         {activeNav === "Audit & Local History" && <AuditHistoryView />}
         {activeNav === "Settings & Health" && <SystemHealthView health={health} />}
