@@ -48,6 +48,10 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
     if len(ids) != len(set(ids)):
         errors.append("Input record_id values are not unique.")
     positions = {rid: i for i, rid in enumerate(ids)}
+    if "seq" in source.columns:
+        seq = pd.to_numeric(source["seq"], errors="coerce")
+        if seq.isna().any() or seq.duplicated().any() or seq.tolist() != list(range(1, len(source) + 1)):
+            errors.append("Input seq must be the exact 1-based organizer replay order.")
 
     classification = _read(output_dir / "classification.csv", CLASS_COLUMNS)
     policies = _read(output_dir / "policies.csv", POLICY_COLUMNS)
