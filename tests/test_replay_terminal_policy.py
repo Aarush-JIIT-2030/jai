@@ -6,19 +6,13 @@ from cybersentinel.replay import ReplayEngine
 
 
 class AttackThreatAgent:
-    def predict_many(self, frame):
-        return [
-            ThreatDetectionResult(predicted_class="DOS", confidence=0.99, status="success")
-            for _ in range(len(frame))
-        ]
+    def predict(self, flow):
+        return ThreatDetectionResult(predicted_class="DOS", confidence=0.99, status="success")
 
 
 class AttackAnomalyAgent:
-    def score_frame(self, frame):
-        return [
-            AnomalyDetectionResult(anomaly_score=-0.2, is_anomaly=True, evidence=[], status="success")
-            for _ in range(len(frame))
-        ]
+    def score(self, flow):
+        return AnomalyDetectionResult(anomaly_score=0.9, is_anomaly=True, evidence=[], status="success")
 
 
 def test_final_replay_record_does_not_create_unusable_policy():
