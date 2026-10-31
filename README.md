@@ -10,10 +10,24 @@ CyberSentinel is an offline, five-agent network-flow intrusion detection and sim
 
 > **Operating boundary:** CyberSentinel evaluates supplied flow records and performs offline chronological replay. `ALLOW`, `BLOCK`, and `REVIEW` are simulated decisions. It does not capture live packets, monitor sockets, inject traffic, or modify operating-system firewalls.
 
+## Five-minute presentation route
+
+| Time | Focus | Presenter pointers |
+|---|---|---|
+| 00:00–00:35 | Problem and goal | Introduce flow analysis and the goal of combining independent evidence with temporal context. |
+| 00:35–01:30 | Five-agent architecture | Show the two learned detectors and three deterministic response agents. |
+| 01:30–02:45 | Analyst console | Use actual local artifacts; mark manual fusion inputs as what-if scenarios. |
+| 02:45–03:45 | Causal replay | Explain pre-existing policy checks and why a trigger cannot block itself. |
+| 03:45–04:35 | Evaluation | Show a fresh labelled report, run hashes, and the repeated-feature overlap caveat. |
+| 04:35–05:00 | Submission and limits | Show the three outputs and validator; a local pass is not organizer acceptance. |
+
+Confirm data/model readiness with diagnostics before the demo. Do not present archived metrics as current results or infer hidden-set performance from unlabelled replay.
+
 ---
 
 ## Contents
 
+- [Five-minute presentation route](#five-minute-presentation-route)
 - [System at a glance](#system-at-a-glance)
 - [Five-agent architecture](#five-agent-architecture)
 - [Data and model contract](#data-and-model-contract)
@@ -273,6 +287,19 @@ The evaluation implementation also contains assumptions that should be kept visi
 - **Feature-vector hashing rounds numeric features to four decimals** in the generalization evaluator, so “seen” means matching the evaluator's canonicalized signature, not necessarily bitwise-identical raw rows.
 - **The framework tests use synthetic fixtures** to test metric shapes, API-facing contracts, and validator behavior. Synthetic test fixtures are not benchmark evidence and are not production dataset results.
 
+### Evidence path for presentation claims
+
+```mermaid
+flowchart TD
+  CLAIM["Choose the claim"] --> TYPE{"Claim type?"}
+  TYPE -->|"Model performance"| LABELED["Fresh labelled evaluation data"]
+  LABELED --> SCORE["Score existing models and record hashes"]
+  SCORE --> METRIC["Present measured metrics with overlap caveat"]
+  TYPE -->|"Submission correctness"| HIDDEN["Unlabelled hidden replay input"]
+  HIDDEN --> VALIDATE["Generate and validate exact CSV templates"]
+  VALIDATE --> CONTRACT["Claim schema/order consistency only"]
+  TYPE -->|"Hidden accuracy or live protection"| LIMIT["Not supported by labels or offline scope"]
+```
 ## Chronological replay and submissions
 
 The separate Level 2 replay path takes the organizer's unlabelled replay input and generates three CSV files. Its authoritative workflow is documented in [`docs/level2-brief.md`](docs/level2-brief.md), [`docs/judge-disclosures.md`](docs/judge-disclosures.md), and [`docs/evaluation.md`](docs/evaluation.md).
@@ -321,6 +348,24 @@ The labelled CICIDS2017 training/evaluation feature partitions contain numeric f
 ## Analyst console
 
 The React/TypeScript application is mounted from `src/main.tsx` and `src/App.tsx`. The analyst console includes:
+
+### Demo walkthrough
+
+Follow this path and show only outputs from the current local run:
+
+```mermaid
+flowchart LR
+  START["Check diagnostics"] --> READY{"Authorized data and models ready?"}
+  READY -->|"Yes"| OVERVIEW["SOC overview + architecture"]
+  READY -->|"No"| UNAVAILABLE["Show unavailable state; skip metric claims"]
+  OVERVIEW --> FLOW["Flow inspector"]
+  FLOW --> FUSION["Evidence fusion<br/>label manual inputs as what-if"]
+  FUSION --> REPLAY["Chronological replay studio"]
+  REPLAY --> OUTPUTS["Review classification, replay, and policy outputs"]
+  OUTPUTS --> VALIDATE["Run independent validator"]
+  VALIDATE --> CLOSE["Close with scope and limitations"]
+  UNAVAILABLE --> CLOSE
+```
 
 1. **SOC overview:** a WebGL schematic of the five-agent system, with a 2D fallback. Visual effects are illustrative, not live traffic telemetry.
 2. **Five-agent architecture:** agent responsibilities, model parameters, and input/output contracts.
