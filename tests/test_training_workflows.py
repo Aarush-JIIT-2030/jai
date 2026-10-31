@@ -86,11 +86,14 @@ def test_combined_training_workflow_reloads_both_real_model_artifacts(tmp_path):
         report_dir=tmp_path / "reports",
         n_estimators=20,
     )
-    assert manifest["status"] == "TRAINED_AND_RELOADED"
-    assert manifest["hidden_records_used_for_training_or_calibration"] is False
-    assert manifest["agent_1"]["training_rows"] == len(training)
-    assert manifest["agent_2"]["training_rows"] == 20
-    assert manifest["agent_1"]["confidence_calibrated"] is False
-    assert manifest["agent_2"]["threshold_calibrated"] is False
-    assert Path(manifest["agent_1"]["artifact"]).is_file()
-    assert Path(manifest["agent_2"]["artifact"]).is_file()
+    assert manifest["training_rows"] == len(training)
+    assert manifest["model_training_rows"] == 85
+    assert manifest["validation_rows"] == 15
+    assert manifest["evaluation_data_used_for_training_or_calibration"] is False
+    assert manifest["hidden_data_used_for_training_or_calibration"] is False
+    assert manifest["a1"]["training_rows"] == 85
+    assert manifest["a2"]["training_rows"] == 17
+    assert manifest["a1"]["confidence_calibrated"] is True
+    assert manifest["a2"]["threshold_calibrated"] is True
+    assert Path(manifest["a1"]["artifact"]).is_file()
+    assert Path(manifest["a2"]["artifact"]).is_file()
