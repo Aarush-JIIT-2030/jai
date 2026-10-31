@@ -56,7 +56,7 @@ flowchart TD
 
 4. **Agent 4 (Temporal Correlation Agent):**
    - Maintains a stateful 150-flow sliding window across arrival order.
-   - Correlates isolated probes into multi-stage attack campaigns: distributed Port Scans, DDoS amplification bursts, and authentication sweeps.
+   - Correlates isolated probes into multi-stage campaigns using observed endpoints and bounded time windows. DDoS and brute-force heuristics require matching A1 attack-class evidence; ordinary web fan-in or repeated benign SSH flows alone do not trigger those campaigns.
    - Extracts target endpoints, member records, and threat group IDs.
 
 5. **Agent 5 (Adaptive Defense Agent):**
