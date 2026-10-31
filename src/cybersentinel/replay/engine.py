@@ -152,7 +152,8 @@ class ReplayEngine:
                 "activated_after_record_id": policy.activated_after_record_id,
                 "scope_type": policy.scope_type, "scope_value": policy.scope_value,
                 "expires_after_record_id": record_ids[expiry_step],
-                                                            })
+                "policy_action": policy.policy_action,
+            })
         observed_source_flags = [TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records]
         observed_identity_count = sum(observed_source_flags)
         unresolved_identity_count = total_rows - observed_identity_count
@@ -194,8 +195,8 @@ class ReplayEngine:
         out_path.mkdir(parents=True, exist_ok=True)
         results = self.run_replay(df)
         files = {
-            "classification": (["record_id", "predicted_class", "anomaly_score", "evidence_status"], results["classification_rows"]),
-            "policies": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"], results["policy_rows"]),
+            "classification": (["record_id", "predicted_class", "anomaly score", "evidence status"], [{**row, "anomaly score": row["anomaly_score"], "evidence status": row["evidence_status"]} for row in results["classification_rows"]]),
+            "policy": (["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"], results["policy_rows"]),
             "replay": (["record_id", "action", "active_policy_id"], results["replay_rows"]),
         }
         paths = {}
