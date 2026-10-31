@@ -1,46 +1,29 @@
-# CyberSentinel — SOURCE_IP Scope & Synthetic Identity Disclosure
+# CyberSentinel — Observed Endpoint Scope Audit
 
-**Current release status:** The replay engine prefers a valid native source IP. When none is present, it derives a deterministic synthetic source identity from TCP-stack fingerprint fields and uses that identity for Agent 4 source grouping and Agent 5 simulated SOURCE_IP policies.
+**Current release rule:** Agent 4 and Agent 5 use only literal endpoint values present in the replay input. Missing or invalid endpoints remain unknown. The system never fabricates an IP address from flow fingerprints.
 
-## 1. Why a synthetic identity is used
+## Organizer hidden input
 
-The prepared CICIDS2017 feature matrix contains numeric flow features and a label, but no native Layer-3 source/destination IP columns. The Day 2 policy interface expects a `SOURCE_IP` scope. To preserve source-level grouping and forward policy behavior on feature-only rows, the implementation derives a deterministic pseudo-IPv4 identity when a valid source IP is absent.
+The supplied 200-row hidden replay input contains native source_ip and destination_ip fields, alongside record_id, seq, protocol, ports, day, and time_offset. These observed endpoints are available to correlation and policy replay.
 
-## 2. Derivation
+The CICIDS2017 training/evaluation feature partitions are feature matrices and do not supply native Layer-3 endpoints. That does not justify manufacturing endpoints for the hidden replay. Model training and endpoint-aware hidden replay remain separate concerns.
 
-Derivation order:
-1. If a valid native source IP field is present, normalize and use that observed address.
-2. Otherwise require all three TCP-stack fingerprint fields: `Init_Win_bytes_forward`, `min_seg_size_forward`, and `Fwd Header Length`.
-3. Convert finite numeric values to stable normalized strings, join them in a fixed field order, and hash the tuple with SHA-256.
-4. Render the first three digest bytes as a private-address-shaped value in `10.x.y.z`.
-5. If any required fingerprint field is missing or non-finite, return no source identity and fail closed for source correlation/policy creation.
+## Scope rules
 
-The replay and both validators call the same `TemporalCorrelationAgent.derive_source_identity()` helper so policy creation and validation use the same mapping.
+- SOURCE_IP: a normalized literal IP from the current row's source_ip field.
+- DESTINATION_IP: a normalized literal IP from the current row's destination_ip field.
+- SRC_DST_PAIR: the normalized literal source and destination joined as source|destination.
+- If a required endpoint is absent, malformed, or non-literal, the corresponding scope cannot be created or matched.
+- TCP fingerprint fields such as Init_Win_bytes_forward, min_seg_size_forward, and Fwd Header Length are never converted into IP addresses.
 
-## 3. Critical limitations
+## Validation
 
-- The derived value is **synthetic, not an observed Layer-3 address**. It is not obtained from packet capture, a socket, or an endpoint inventory.
-- Identical TCP-stack fingerprints intentionally produce the same identity. Two distinct clients with the same tuple are indistinguishable to this fallback.
-- Only 24 hash bits are rendered into the pseudo-IPv4 suffix, so different fingerprints can also collide by chance.
-- NAT, proxies, virtualisation and common OS/network-stack defaults reduce fingerprint uniqueness.
-- A SOURCE_IP policy collision can block benign traffic from another client sharing the synthetic identity. Report false-block and benign-preservation metrics; do not present containment without this caveat.
-- Destination IP is never synthesized. Destination-convergence correlation requires a literal observed destination IP.
+Both validators recompute policy scope matches from the original input row and the policy scope type. A BLOCK must reference a known policy that is active after its activation record and through its expiry record, inclusive. The scope must match the observed endpoint(s) for the blocked record.
 
-## 4. Scored interface and validator behavior
+## Limitations
 
-The official policy file uses `scope_type=SOURCE_IP` and `policy_action=BLOCK`. When the source is synthetic, `scope_value` contains the deterministic pseudo-IP described above. The independent validator recomputes the same identity from the original row's TCP-stack fields; it does not claim that the value is observed.
+- If an organizer replay input omits native endpoints, endpoint correlation and endpoint-scoped policy generation are intentionally unavailable for those records.
+- No pseudo-IP, hash-derived identity, or fingerprint-derived endpoint is permitted in the official submission.
+- The hidden input is unlabelled, so false-block rates and attack containment cannot be measured from the hidden replay itself.
 
-Replay metrics include `synthetic_source_identity_rows` and `source_identity_mode` so the run report identifies synthetic usage. Preserve those metrics with the output bundle.
-
-## 5. Required checks before final submission
-
-Regenerate the three official CSVs from the exact hidden replay input and measure:
-- count of rows with observed versus synthetic source identities,
-- number of unique synthetic identities and identical-fingerprint groups,
-- distinct fingerprint tuples that collide after 24-bit truncation,
-- policy creation and expiry invariants,
-- attack containment and benign preservation,
-- false blocks attributable to identical-fingerprint and hash collisions,
-- exact official CSV/API validation.
-
-Never describe a synthetic SOURCE_IP as an observed endpoint. Do not reuse collision counts or false-block attribution from a different fingerprint mapping or replay input.
+Do not describe a missing endpoint as a synthetic or observed IP. Do not claim live firewall enforcement; all ALLOW/BLOCK outcomes are simulated offline replay actions.
