@@ -21,7 +21,7 @@ python scripts/validate_submissions.py --input PATH_TO_ORGANIZER_INPUT --output-
 
 The independent validator verifies record coverage and ordering, exact official headers, five-class predictions, allowed evidence states, finite anomaly scores, unique policy IDs, literal IP scopes, policy activation/expiry ordering, causal BLOCK references, and matching observed source IP.
 
-The API's bundle validator also checks exact record ordering and policy lifecycle boundaries. It does not have the raw source rows, so use the independent validator for source-IP-to-record matching.
+The API's bundle validator checks exact record ordering, policy lifecycle boundaries, and (when validating against the installed evaluation frame) that every BLOCK policy scope matches the observed source IP for that record. The independent CLI validator performs the same source-IP-to-record check against the original input file.
 
 ## Explicit limitations
 
