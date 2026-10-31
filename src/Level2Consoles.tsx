@@ -252,10 +252,10 @@ export function FiveAgentArchitectureView() {
 // 3. EVIDENCE FUSION STUDIO (Agent 3 Matrix & Interactive Simulator)
 // ============================================================================
 export function EvidenceFusionStudio() {
-  const [threatClass, setThreatClass] = useState("PORT_SCAN");
-  const [confidence, setConfidence] = useState(0.88);
-  const [anomalyScore, setAnomalyScore] = useState(0.75);
-  const [isAnomaly, setIsAnomaly] = useState(true);
+  const [threatClass, setThreatClass] = useState("BENIGN");
+  const [confidence, setConfidence] = useState(0.5);
+  const [anomalyScore, setAnomalyScore] = useState(0);
+  const [isAnomaly, setIsAnomaly] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -290,8 +290,8 @@ export function EvidenceFusionStudio() {
       <div className="panel-head">
         <div>
           <div className="panel-kicker">AGENT 03 · EVIDENCE FUSION & DECISION MATRIX</div>
-          <h3>Production Fusion Workbench</h3>
-          <p>Submits explicit A1 and A2 evidence to the same Python fusion agent used by the replay engine.</p>
+          <h3>Evidence Fusion Rule Simulator</h3>
+          <p>Evaluates manually entered what-if evidence using the same Python fusion rules as replay. Inputs are not model predictions or observed traffic.</p>
         </div>
         <span className="panel-icon"><Fingerprint size={18} /></span>
       </div>
@@ -304,7 +304,7 @@ export function EvidenceFusionStudio() {
             {["BENIGN", "PORT_SCAN", "DOS", "DDOS", "BRUTE_FORCE"].map(value => <option key={value}>{value}</option>)}
           </select>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
-            <span style={{ color: "var(--muted)" }}>A1 confidence (model output)</span><b>{confidence.toFixed(2)}</b>
+            <span style={{ color: "var(--muted)" }}>A1 confidence input (manual)</span><b>{confidence.toFixed(2)}</b>
           </div>
           <input aria-label="A1 confidence" type="range" min="0" max="1" step="0.01" value={confidence} onChange={e => setConfidence(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
@@ -313,17 +313,17 @@ export function EvidenceFusionStudio() {
           <input aria-label="A2 anomaly score" type="range" min="0" max="1" step="0.01" value={anomalyScore} onChange={e => setAnomalyScore(Number(e.target.value))} style={{ width: "100%", marginBottom: 14 }} />
           <label style={{ display: "flex", alignItems: "center", gap: 9, color: "var(--muted)", fontSize: 11 }}>
             <input type="checkbox" checked={isAnomaly} onChange={e => setIsAnomaly(e.target.checked)} />
-            A2 independently flagged this flow as anomalous
+            Manual A2 anomaly flag input
           </label>
           <button className="primary-btn" type="button" onClick={runFusion} disabled={busy} style={{ marginTop: 16, width: "100%" }}>
-            {busy ? "Evaluating with Agent 3…" : "Run production fusion"} <Fingerprint size={15}/>
+            {busy ? "Evaluating with Agent 3…" : "Evaluate manual scenario"} <Fingerprint size={15}/>
           </button>
         </div>
 
         <div style={{ background: "var(--panel2)", padding: 16, borderRadius: 8, border: "1px solid var(--line)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Agent 3 decision output</div>
           {error && <div className="parse-warning" role="alert">{error}</div>}
-          {!result && !error && <div className="empty-inline">Run the workbench to request a decision from the backend fusion agent. No result is assumed.</div>}
+          {!result && !error && <div className="empty-inline">Set the what-if inputs and evaluate them. This panel does not create a flow record or change replay artifacts.</div>}
           {result && <>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 12 }}>
               <span className={"tag " + (result.action === "BLOCK" ? "tag-red" : result.action === "ALLOW" ? "tag-green" : "tag-amber")}>{result.action}</span>
@@ -343,7 +343,7 @@ export function EvidenceFusionStudio() {
       </div>
       <div className="panel-foot">
         <span><LockKeyhole size={13} /> Backend-authoritative Agent 3 · simulated action only</span>
-        <span>Confidence threshold and anomaly flag come from Python implementation</span>
+        <span>Manual inputs only · no flow is analyzed by this simulator</span>
       </div>
     </section>
   );
