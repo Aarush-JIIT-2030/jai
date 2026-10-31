@@ -2,7 +2,7 @@
 
 Produces and verifies the three required competition files:
 1. classification.csv
-2. policy.csv
+2. policies.csv
 3. replay.csv
 """
 from __future__ import annotations
@@ -153,7 +153,7 @@ class SubmissionValidator:
 
         with file_path.open("r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            required_cols = ["record_id", "action", "applied_policy_id"]
+            required_cols = ["record_id", "action", "active_policy_id"]
             if reader.fieldnames != required_cols:
                 issues.append(f"Header mismatch. Expected {required_cols}, found {reader.fieldnames}")
 
@@ -161,7 +161,7 @@ class SubmissionValidator:
                 row_count += 1
                 rec_id = row.get("record_id")
                 action = row.get("action")
-                applied_pol = row.get("applied_policy_id", "").strip()
+                applied_pol = row.get("active_policy_id", "").strip()
 
                 if rec_id in seen_records:
                     issues.append(f"Row {idx}: Duplicate record_id '{rec_id}'")
@@ -173,7 +173,7 @@ class SubmissionValidator:
                 if action == "ALLOW":
                     allow_count += 1
                     if applied_pol != "":
-                        issues.append(f"Row {idx}: ALLOW action must have empty applied_policy_id, got '{applied_pol}'")
+                        issues.append(f"Row {idx}: ALLOW action must have empty active_policy_id, got '{applied_pol}'")
                 elif action == "BLOCK":
                     block_count += 1
                     if not applied_pol:
@@ -203,7 +203,7 @@ class SubmissionValidator:
     ) -> dict[str, Any]:
         """Validate the CSV bundle against input IDs and, when supplied, observed source IPs."""
         class_res = cls.validate_classification(output_dir / "classification.csv", expected_records)
-        policy_res = cls.validate_policy(output_dir / "policy.csv")
+        policy_res = cls.validate_policy(output_dir / "policies.csv")
         replay_res = cls.validate_replay(output_dir / "replay.csv", expected_records, policy_res.get("policies", {}))
 
         # Cross-file causal validation uses organizer record order, never numeric ID arithmetic.
@@ -238,7 +238,7 @@ class SubmissionValidator:
                         if row.get("action") != "BLOCK":
                             continue
                         rid = str(row.get("record_id", ""))
-                        policy_id = (row.get("applied_policy_id") or "").strip()
+                        policy_id = (row.get("active_policy_id") or "").strip()
                         policy = policy_map.get(policy_id)
                         if policy is None or rid not in positions:
                             continue
@@ -280,7 +280,7 @@ class SubmissionValidator:
                 for row in csv.DictReader(handle):
                     if row.get("action") != "BLOCK":
                         continue
-                    policy_id = (row.get("applied_policy_id") or "").strip()
+                    policy_id = (row.get("active_policy_id") or "").strip()
                     policy = policy_map.get(policy_id)
                     rid = str(row.get("record_id", ""))
                     if policy is None:
