@@ -47,7 +47,19 @@ python scripts/evaluate_benchmark.py \
 
 This command loads existing artifacts and scores the labelled evaluation partition. It does not fit, calibrate, or select thresholds. Treat its output as the current evaluation only when it was produced by the exact current code revision and verified input hashes. Include the 8.58% repeated-feature overlap caveat.
 
-## 4. Generate and independently validate all 200 hidden records
+## 4. Run the extended five-agent evaluation suite (optional)
+
+After the training and labelled evaluation partitions are prepared and both model artifacts exist, run:
+
+```bash
+python scripts/evaluate_full_system.py
+```
+
+This supplemental suite writes provenance-bearing JSON reports and PNG/SVG plots under the ignored local directory `outputs/evaluation/`. It evaluates classification, fusion, anomaly detection, seen/unseen feature generalization, leave-one-attack-out experiments, training-only group-isolated confidence calibration, chronological correlation, and simulated adaptive defense. It requires both `data/processed/training_prepared.parquet` and `data/processed/eval_prepared.parquet`; it stops with a clear error if inputs or model artifacts are missing. It does not use the unlabelled hidden replay input and does not generate synthetic substitute results.
+
+The local API exposes only reports that have actually been generated at `/api/evaluation/all` and individual `/api/evaluation/{report_name}` routes. Missing reports are explicitly marked as not generated. Install plotting support through the existing `.[ml]` extra.
+
+## 5. Generate and independently validate all 200 hidden records
 
 ```bash
 python scripts/generate_submissions.py \

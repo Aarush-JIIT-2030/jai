@@ -30,12 +30,14 @@ from cybersentinel.replay.submission import SubmissionValidator
 from cybersentinel.replay.input_validation import validate_replay_input
 from cybersentinel.storage.history_db import list_runs, record_run
 import pandas as pd
+from api.evaluation import router as evaluation_router
 
 app = FastAPI(
     title="CyberSentinel API",
     version="1.0.0",
     description="Offline 5-agent network-flow intrusion detection and adaptive defense replay system.",
 )
+app.include_router(evaluation_router)
 
 THREAT_MODEL = BASE_DIR / "models" / "threat_detection" / "model.joblib"
 ANOMALY_MODEL = BASE_DIR / "models" / "anomaly_detection" / "model.joblib"

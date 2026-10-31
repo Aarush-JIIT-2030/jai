@@ -817,6 +817,20 @@ export function ModelIntelligenceView() {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [evaluationReports, setEvaluationReports] = useState<any>(null);
+  const [evaluationLoading, setEvaluationLoading] = useState(true);
+  const [evaluationError, setEvaluationError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/evaluation/all")
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail?.message || "Evaluation reports unavailable.");
+        setEvaluationReports(data);
+      })
+      .catch(err => setEvaluationError(err instanceof Error ? err.message : "Evaluation reports could not be loaded."))
+      .finally(() => setEvaluationLoading(false));
+  }, []);
 
   useEffect(() => {
     fetch("/api/benchmarks")
@@ -893,6 +907,35 @@ export function ModelIntelligenceView() {
         </div>
         <div style={{ marginTop: 6, fontSize: 10, color: "var(--muted)" }}>Source: {report.evaluation_dataset?.path || "benchmark report"} · Training/evaluation provenance must be checked against the accompanying experiment documentation.</div>
       </>}
+      <div style={{ marginTop: 18, padding: 15, border: "1px solid var(--line)", borderRadius: 10, background: "var(--panel2)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div>
+            <div className="panel-kicker">EXTENDED EVALUATION · LOCAL GENERATED REPORTS</div>
+            <b style={{ fontSize: 13 }}>Five-agent evaluation suite</b>
+            <p style={{ fontSize: 11, color: "var(--muted)", margin: "4px 0 0" }}>Only metrics from generated reports are shown. Missing reports are not replaced with estimates.</p>
+          </div>
+          <span style={{ fontSize: 10, color: "var(--muted)" }}>{evaluationLoading ? "Loading…" : evaluationReports?.status === "ready" ? "All reports available" : evaluationReports?.status === "partial" ? "Partial reports" : "Not generated"}</span>
+        </div>
+        {evaluationError && <div className="parse-warning" role="alert" style={{ marginTop: 10 }}>{evaluationError}</div>}
+        {!evaluationLoading && !evaluationError && <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(135px,1fr))", gap: 9, marginTop: 13 }}>
+            {[
+              ["A1 accuracy", evaluationReports?.reports?.classification?.metrics?.accuracy],
+              ["A1 macro F1", evaluationReports?.reports?.classification?.metrics?.macro_f1],
+              ["A2 ROC-AUC", evaluationReports?.reports?.anomaly?.roc_auc],
+              ["A2 PR-AUC", evaluationReports?.reports?.anomaly?.average_precision],
+              ["A4 campaigns", evaluationReports?.reports?.temporal?.evaluation_summary?.total_campaigns_detected],
+              ["A5 containment", evaluationReports?.reports?.defense?.comparison_table?.config_4_temporal_plus_defense?.containment_rate],
+            ].map(([label, value]) => <div key={String(label)} style={{ padding: 11, borderRadius: 7, border: "1px solid var(--line)", background: "var(--panel)" }}>
+              <small style={{ color: "var(--muted)", fontSize: 9 }}>{label}</small>
+              <div style={{ fontSize: 17, fontWeight: 700, marginTop: 5 }}>{typeof value === "number" ? (String(label).includes("campaigns") ? value.toLocaleString() : value.toFixed(4)) : "—"}</div>
+            </div>)}
+          </div>
+          {evaluationReports?.status === "not_generated" && <p style={{ fontSize: 11, color: "var(--muted)", margin: "12px 0 0" }}>Run <code>python scripts/evaluate_full_system.py</code> locally after preparing the authorized training/evaluation datasets and training both model artifacts. The hidden replay input is not a labelled evaluation set.</p>}
+          {evaluationReports?.missing_reports?.length > 0 && <p style={{ fontSize: 10, color: "var(--muted)", margin: "8px 0 0" }}>Missing: {evaluationReports.missing_reports.join(", ")}</p>}
+        </>}
+      </div>
+
       <div className="panel-foot" style={{ marginTop: 14 }}>
         <span><LockKeyhole size={13} /> No fallback metrics or confusion matrix are fabricated</span>
         <span>CONFIDENCE CALIBRATION IS ARTIFACT-DEPENDENT</span>
