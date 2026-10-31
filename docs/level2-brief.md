@@ -12,12 +12,12 @@ flowchart TD
 
     subgraph A5_Pre["Agent 5: Pre-Filter Phase"]
         PF{Active Policy<br/>Match Source IP?}
-        BLK[Immediate Simulated BLOCK<br/>applied_policy_id = POL-XXXXX<br/>Classification and fusion evidence still retained; skip correlation and policy updates]
+        BLK[Immediate Simulated BLOCK<br/>active_policy_id = POL-XXXXX<br/>Classification and fusion evidence still retained; skip correlation and policy updates]
     end
 
     subgraph Detection["Tri-Agent Core (Analyzed Flows)"]
         A1[Agent 1: Supervised Threat Detection<br/>Random Forest / XGBoost<br/>Class + Confidence]
-        A2[Agent 2: Independent Anomaly Detection<br/>Isolation Forest on Benign Only<br/>Anomaly Score + Out-of-Range Features]
+        A2[Agent 2: Independent Anomaly Detection<br/>Isolation Forest on Benign Only<br/>0–1 anomaly index + out-of-range feature evidence]
         A3[Agent 3: Evidence Fusion<br/>Deterministic 6-Scenario Matrix<br/>Final Action: ALLOW / BLOCK / REVIEW]
     end
 
@@ -28,7 +28,7 @@ flowchart TD
     subgraph A5_Post["Agent 5: Adaptive Policy Generation"]
         PG{Attack Confirmed<br/>by A3 or A4?}
         POL[Activate New Forward Policy<br/>scope_type: SOURCE_IP<br/>expires_after_record_id: N + Offset]
-        ALW[Simulated ALLOW<br/>applied_policy_id = empty]
+        ALW[Simulated ALLOW<br/>active_policy_id = empty]
     end
 
     F --> PF
@@ -51,7 +51,7 @@ flowchart TD
 | **Agent 2: Anomaly Detection** | Unsupervised outlier scoring trained strictly on benign baseline. | `anomaly_score`, `is_anomaly`, `evidence` | `src/cybersentinel/agents/anomaly_detection.py` |
 | **Agent 3: Evidence Fusion** | Deterministic agreement/disagreement reconciliation. | `final_class`, `evidence_status`, `action`, `rationale` | `src/cybersentinel/agents/fusion.py` |
 | **Agent 4: Temporal Correlation** | Correlates sliding-window endpoints to identify coordinated attacks. | `group_id`, `attack_type`, `group_size`, `evidence` | `src/cybersentinel/agents/correlation.py` |
-| **Agent 5: Adaptive Defense** | Evaluates active policies & creates forward-looking temporary blocks. | `action`, `applied_policy_id`, `new_policy` | `src/cybersentinel/agents/adaptive_defense.py` |
+| **Agent 5: Adaptive Defense** | Evaluates active policies & creates forward-looking temporary blocks. | `action`, `active_policy_id`, `new_policy` | `src/cybersentinel/agents/adaptive_defense.py` |
 
 ---
 
@@ -72,12 +72,12 @@ python scripts/generate_submissions.py \
 1. **`classification.csv`**:
    `record_id,predicted_class,anomaly_score,evidence_status`
    * Contains one row per input flow regardless of whether it was later blocked.
-2. **`policy.csv`**:
-   `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
+2. **`policies.csv`**:
+   `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
    * Logs every defensive policy generated after an analyzed attack flow.
 3. **`replay.csv`**:
-   `record_id,action,applied_policy_id`
-   * Every record in exact replay order. Pre-filtered matching records are `BLOCK` with valid `applied_policy_id`. Allowed records are `ALLOW` with empty `applied_policy_id`.
+   `record_id,action,active_policy_id`
+   * Every record in exact replay order. Pre-filtered matching records are `BLOCK` with valid `active_policy_id`. Allowed records are `ALLOW` with empty `active_policy_id`.
 
 ---
 
