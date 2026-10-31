@@ -84,8 +84,6 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
             errors.append(f"Policy {pid}: unsupported scope_type {scope_type!r}.")
         if row["policy_action"] != "BLOCK":
             errors.append("Policy " + pid + ": policy_action must be BLOCK.")
-        if row["policy_action"] != "BLOCK":
-            errors.append("Policy " + pid + ": policy_action must be BLOCK.")
         if scope_type in {"SOURCE_IP", "DESTINATION_IP"} and not _ip(scope_value):
             errors.append(f"Policy {pid}: {scope_type} scope_value must be a literal IP.")
         if scope_type == "SRC_DST_PAIR":
