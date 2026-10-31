@@ -91,7 +91,7 @@ The repository includes a generator for the three replay CSVs:
 
 ```bash
 python scripts/generate_submissions.py \
-  --input data/processed/eval_prepared.parquet \
+  --input data/processed/hidden_replay_input.csv \
   --output-dir outputs/submission
 ```
 
