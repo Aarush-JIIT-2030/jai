@@ -114,3 +114,46 @@ def test_timestamp_window_evicts_old_flows_by_elapsed_time():
     )
     assert result.correlated is False
     assert len(agent.history) == 1
+
+
+def test_repeated_benign_ssh_flows_do_not_become_brute_force_campaigns():
+    agent = TemporalCorrelationAgent(window_size=50)
+    result = None
+    for index in range(6):
+        result = agent.correlate(
+            f"benign-ssh-{index}",
+            {"source_ip": "192.0.2.44", "destination_ip": "192.0.2.10", "Destination Port": 22},
+            threat_class="BENIGN",
+        )
+    assert result is not None
+    assert result.correlated is False
+
+
+def test_many_benign_web_clients_do_not_become_ddos_without_classifier_evidence():
+    agent = TemporalCorrelationAgent(window_size=50)
+    result = None
+    for index in range(10):
+        result = agent.correlate(
+            f"web-{index}",
+            {"source_ip": f"192.0.2.{index + 1}", "destination_ip": "198.51.100.10", "Destination Port": 443},
+            threat_class="BENIGN",
+        )
+    assert result is not None
+    assert result.correlated is False
+
+
+def test_ddos_destination_convergence_requires_attack_classifier_evidence():
+    agent = TemporalCorrelationAgent(window_size=50)
+    for index in range(7):
+        agent.correlate(
+            f"benign-web-{index}",
+            {"source_ip": f"203.0.113.{index + 1}", "destination_ip": "198.51.100.20", "Destination Port": 443},
+            threat_class="BENIGN",
+        )
+    result = agent.correlate(
+        "suspected-ddos",
+        {"source_ip": "203.0.113.8", "destination_ip": "198.51.100.20", "Destination Port": 443},
+        threat_class="DDOS",
+    )
+    assert result.correlated is True
+    assert result.attack_type == "DDOS"
