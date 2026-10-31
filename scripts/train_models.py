@@ -125,6 +125,9 @@ def train_models(
         fit_frame = training_frame
         calibration_frame = None
 
+    if calibration_frame is not None and set(calibration_frame[label_column].unique()) != set(BENCHMARK_CLASSES):
+        raise ValueError("Calibration data must contain all five canonical classes for A1 calibration and A2 threshold selection.")
+
     model_dir.mkdir(parents=True, exist_ok=True)
     report_dir.mkdir(parents=True, exist_ok=True)
     a1_path = model_dir / "threat_detection" / "model.joblib"
