@@ -5,12 +5,11 @@ from pathlib import Path
 import io
 import json
 import base64
+import http.client
 import os
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
 import zipfile
 from typing import Any
 
@@ -261,25 +260,27 @@ def _persist_agent2_event(result: AnomalyDetectionResult, source: str = "agent2_
         "evidence": payload.get("evidence") or [],
         "request_metadata": {"runtime": "vercel" if SERVERLESS_RUNTIME else "local"},
     }
-    request = urllib.request.Request(
-        f"{base_url}/rest/v1/agent2_inference_events",
-        data=json.dumps(record, separators=(",", ":")).encode("utf-8"),
-        headers={
-            "apikey": secret,
-            "Authorization": f"Bearer {secret}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal",
-        },
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(request, timeout=4) as response:
-            if response.status not in (200, 201, 204):
-                return {"stored": False, "reason": f"supabase_http_{response.status}"}
+        connection = http.client.HTTPSConnection("egwguyexqixmqytydesc.supabase.co", timeout=4)
+        connection.request(
+            "POST",
+            "/rest/v1/agent2_inference_events",
+            body=json.dumps(record, separators=(",", ":")),
+            headers={
+                "apikey": secret,
+                "Authorization": f"Bearer {secret}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+        response = connection.getresponse()
+        status = response.status
+        response.read()
+        connection.close()
+        if status not in (200, 201, 204):
+            return {"stored": False, "reason": f"supabase_http_{status}"}
         return {"stored": True, "backend": "supabase"}
-    except urllib.error.HTTPError as exc:
-        return {"stored": False, "reason": f"supabase_http_{exc.code}"}
-    except (urllib.error.URLError, TimeoutError):
+    except (OSError, TimeoutError):
         return {"stored": False, "reason": "supabase_unreachable"}
     except Exception as exc:
         return {"stored": False, "reason": f"supabase_error_{type(exc).__name__}"}
