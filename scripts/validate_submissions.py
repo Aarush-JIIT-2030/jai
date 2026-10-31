@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import numpy as np
 import pandas as pd
+from cybersentinel.agents.correlation import TemporalCorrelationAgent
 
 CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE = {"AGREE", "DISAGREE", "INCOMPLETE"}
@@ -33,8 +34,10 @@ def _observed_scope(source: pd.DataFrame, position: int, scope_type: str) -> str
         "SOURCE_IP": ("source_ip", "Source IP", "Source_IP", "src_ip", "src"),
         "DESTINATION_IP": ("destination_ip", "Destination IP", "Destination_IP", "dst_ip", "dst"),
     }
+    if scope_type == "SOURCE_IP":
+        return TemporalCorrelationAgent.derive_source_identity(row.to_dict())
     if scope_type == "SRC_DST_PAIR":
-        src = next((_ip(row.get(c)) for c in aliases["SOURCE_IP"] if c in source.columns and _ip(row.get(c))), "")
+        src = TemporalCorrelationAgent.derive_source_identity(row.to_dict())
         dst = next((_ip(row.get(c)) for c in aliases["DESTINATION_IP"] if c in source.columns and _ip(row.get(c))), "")
         return f"{src}|{dst}" if src and dst else ""
     return next((_ip(row.get(c)) for c in aliases.get(scope_type, ()) if c in source.columns and _ip(row.get(c))), "")
