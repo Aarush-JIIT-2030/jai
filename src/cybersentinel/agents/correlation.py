@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict, deque
 import ipaddress
-import hashlib
-import math
 from datetime import datetime
 from typing import Any
 import pandas as pd
@@ -50,11 +48,7 @@ class TemporalCorrelationAgent:
 
     @staticmethod
     def derive_source_identity(flow: dict[str, Any]) -> str:
-        """Prefer an observed source IP; otherwise return a deterministic synthetic TCP fingerprint ID.
-
-        The fallback is an IP-shaped compatibility identity, not an observed Layer-3
-        address. It is derived from a small TCP-stack feature tuple and can collide.
-        """
+        """Return only a literal observed source IP; never synthesize an endpoint."""
         for key in ("source_ip", "Source IP", "Source_IP", "src_ip", "src"):
             value = flow.get(key)
             if value is None or not str(value).strip():
@@ -62,29 +56,8 @@ class TemporalCorrelationAgent:
             try:
                 return str(ipaddress.ip_address(str(value).strip()))
             except ValueError:
-                # Invalid endpoint metadata is not trusted; try the fingerprint fallback.
                 continue
-
-        fingerprint_keys = (
-            "Init_Win_bytes_forward",
-            "min_seg_size_forward",
-            "Fwd Header Length",
-        )
-        normalized: list[str] = []
-        for key in fingerprint_keys:
-            value = flow.get(key)
-            try:
-                numeric = float(value)
-            except (TypeError, ValueError, OverflowError):
-                return ""
-            if not math.isfinite(numeric):
-                return ""
-            normalized.append(format(numeric, ".12g"))
-        fingerprint = "|".join(normalized)
-        digest = hashlib.sha256(fingerprint.encode("utf-8")).digest()
-        # Keep the compatibility identity in RFC1918 10/8 space. The 24-bit
-        # suffix is intentionally disclosed as collision-prone.
-        return f"10.{digest[0]}.{digest[1]}.{digest[2]}"
+        return ""
 
     @staticmethod
     def has_observed_source_ip(flow: dict[str, Any]) -> bool:
@@ -101,7 +74,7 @@ class TemporalCorrelationAgent:
         return False
     @staticmethod
     def extract_endpoints(flow: dict[str, Any]) -> tuple[str, str, int]:
-        """Extract observed endpoints; only source identity may be derived."""
+        """Extract literal observed endpoints; missing endpoint identities remain unknown."""
         src_ip = TemporalCorrelationAgent.derive_source_identity(flow)
 
         dst_ip = ""
