@@ -407,7 +407,7 @@ def run_official_replay():
         if "record_id" not in frame.columns:
             raise HTTPException(status_code=422, detail="The evaluation dataset must contain organiser-provided record_id values.")
         record_ids = frame["record_id"].astype(str).tolist()
-        validation = SubmissionValidator.validate_submission_bundle(output_dir, record_ids)
+        validation = SubmissionValidator.validate_submission_bundle(output_dir, record_ids, source_frame=frame)
 
         global _LAST_CORRELATION_GROUPS
         _LAST_CORRELATION_GROUPS = [
@@ -497,7 +497,7 @@ def validate_submissions():
     if len(records) != len(set(records)):
         raise HTTPException(status_code=422, detail="The evaluation dataset contains duplicate record_id values.")
 
-    return SubmissionValidator.validate_submission_bundle(sub_dir, records)
+    return SubmissionValidator.validate_submission_bundle(sub_dir, records, source_frame=source)
 
 
 @app.get("/api/overview")
