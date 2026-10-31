@@ -310,5 +310,5 @@ class AnomalyDetectionAgent:
             profiles=payload.get("profiles", {}),
             threshold=float(payload["threshold"]),
             metadata=payload.get("metadata", {}),
-            score_scale=float(payload["score_scale"]),
+            score_scale=float(payload.get("score_scale", 1.0)),
         )
