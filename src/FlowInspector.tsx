@@ -74,9 +74,9 @@ const MITRE_MAPPING: Record<string, MitreInfo> = {
     ]
   },
   BENIGN: {
-    tactic: "Normal Operations",
-    techniqueId: "T0000",
-    techniqueName: "Legitimate Enterprise Traffic Baseline",
+    tactic: "No malicious tactic assigned",
+    techniqueId: "—",
+    techniqueName: "No ATT&CK technique assigned",
     severity: "INFO",
     nistGuidance: [
       "Observation: Traffic conforms to verified protocol specifications and baseline timing.",
@@ -131,14 +131,14 @@ export function FlowInspector({ modelReady }: { modelReady: boolean }) {
 
   function copyIncidentReport() {
     if (!result || !mitre) return;
-    const report = `# CYBERSENTINEL INCIDENT INVESTIGATION BRIEF
+    const report = `# CYBERSENTINEL FLOW ANALYSIS REPORT
 Generated: ${new Date().toISOString()}\nSource: user-supplied single-flow JSON; offline inference only
 Classification: ${result.final_class}
 Decision Action: ${result.action}
 Evidence Status: ${result.evidence_status}
 Inference Latency: ${result.latency_ms?.toFixed(2)} ms
 
-## MITRE ATT&CK Mapping
+## MITRE ATT&CK Reference
 - Tactic: ${mitre.tactic}
 - Technique: ${mitre.techniqueId} - ${mitre.techniqueName}
 - Severity: ${mitre.severity}
