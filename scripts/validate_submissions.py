@@ -14,7 +14,7 @@ CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 EVIDENCE = {"AGREE", "CONFLICT", "UNCERTAIN"}
 ACTIONS = {"ALLOW", "BLOCK"}
 SCOPES = {"SOURCE_IP", "DESTINATION_IP", "SRC_DST_PAIR"}
-ALLOW_SENTINEL = "NONE"
+ALLOW_SENTINEL = ""
 CLASS_COLUMNS = ["record_id", "predicted_class", "anomaly_score", "evidence_status"]
 POLICY_COLUMNS = [
     "policy_id", "activated_after_record_id", "scope_type",
@@ -167,7 +167,7 @@ def validate(input_path: Path, output_dir: Path) -> list[str]:
 
         if action == "ALLOW":
             if active_policy_id != ALLOW_SENTINEL:
-                errors.append(f"Record {record_id}: ALLOW must use active_policy_id=NONE.")
+                errors.append(f"Record {record_id}: ALLOW must have an empty active_policy_id.")
             if matches:
                 errors.append(f"Record {record_id}: ALLOW is invalid because active policy {expected_policy} matches this flow.")
         elif action == "BLOCK":
