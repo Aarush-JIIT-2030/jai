@@ -41,7 +41,7 @@ def main() -> int:
         "--output-dir",
         type=Path,
         default=Path("submissions"),
-        help="Output directory to save classification.csv, policy.csv, and replay.csv",
+        help="Output directory to save classification.csv, policies.csv, and replay.csv",
     )
     parser.add_argument(
         "--limit",
@@ -89,7 +89,7 @@ def main() -> int:
     (args.output_dir / "classification.csv").write_text(class_csv, encoding="utf-8")
     logger.info("Wrote %s", args.output_dir / "classification.csv")
 
-    # 2. policy.csv
+    # 2. policies.csv
     policy_csv = engine.export_csv(
         results["policy_rows"],
         ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"],
