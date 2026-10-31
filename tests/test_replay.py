@@ -55,7 +55,7 @@ def test_replay_causal_workflow(tmp_path):
     # Flow 101: First attack flow -> ALLOW into analyzer, activates policy
     assert results["replay_rows"][0]["record_id"] == 101
     assert results["replay_rows"][0]["action"] == "ALLOW"
-    assert results["replay_rows"][0]["active_policy_id"] == ""
+    assert results["replay_rows"][0]["applied_policy_id"] == ""
 
     # Flow 102: Second attack flow from same source -> BLOCKED by active policy!
     assert results["replay_rows"][1]["record_id"] == 102
@@ -103,7 +103,7 @@ def test_replay_does_not_fabricate_benign_when_agents_fail():
     assert result["policy_rows"] == []
 
 
-def test_replay_never_creates_policy_from_fingerprint_metadata():
+def test_replay_uses_synthetic_fingerprint_identity_for_forward_policy():
     engine = ReplayEngine(DummyThreatAgent(), DummyAnomalyAgent())
     fingerprint = {
         "Init_Win_bytes_forward": 64240,
@@ -115,8 +115,12 @@ def test_replay_never_creates_policy_from_fingerprint_metadata():
         {"record_id": 2, "Destination Port": 80, **fingerprint},
     ])
     result = engine.run_replay(df)
-    assert result["policy_rows"] == []
-    assert [row["action"] for row in result["replay_rows"]] == ["ALLOW", "ALLOW"]
+    expected_identity = TemporalCorrelationAgent.derive_source_identity(fingerprint)
+    assert len(result["policy_rows"]) == 1
+    assert result["policy_rows"][0]["scope_value"] == expected_identity
+    assert result["replay_rows"][0]["action"] == "ALLOW"
+    assert result["replay_rows"][1]["action"] == "BLOCK"
+    assert result["replay_rows"][1]["applied_policy_id"] == result["policy_rows"][0]["policy_id"]
 
 
 
