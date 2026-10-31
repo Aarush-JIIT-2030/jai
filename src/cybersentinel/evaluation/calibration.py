@@ -111,4 +111,5 @@ def evaluate_probability_calibration(
             "brier_score_reduction": uncalibrated["brier_score"] - calibrated_metrics["brier_score"],
             "log_loss_reduction": uncalibrated["log_loss"] - calibrated_metrics["log_loss"],
         },
+        "evaluation": {"method": "scalar temperature scaling", "uncalibrated": uncalibrated, "calibrated": calibrated_metrics},
     }
