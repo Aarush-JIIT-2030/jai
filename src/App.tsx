@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Papa from "papaparse";
 import {
   Activity, ArrowRight, ArrowUpRight, Check,
@@ -7,6 +7,8 @@ import {
   ShieldAlert, ShieldCheck, SlidersHorizontal, Sparkles
 } from "lucide-react";
 import { ParticleBackdrop } from "./components/ParticleBackdrop";
+import { supabase } from "./lib/supabase";
+import { apiFetch } from "./lib/api";
 const Agent2Console = lazy(() => import("./FlowInspector").then(module => ({ default: module.Agent2Console })));
 const FlowInspector = lazy(() => import("./FlowInspector").then(module => ({ default: module.FlowInspector })));
 const BatchReplay = lazy(() => import("./BatchReplay").then(module => ({ default: module.BatchReplay })));
@@ -61,8 +63,23 @@ const BENCHMARK = ["BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"];
 const formatNumber = (n: number) => new Intl.NumberFormat("en-IN").format(n);
 
 export default function App() {
-  const session = { user: { display_name: "Local analyst", email: null as string | null } };
+  const [authSession, setAuthSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(Boolean(supabase));
+  const session = { user: { display_name: authSession?.user?.email ?? "Local analyst", email: authSession?.user?.email ?? null } };
   const [health, setHealth] = useState<Health | null>(null);
+
+  useEffect(() => {
+    if (!supabase) { setAuthLoading(false); return; }
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) { setAuthSession(data.session); setAuthLoading(false); }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setAuthSession(nextSession);
+      setAuthLoading(false);
+    });
+    return () => { active = false; subscription.unsubscribe(); };
+  }, []);
   const [overview, setOverview] = useState<any>(null);
   const [dataset, setDataset] = useState<DatasetInfo | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
@@ -75,7 +92,7 @@ export default function App() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const response = await fetch("/api/history?limit=8");
+      const response = await apiFetch("/api/history?limit=8");
       if (!response.ok) throw new Error("Local history API unavailable");
       const data = await response.json();
       setHistory(Array.isArray(data.runs) ? data.runs : []);
@@ -90,7 +107,7 @@ export default function App() {
 
   const loadOverview = useCallback(async () => {
     try {
-      const response = await fetch("/api/overview");
+      const response = await apiFetch("/api/overview");
       if (!response.ok) throw new Error("Replay artifacts are not available");
       setOverview(await response.json());
     } catch {
@@ -100,7 +117,7 @@ export default function App() {
 
   const checkHealth = useCallback(async () => {
     try {
-      const response = await fetch("/api/health");
+      const response = await apiFetch("/api/health");
       if (!response.ok) throw new Error("API unavailable");
       setHealth(await response.json());
     } catch {
@@ -139,6 +156,9 @@ export default function App() {
   const knownLabels = dataset ? Object.keys(dataset.labels).filter(l => BENCHMARK.includes(l)) : [];
   const totalLabels = dataset ? Object.values(dataset.labels).reduce((a, b) => a + b, 0) : 0;
   const labelCoverage = totalLabels ? Math.round(knownLabels.reduce((n, l) => n + dataset!.labels[l], 0) / totalLabels * 100) : 0;
+
+  if (supabase && authLoading) return <div className="app-shell"><main className="main-content"><div className="page-wrap"><div className="panel empty-inline">Checking secure Supabase session…</div></div></main></div>;
+  if (supabase && !authSession) return <AuthScreen />;
 
   return <div className="app-shell">
     <ParticleBackdrop />
@@ -181,8 +201,9 @@ export default function App() {
           <div className="system-row"><span>ML models</span><b className={health?.model_ready ? "status-ok" : "status-warn"}>{health?.model_ready ? "Active" : "Pending"}</b></div>
         </div>
         <div className="profile-row">
-          <div className="profile-avatar">L</div>
-          <div className="profile-meta"><b>{session.user.display_name}</b><small>Local analyst session</small></div>
+          <div className="profile-avatar">{session.user.display_name.slice(0,1).toUpperCase()}</div>
+          <div className="profile-meta"><b>{session.user.display_name}</b><small>{authSession ? "Authenticated Supabase user" : "Local analyst session"}</small></div>
+          {authSession && <button className="secondary-btn" onClick={() => { void supabase?.auth.signOut(); }} style={{ padding: "5px 8px", fontSize: 10 }}>Sign out</button>}
         </div>
       </div>
     </aside>
@@ -299,9 +320,9 @@ export default function App() {
             <section className="panel history-panel">
               <div className="panel-head history-head">
                 <div>
-                  <div className="panel-kicker">LOCAL REPLAY AUDIT TRAIL</div>
-                  <h3>Recent Local Replay Runs</h3>
-                  <p>Only completed local API runs appear here. Unlabelled replay data does not provide accuracy or false-block metrics.</p>
+                  <div className="panel-kicker">SUPABASE REPLAY AUDIT TRAIL</div>
+                  <h3>Recent Cloud Replay Runs</h3>
+                  <p>Only your authenticated replay summaries appear here. Unlabelled replay data does not provide accuracy or false-block metrics.</p>
                 </div>
                 <button className="secondary-btn" onClick={loadHistory}><RefreshCw size={14}/> Refresh</button>
               </div>
@@ -361,6 +382,53 @@ export default function App() {
       </div>
     </main>
     </Suspense>
+  </div>;
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      if (mode === "signin") {
+        const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (authError) throw authError;
+      } else {
+        const { data, error: authError } = await supabase.auth.signUp({ email: email.trim(), password });
+        if (authError) throw authError;
+        if (!data.session) setMessage("Account created. Check your email to confirm the address, then sign in.");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Authentication failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="app-shell" style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
+    <section className="panel dataset-panel" style={{ width: "min(460px, 100%)", padding: 28 }}>
+      <div className="panel-kicker">CYBERSENTINEL · SECURE WORKSPACE</div>
+      <h2 style={{ margin: "10px 0" }}>{mode === "signin" ? "Sign in to your workspace" : "Create your analyst account"}</h2>
+      <p style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.6 }}>Sign in with Supabase Auth to access your private replay history and inference audit trail. Network-flow files remain local and are not uploaded.</p>
+      <form onSubmit={submit} style={{ display: "grid", gap: 12, marginTop: 20 }}>
+        <label style={{ display: "grid", gap: 6, fontSize: 11 }}>Email<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} style={{ padding: 12, borderRadius: 8, border: "1px solid var(--line)", background: "var(--panel2)", color: "var(--text)" }} /></label>
+        <label style={{ display: "grid", gap: 6, fontSize: 11 }}>Password<input type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} minLength={8} required value={password} onChange={e => setPassword(e.target.value)} style={{ padding: 12, borderRadius: 8, border: "1px solid var(--line)", background: "var(--panel2)", color: "var(--text)" }} /></label>
+        {error && <div className="parse-warning" role="alert">{error}</div>}
+        {message && <div className="empty-inline" role="status">{message}</div>}
+        <button className="primary-btn" type="submit" disabled={busy}>{busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}</button>
+      </form>
+      <button className="text-btn" style={{ marginTop: 14 }} onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setMessage(""); }}>
+        {mode === "signin" ? "New here? Create an account" : "Already registered? Sign in"}
+      </button>
+    </section>
   </div>;
 }
 

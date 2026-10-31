@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { apiFetch } from "./lib/api";
 import {
   Activity, ArrowRight, Cpu, LockKeyhole, Network,
   Copy, Check, BarChart3
@@ -45,7 +46,7 @@ export function FlowInspector({ modelReady }: { modelReady: boolean }) {
     setError("");
     setResult(null);
     try {
-      const response = await fetch("/api/analyze", {
+      const response = await apiFetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow }),
@@ -332,7 +333,7 @@ export function Agent2Console({ ready }: { ready: boolean }) {
     setError("");
     setResult(null);
     try {
-      const response = await fetch("/api/agents/anomaly/score", {
+      const response = await apiFetch("/api/agents/anomaly/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ flow }),
