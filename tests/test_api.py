@@ -149,7 +149,7 @@ def test_submission_validation_uses_original_input_not_output_ids(monkeypatch, t
 
     data_dir = tmp_path / "data" / "processed"
     data_dir.mkdir(parents=True)
-    (data_dir / "eval_prepared.parquet").write_bytes(b"fixture")
+    (data_dir / "hidden_replay_input.parquet").write_bytes(b"fixture")
     output_dir = tmp_path / "outputs" / "submission"
     output_dir.mkdir(parents=True)
     (output_dir / "classification.csv").write_text(
