@@ -8,8 +8,9 @@ from cybersentinel.agents.anomaly_detection import AnomalyDetectionAgent
 
 BENCHMARK_CLASSES = {"BENIGN", "BRUTE_FORCE", "DOS", "DDOS", "PORT_SCAN"}
 
-def load_frame(path: str) -> pd.DataFrame:
-    return pd.read_parquet(path) if path.lower().endswith((".parquet", ".pq")) else pd.read_csv(path, low_memory=False)
+def load_frame(path: str | Path) -> pd.DataFrame:
+    path = Path(path)
+    return pd.read_parquet(path) if path.suffix.lower() in {".parquet", ".pq"} else pd.read_csv(path, low_memory=False)
 
 def train_anomaly(train_path: str, model_out: str, report_out: str,
                   validation_path: str | None = None, max_benign_fpr: float = 0.02,
