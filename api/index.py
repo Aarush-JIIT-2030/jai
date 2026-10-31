@@ -110,7 +110,7 @@ def system_diagnostics():
         "agent_5_defense_code": True,
     }
     files = {}
-    for filename in ("classification.csv", "policy.csv", "replay.csv"):
+    for filename in ("classification.csv", "policies.csv", "replay.csv"):
         path = submission / filename
         files[filename] = {
             "present": path.is_file(),
@@ -442,7 +442,7 @@ def run_official_replay():
             "validation": validation,
             "files": {name: {"path": f"outputs/submission/{name}", "rows": len(results[key])}
                       for name, key in (("classification.csv", "classification_rows"),
-                                        ("policy.csv", "policy_rows"),
+                                        ("policies.csv", "policy_rows"),
                                         ("replay.csv", "replay_rows"))},
             "correlation_groups": len(_LAST_CORRELATION_GROUPS),
             "source": "installed_unlabelled_hidden_replay_input",
@@ -567,7 +567,7 @@ def get_overview():
     """Return operational replay counts without inventing hidden-set ground-truth metrics."""
     sub_dir = BASE_DIR / "outputs" / "submission"
     replay_file = sub_dir / "replay.csv"
-    policies_file = sub_dir / "policy.csv"
+    policies_file = sub_dir / "policies.csv"
     classification_file = sub_dir / "classification.csv"
     missing = [str(path.name) for path in (replay_file, policies_file, classification_file) if not path.is_file()]
     if missing:
@@ -635,7 +635,7 @@ def get_benchmarks():
 @app.get("/api/submissions/download/{filename}")
 def download_submission_file(filename: str):
     """Download an official submission CSV or report."""
-    allowed = {"classification.csv", "policy.csv", "replay.csv", "summary.json", "validation_report.json"}
+    allowed = {"classification.csv", "policies.csv", "replay.csv", "summary.json", "validation_report.json"}
     if filename not in allowed:
         raise HTTPException(status_code=400, detail=f"Invalid file requested: {filename}")
 
@@ -674,7 +674,7 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         raise HTTPException(status_code=503, detail=f"Flow inspection data could not be loaded: {type(exc).__name__}") from exc
 
     has_class_cols = (
-        {"record_id", "predicted_class", "anomaly score", "evidence status"}.issubset(classifications.columns)
+        {"record_id", "predicted_class", "anomaly_score", "evidence_status"}.issubset(classifications.columns)
     )
     required_replay = {"record_id", "action", "active_policy_id"}
     if not has_class_cols or not required_replay.issubset(replay.columns):
@@ -698,8 +698,8 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
         if class_filter and class_filter.upper() not in ("ALL", predicted_class.upper()):
             continue
         applied = decision.get("active_policy_id") or ""
-        raw_score = prediction.get("anomaly score")
-        raw_evidence = prediction.get("evidence status", "UNCERTAIN")
+        raw_score = prediction.get("anomaly_score")
+        raw_evidence = prediction.get("evidence_status", "UNCERTAIN")
         rows.append({
             "record_id": record_id,
             "predicted_class": predicted_class,
@@ -724,8 +724,8 @@ def get_flows_sample(limit: int = 50, offset: int = 0, class_filter: str | None 
 
 @app.get("/api/policies")
 def get_policies(limit: int = 50, offset: int = 0):
-    """Retrieve policies generated during replay from outputs/submission/policy.csv."""
-    pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
+    """Retrieve policies generated during replay from outputs/submission/policies.csv."""
+    pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
     if not pol_file.is_file():
         return {"policies": [], "total": 0}
     try:
@@ -767,7 +767,7 @@ def test_policy_prefilter(payload: dict[str, Any]):
     except Exception as exc:
         raise HTTPException(status_code=503, detail={"code": "REPLAY_INPUT_INVALID", "type": type(exc).__name__}) from exc
 
-    pol_file = BASE_DIR / "outputs" / "submission" / "policy.csv"
+    pol_file = BASE_DIR / "outputs" / "submission" / "policies.csv"
     matched_policy = None
     if pol_file.is_file():
         try:
