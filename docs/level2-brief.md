@@ -6,39 +6,20 @@ For JAI 2026 Track 1 (Agentic AI for Cybersecurity), CyberSentinel delivers a 5-
 
 ```mermaid
 flowchart TD
-    subgraph Ingestion["Input Stream (Chronological Order)"]
-        F[Incoming Flow Record]
-    end
-
-    subgraph A5_Pre["Agent 5: Pre-Filter Phase"]
-        PF{Active Policy<br/>Match Source IP?}
-        BLK[Immediate Simulated BLOCK<br/>applied_policy_id = POL-XXXXX<br/>Classification and fusion evidence still retained; skip correlation and policy updates]
-    end
-
-    subgraph Detection["Tri-Agent Core (Analyzed Flows)"]
-        A1[Agent 1: Supervised Threat Detection<br/>Random Forest / XGBoost<br/>Class + Confidence]
-        A2[Agent 2: Independent Anomaly Detection<br/>Isolation Forest on Benign Only<br/>0–1 anomaly index + out-of-range feature evidence]
-        A3[Agent 3: Evidence Fusion<br/>Deterministic 6-Scenario Matrix<br/>Final Action: ALLOW / BLOCK / REVIEW]
-    end
-
-    subgraph Correlation["Incident Grouping"]
-        A4[Agent 4: Temporal Correlation<br/>Sliding Window Endpoint Tracker<br/>Identifies Port Scans, DDoS Bursts, Brute Force]
-    end
-
-    subgraph A5_Post["Agent 5: Adaptive Policy Generation"]
-        PG{Attack Confirmed<br/>by A3 or A4?}
-        POL[Activate New Forward Policy<br/>scope_type: SOURCE_IP<br/>expires_after_record_id: N + Offset]
-        ALW[Simulated ALLOW<br/>applied_policy_id = empty]
-    end
-
-    F --> A1 & A2
-    A1 & A2 --> A3
-    A3 --> PF
-    PF -- Yes --> BLK
-    PF -- No --> A4
-    A4 --> PG
-    PG -- Attack Detected --> POL
-    PG -- Benign Traffic --> ALW
+    F[Chronological input row] --> A1[Agent 1: five-class prediction]
+    F --> A2[Agent 2: BENIGN-only anomaly score]
+    A1 --> PF{Existing active policy matches this source identity?}
+    A2 --> PF
+    PF -->|Yes| BLK[Simulated BLOCK + applied policy ID]
+    PF -->|No| A3[Agent 3: AGREE / CONFLICT / UNCERTAIN]
+    BLK --> CLASS[(classification.csv retains row evidence)]
+    A3 --> CLASS
+    A3 --> A4[Agent 4: temporal correlation]
+    A4 --> A5[Agent 5: forward-only temporary policy]
+    A5 --> POLICY[(policy.csv)]
+    BLK --> REPLAY[(replay.csv)]
+    A3 --> REPLAY
+    A5 -.->|Policy applies only to later rows| PF
 ```
 
 ---
