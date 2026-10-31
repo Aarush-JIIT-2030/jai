@@ -54,12 +54,12 @@ def test_replay_causal_workflow(tmp_path):
     # Flow 101: First attack flow -> ALLOW into analyzer, activates policy
     assert results["replay_rows"][0]["record_id"] == 101
     assert results["replay_rows"][0]["action"] == "ALLOW"
-    assert results["replay_rows"][0]["applied_policy_id"] == ""
+    assert results["replay_rows"][0]["active_policy_id"] == ""
 
     # Flow 102: Second attack flow from same source -> BLOCKED by active policy!
     assert results["replay_rows"][1]["record_id"] == 102
     assert results["replay_rows"][1]["action"] == "BLOCK"
-    assert results["replay_rows"][1]["applied_policy_id"].startswith("POL-")
+    assert results["replay_rows"][1]["active_policy_id"].startswith("POL-")
 
     # Flow 103 & 104: Benign flows from different source -> ALLOWED!
     assert results["replay_rows"][2]["action"] == "ALLOW"
@@ -76,10 +76,10 @@ def test_replay_causal_workflow(tmp_path):
     assert class_header == "record_id,predicted_class,anomaly_score,evidence_status"
 
     policy_header = sub_files["policies"].read_text().splitlines()[0]
-    assert policy_header == "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action"
+    assert policy_header == "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id"
 
     replay_header = sub_files["replay"].read_text().splitlines()[0]
-    assert replay_header == "record_id,action,applied_policy_id"
+    assert replay_header == "record_id,action,active_policy_id"
 
 
 
