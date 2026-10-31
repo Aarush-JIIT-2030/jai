@@ -1,74 +1,76 @@
-# CyberSentinel — Level 2 Multi-Agent Architecture & Competition Strategy
+# CyberSentinel — Level 2 Architecture and Submission Contract
 
-## 1. System Overview
+## Organizer input
 
-For JAI 2026 Track 1 (Agentic AI for Cybersecurity), CyberSentinel delivers a 5-agent multi-agent intrusion detection and causal adaptive defense system operating in an offline traffic-replay environment.
+The Level 2 hidden input contains exactly 200 unlabelled records in organizer order. Each row has a unique `record_id`, 1-based `seq`, literal `source_ip` and `destination_ip`, ports, protocol, `day`, `time_offset`, and 78 numeric flow features. There is no hidden label column. Never infer or add ground-truth labels.
 
-```mermaid
-flowchart TD
-    A[Chronological offline flow row] --> D1[Agent 1: five-class prediction]
-    A --> D2[Agent 2: anomaly score]
-    D1 --> PF{Agent 5: check earlier active policy}
-    D2 --> PF
-    PF --> F3[Agent 3: evidence fusion for every row]
-    F3 --> CLASS[(classification.csv: every row)]
-    PF -->|Policy matches| B[Replay action BLOCK + policy ID]
-    PF -->|No policy match| C4[Agent 4: correlate allowed row]
-    C4 --> R5[Agent 5: create forward-only policy if warranted]
-    R5 --> POLICY[(policy.csv)]
-    B --> REPLAY[(replay.csv)]
-    C4 --> ALLOW[Replay action ALLOW]
-    ALLOW --> REPLAY
-    R5 -.->|Only later rows can match| PF
-```
+## Five-agent data path
 
----
+1. **A1 — Threat Detection:** five-class supervised prediction for every hidden record.
+2. **A2 — Anomaly Analysis:** BENIGN-only Isolation Forest baseline; emits a bounded anomaly index in [0,1], with higher values meaning more anomalous. It is not a probability.
+3. **A3 — Evidence Fusion:** combines A1/A2 outputs into `AGREE`, `CONFLICT`, or `UNCERTAIN` and preserves one classification row per hidden record.
+4. **A4 — Temporal Correlation:** consumes only observed source/destination endpoints and organizer `day` + `time_offset`; no fingerprint-derived or synthetic IP identities are permitted.
+5. **A5 — Adaptive Defense:** checks already-active policies before A4 correlation/policy updates. It creates forward-only simulated policies from analyzed records; a policy never blocks its own trigger record.
 
-## 2. Five-Agent Responsibilities
+A1/A2 predictions are generated for all records because the organizer requires one classification row per record, including records later blocked. The sequential replay gate then checks A5's active policies. A pre-filtered record is BLOCKed and does not enter A4/A5 state updates. An allowed record proceeds through A3/A4 and may create a policy for later records.
 
-| Agent | Responsibility | Key Outputs | Implementation |
-| :--- | :--- | :--- | :--- |
-| **Agent 1: Threat Detection** | Supervised multi-class classification across 5 benchmark classes. | `predicted_class`, `confidence` | `src/cybersentinel/agents/threat_detection/` |
-| **Agent 2: Anomaly Detection** | Unsupervised outlier scoring trained strictly on benign baseline. | `anomaly_score`, `is_anomaly`, `evidence` | `src/cybersentinel/agents/anomaly_detection.py` |
-| **Agent 3: Evidence Fusion** | Deterministic AGREE/CONFLICT/UNCERTAIN reconciliation. | `final_class`, `evidence_status`, `action`, `rationale` | `src/cybersentinel/agents/fusion.py` |
-| **Agent 4: Temporal Correlation** | Correlates sliding-window endpoints to identify coordinated attacks. | `group_id`, `attack_type`, `group_size`, `evidence` | `src/cybersentinel/agents/correlation.py` |
-| **Agent 5: Adaptive Defense** | Evaluates active policies & creates forward-looking temporary blocks. | `action`, `applied_policy_id`, `new_policy` | `src/cybersentinel/agents/adaptive_defense.py` |
+## Exact organizer CSV templates
 
----
+### classification.csv
 
-## 3. Submission Files Generator
+`record_id,predicted_class,anomaly_score,evidence_status`
 
-The hidden input must be processed in organiser `seq` order. It carries observed `source_ip`, `destination_ip`, `day`, and `time_offset` metadata; the replay engine preserves the input order and converts the minute-second offsets into timestamps for Agent 4.
+- Exactly 200 rows, one per hidden record, in exact `seq` order.
+- `predicted_class`: `BENIGN`, `BRUTE_FORCE`, `DOS`, `DDOS`, or `PORT_SCAN`.
+- `anomaly_score`: finite numeric value in [0,1], higher means more anomalous; not a probability.
+- `evidence_status`: `AGREE`, `CONFLICT`, or `UNCERTAIN`.
 
-Run the 5-agent chronological replay engine to produce the three official competition CSV files:
+### replay.csv
+
+`record_id,action,active_policy_id`
+
+- Exactly 200 rows, one per hidden record, in exact `seq` order.
+- `action` is `ALLOW` or `BLOCK`.
+- `ALLOW` must use `active_policy_id=NONE` and is invalid if any active policy matches the flow.
+- `BLOCK` must reference the lexicographically smallest matching active `policy_id`.
+
+### policies.csv
+
+`policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id`
+
+- Zero or more rows; no fixed policy row count.
+- `policy_id` values are unique.
+- `scope_type` is `SOURCE_IP`, `DESTINATION_IP`, or `SRC_DST_PAIR`.
+- Scope values must be exact literal observed endpoint values. Pair format is `source_ip|destination_ip`. No wildcards, CIDR ranges, hashes, or synthetic identities.
+- A policy activates on the record after `activated_after_record_id` and remains active through `expires_after_record_id`, inclusive.
+- The organizer schema has no `policy_action` column; each ledger row represents a simulated BLOCK policy.
+
+## Local workflow
+
+Install the exact supplied packs into ignored local paths and verify the training/evaluation partition hashes:
 
 ```bash
+python scripts/prepare_challenge_data.py \
+  --training-pack cyber-pack.zip \
+  --hidden-pack cyber-hidden.zip
+
+pip install -e ".[dev,ml]"
+
+# Train A1 and A2 from the authorized training partition only.
+python scripts/train_models.py \
+  --train data/raw/training/flows.parquet
+
+# If a separate labelled validation partition is explicitly provided by the organizers,
+# pass it with --validation. Do not use the hidden records for training/calibration.
+# Do not repurpose the held-out evaluation partition as a tuning set.
+
 python scripts/generate_submissions.py \
   --input data/processed/hidden_replay_input.csv \
-  --output-dir submissions/
+  --output-dir outputs/submission
+
+python scripts/validate_submissions.py \
+  --input data/processed/hidden_replay_input.csv \
+  --output-dir outputs/submission
 ```
 
-### Expected Output CSVs:
-
-1. **`classification.csv`**:
-   `record_id,predicted_class,anomaly_score,evidence_status`
-   * Contains one row per input flow regardless of whether it was later blocked.
-2. **`policy.csv`**:
-   `policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id,policy_action`
-   * Logs every defensive policy generated after an analyzed attack flow.
-3. **`replay.csv`**:
-   `record_id,action,applied_policy_id`
-   * Every record in exact replay order. Pre-filtered matching records are `BLOCK` with valid `applied_policy_id`. Allowed records are `ALLOW` with empty `applied_policy_id`.
-
----
-
-## 4. Key Talking Points for Judges & Panel Demonstration
-
-1. **Strict Causal Replay Discipline:**
-   * Never uses future records or ground-truth labels during decision making.
-   * Policies only apply to *later* incoming records, strictly adhering to real-world causality.
-2. **Pre-Filter Action Gate:**
-   * A1/A2 classification and A3 evidence-fusion outputs are still computed for every row because `classification.csv` requires one prediction per record, including records later blocked. The active-policy check determines the replay action before Agent 4 correlation and Agent 5 policy updates; blocked rows do not enter those later state updates. This is simulated replay behavior, not a measured inference-speed optimization. When native source IP is absent, the replay engine derives a synthetic IP-shaped source identity from three TCP-stack fingerprint fields. It is not observed and can collide, potentially causing false blocks; destination IP is never synthesized. See the [scope audit](../release/benchmarks/source-ip-scope-audit.md).
-3. **Defense-in-Depth Trade-Off:**
-   * Report only metrics reproduced on the current code and authorized data. Include macro-F1 and per-class results, state the evaluation split and its repeated-feature overlap, and describe ALLOW/BLOCK/REVIEW as simulated actions. Older release reports contain historical figures, not current results.
-
+A limited replay is a smoke test only. A successful local validator pass proves contract consistency, not organizer acceptance. Only an actual organizer upload receipt proves acceptance. The system is an offline simulated replay; it does not modify a host firewall or inspect live traffic.
