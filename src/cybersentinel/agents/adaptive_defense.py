@@ -73,7 +73,7 @@ class AdaptiveDefenseAgent:
 
         new_policy: DefensePolicy | None = None
 
-        if attack_detected and attack_type and attack_type != "BENIGN" and self._is_observed_ip(source_ip):
+        if attack_detected and attack_type and attack_type != "BENIGN" and self._is_valid_ip_scope(source_ip):
             # Generate a new policy for subsequent matching records if one isn't already active
             if source_ip not in self.active_policies:
                 self.policy_counter += 1
@@ -104,8 +104,8 @@ class AdaptiveDefenseAgent:
         )
 
     @staticmethod
-    def _is_observed_ip(value: str) -> bool:
-        """Accept observed or deterministic IP-shaped fingerprint identities for simulated policy scope."""
+    def _is_valid_ip_scope(value: str) -> bool:
+        """Accept observed IPs or IP-shaped synthetic fingerprint identities for simulated scope."""
         try:
             ipaddress.ip_address(str(value).strip())
             return True
