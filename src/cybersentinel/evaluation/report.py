@@ -190,7 +190,7 @@ def build_master_summary(
         },
         "audit": {
             "all_5_agents_evaluated": True,
-            "research_ready": True,
-            "no_fabricated_metrics": True,
+            "provenance_metadata_attached": bool(metadata),
+            "metrics_are_computed_from_supplied_partitions": True,
         },
     }
