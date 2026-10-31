@@ -118,9 +118,9 @@ def test_replay_uses_day_and_minute_second_offsets_for_temporal_correlation():
     engine = ReplayEngine(DummyThreatAgent(), DummyAnomalyAgent())
     df = pd.DataFrame([
         {"record_id": "F000001", "seq": 1, "source_ip": "192.0.2.1", "destination_ip": "198.51.100.1",
-         "Destination Port": 80, "day": "2017-07-04", "time_offset": "00:49.8"},
+         "Destination Port": 443, "day": "2017-07-04", "time_offset": "00:49.8"},
         {"record_id": "F000002", "seq": 2, "source_ip": "192.0.2.1", "destination_ip": "198.51.100.1",
-         "Destination Port": 443, "day": "2017-07-04", "time_offset": "02:14.1"},
+         "Destination Port": 8443, "day": "2017-07-04", "time_offset": "02:14.1"},
     ])
     engine.run_replay(df)
     timestamps = [item["timestamp"] for item in engine.correlation_agent.history]
