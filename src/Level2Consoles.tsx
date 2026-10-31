@@ -101,7 +101,7 @@ export function FiveAgentArchitectureView() {
       throughput: "See measured benchmark report",
       accuracy: "See generated evaluation report",
       classes: "BENIGN, BRUTE_FORCE, DOS, DDOS, PORT_SCAN",
-      description: "Extracts flow-level features and runs high-speed tree ensemble inference with canonical label encoding. Resolves unambiguous signatures within microsecond windows.",
+      description: "Extracts flow-level features and runs high-speed tree ensemble inference with canonical label encoding. Produces a class prediction and artifact-defined confidence; request latency is measured separately.",
     },
     {
       id: 2,
