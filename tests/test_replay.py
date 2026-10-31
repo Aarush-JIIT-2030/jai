@@ -68,14 +68,14 @@ def test_replay_causal_workflow(tmp_path):
     # Verify CSV files export
     sub_files = engine.generate_submission_files(df, output_dir=tmp_path)
     assert sub_files["classification"].is_file()
-    assert sub_files["policy"].is_file()
+    assert sub_files["policies"].is_file()
     assert sub_files["replay"].is_file()
 
     # Check header conformity
     class_header = sub_files["classification"].read_text().splitlines()[0]
     assert class_header == "record_id,predicted_class,anomaly_score,evidence_status"
 
-    policy_header = sub_files["policy"].read_text().splitlines()[0]
+    policy_header = sub_files["policies"].read_text().splitlines()[0]
     assert policy_header == "policy_id,activated_after_record_id,scope_type,scope_value,expires_after_record_id"
 
     replay_header = sub_files["replay"].read_text().splitlines()[0]
