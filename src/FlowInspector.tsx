@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Activity, ArrowRight, Cpu, LockKeyhole, Network,
-  ShieldAlert, Copy, Check, BarChart3
+  Copy, Check, BarChart3
 } from "lucide-react";
 
 type FlowResult = {
