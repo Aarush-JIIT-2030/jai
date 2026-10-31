@@ -137,7 +137,7 @@ class ReplayEngine:
                         attack_type=correlation.attack_type or t_class or "ATTACK",
                         confidence=t_conf, duration=duration,
                     )
-            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id if action == "BLOCK" else ""})
+            replay_rows.append({"record_id": record_id, "action": action, "active_policy_id": applied_id if action == "BLOCK" else "NONE"})
             if progress_callback and (step % 25000 == 0 or step == total_rows - 1):
                 progress_callback(step + 1, total_rows)
 
@@ -152,7 +152,6 @@ class ReplayEngine:
                 "activated_after_record_id": policy.activated_after_record_id,
                 "scope_type": policy.scope_type, "scope_value": policy.scope_value,
                 "expires_after_record_id": record_ids[expiry_step],
-                "policy_action": policy.policy_action,
             })
         observed_source_flags = [TemporalCorrelationAgent.has_observed_source_ip(row) for row in flow_records]
         observed_identity_count = sum(observed_source_flags)
