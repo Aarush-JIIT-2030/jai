@@ -84,7 +84,7 @@ def main() -> int:
     # 1. classification.csv
     class_csv = engine.export_csv(
         results["classification_rows"],
-        ["record_id", "predicted_class", "anomaly score", "evidence status"],
+        ["record_id", "predicted_class", "anomaly_score", "evidence_status"],
     )
     (args.output_dir / "classification.csv").write_text(class_csv, encoding="utf-8")
     logger.info("Wrote %s", args.output_dir / "classification.csv")
@@ -92,15 +92,15 @@ def main() -> int:
     # 2. policy.csv
     policy_csv = engine.export_csv(
         results["policy_rows"],
-        ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
+        ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id"],
     )
-    (args.output_dir / "policy.csv").write_text(policy_csv, encoding="utf-8")
-    logger.info("Wrote %s", args.output_dir / "policy.csv")
+    (args.output_dir / "policies.csv").write_text(policy_csv, encoding="utf-8")
+    logger.info("Wrote %s", args.output_dir / "policies.csv")
 
     # 3. replay.csv
     replay_csv = engine.export_csv(
         results["replay_rows"],
-        ["record_id", "action", "applied_policy_id"],
+        ["record_id", "action", "active_policy_id"],
     )
     (args.output_dir / "replay.csv").write_text(replay_csv, encoding="utf-8")
     logger.info("Wrote %s", args.output_dir / "replay.csv")
