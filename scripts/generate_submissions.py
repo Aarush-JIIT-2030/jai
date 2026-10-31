@@ -89,7 +89,7 @@ def main() -> int:
     (args.output_dir / "classification.csv").write_text(class_csv, encoding="utf-8")
     logger.info("Wrote %s", args.output_dir / "classification.csv")
 
-    # 2. policies.csv
+    # 2. policy.csv
     policy_csv = engine.export_csv(
         results["policy_rows"],
         ["policy_id", "activated_after_record_id", "scope_type", "scope_value", "expires_after_record_id", "policy_action"],
