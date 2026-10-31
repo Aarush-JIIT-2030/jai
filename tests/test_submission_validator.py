@@ -26,7 +26,7 @@ def test_submission_validator_valid_bundle(tmp_path):
     with (sub_dir / "replay.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(["record_id", "action", "active_policy_id"])
-        writer.writerow(["rec-1", "ALLOW", "NONE"])
+        writer.writerow(["rec-1", "ALLOW", ""])
         writer.writerow(["rec-2", "BLOCK", "POL-00001"])
 
     report = SubmissionValidator.validate_submission_bundle(sub_dir, ["rec-1", "rec-2"])
