@@ -72,7 +72,7 @@ The repository does not include organizer data, prepared Parquet files, trained 
 
 Read [`docs/judge-disclosures.md`](docs/judge-disclosures.md) before the live demo. In brief:
 
-- The CICIDS2017 feature-only split does not provide native Layer-3 source/destination addresses. When a native source IP is absent, the current implementation derives an IP-shaped `SOURCE_IP` identity from `Init_Win_bytes_forward`, `min_seg_size_forward`, and `Fwd Header Length`. **That identity is synthetic, not observed; identical fingerprints map to the same identity and the truncated 24-bit hash can collide across different clients, potentially causing false blocks.** Destination IPs are never synthesized.
+- The CICIDS2017 training/evaluation feature partitions do not contain native Layer-3 endpoints. The separate 200-row Level 2 hidden input does contain organizer-provided `source_ip` and `destination_ip` fields. Correlation and policy generation use only those literal observed endpoints. Missing or invalid endpoints remain unknown; no IP is derived from TCP fingerprints, hashes, or other synthetic identities.
 - The documented train/eval feature overlap is 8.58% of evaluation rows and can make repeated-flow results optimistic.
 - Agent 1 confidence is uncalibrated unless the separate held-out calibration workflow was run. Agent 2 exports a bounded 0–1 anomaly index (higher means more anomalous), not a probability; its operating threshold is applied to the underlying Isolation Forest decision function.
 - The temporal correlator has a fixed 150-record cap and a configured 300-second time window when timestamps are available. Adaptive-defense policy duration defaults to 150 replay positions; these are fixed configuration values, not learned/adaptive parameters.
@@ -85,7 +85,7 @@ The chronological replay engine enforces these invariants:
 1. Only policies active before record `N` may affect record `N`.
 2. A record cannot trigger a policy that blocks itself.
 3. Classifications are recorded for every input flow, including flows later blocked by an already-active simulated policy.
-4. Policies expire after their configured replay interval.
+4. Policies activate on the record after their trigger and remain active through the expiry record, inclusive.
 
 All actions are simulated. The system does not modify a host firewall or inspect live network traffic.
 
@@ -101,7 +101,7 @@ python scripts/generate_submissions.py \
   --output-dir outputs/submission
 ```
 
-This requires locally supplied evaluation data and trained model artifacts. Generated files and validation reports are ignored by Git. Place the organizer's unlabelled hidden input at data/processed/hidden_replay_input.csv before running the final Level 2 replay. The current checkout alone therefore does not establish that a fresh full-data replay passed or that a submission is ready. See [`docs/level2-brief.md`](docs/level2-brief.md) for the repository’s replay output schemas.
+Generated files, model artifacts, and organizer data are ignored by Git. The supported local workflow is documented below and in [`docs/level2-brief.md`](docs/level2-brief.md). A fresh full replay and independent validation are required before claiming submission readiness.
 
 ---
 
@@ -186,9 +186,9 @@ uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload
 
 If the dataset or models are missing, the API returns an explicit unavailable response. It does not substitute synthetic benchmark values or sample incidents.
 
-### SOURCE_IP identity limitation
+### Observed endpoint boundary
 
-The prepared CICIDS2017 feature dataset does not contain native Layer-3 endpoints. The replay engine prefers a literal observed source IP; otherwise it derives a deterministic IP-shaped identity from the TCP-stack fingerprint tuple (`Init_Win_bytes_forward`, `min_seg_size_forward`, `Fwd Header Length`). This synthetic identity enables source grouping and simulated SOURCE_IP policies but is not an observed address. Identical tuples share an identity and the 24-bit suffix can collide, so unrelated clients can be grouped or blocked together. Destination IP remains unknown unless it is explicitly present. Replay metrics report how many rows used synthetic identities. See `release/benchmarks/source-ip-scope-audit.md`.
+The hidden replay input supplies literal source and destination IP metadata. Those fields are used for temporal correlation and policy scope matching. The CICIDS2017 training/evaluation feature partitions do not supply endpoints, so endpoint-aware analysis is not claimed for those partitions. Missing or invalid endpoint fields remain unknown; the implementation never manufactures an IP address from flow fingerprints or hashes. See `release/benchmarks/source-ip-scope-audit.md`.
 
 ## 8. Third-Party, Reference & AI Disclosures
 
